@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm check:*)",
+      "Bash(pnpm dev)",
+      "Bash(node test-worker-deployment.js:*)",
+      "Bash(node check-all-deployments.js:*)",
+      "Bash(node fix-deployment-worker.js:*)",
+      "Bash(node check-worker-user-id.js:*)",
+      "Bash(node check-driver-templates.js:*)",
+      "Bash(node activate-driver-template.js:*)",
+      "Bash(node check-users.js:*)",
+      "Bash(node fix-users-sync.js:*)",
+      "Bash(node check-workers.js:*)",
+      "Bash(node check-workers-users-relation.js:*)",
+      "Bash(node pnpm check:deployment-worker:*)",
+      "Bash(node create-test-users-proper.js:*)",
+      "Bash(node test-user-delete-with-worker.js:*)",
+      "Bash(node check-latest-workers.js:*)",
+      "Bash(if [ -f .gitignore ])",
+      "Bash(then cat .gitignore)",
+      "Bash(else echo \"No .gitignore found\")",
+      "Bash(fi:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(cat:*)",
+      "Bash(pnpm build:*)",
+      "Bash(node test-users-workers-sync.js:*)",
+      "Bash(node:*)",
+      "Bash(cp:*)",
+      "Bash(git rm:*)",
+      "Bash(vercel --version:*)",
+      "Bash(npm install:*)",
+      "Bash(gh:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

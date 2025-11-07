@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1761107918229,
+      "tag": "0000_colossal_mariko_yashida",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1761107976937,
+      "tag": "0001_complete_ricochet",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1761109862136,
+      "tag": "0002_lying_baron_strucker",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1761111485002,
+      "tag": "0003_vengeful_silhouette",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "supabase-postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "enhanced-postgres-mcp-server@1.0.1"
+      ],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://postgres:cho2239148!@db.zlgehckxiuhjpfjlaycf.supabase.co:5432/postgres",
+        "PGHOST": "db.zlgehckxiuhjpfjlaycf.supabase.co",
+        "PGPORT": "5432",
+        "PGDATABASE": "postgres",
+        "PGUSER": "postgres",
+        "PGPASSWORD": "cho2239148!"
+      }
+    }
+  }
+}

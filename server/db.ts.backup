@@ -1,0 +1,585 @@
+import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import {
+  InsertUser,
+  users,
+  equipTypes,
+  workerTypes,
+  typeDocs,
+  workerDocs,
+  checklistForms,
+  equipment,
+  workers,
+  docsCompliance,
+  checkRecords,
+  workJournal,
+  entryRequests,
+  InsertEquipType,
+  InsertWorkerType,
+  InsertTypeDoc,
+  InsertWorkerDoc,
+  InsertChecklistForm,
+  InsertEquipment,
+  InsertWorker,
+  InsertDocsCompliance,
+  InsertCheckRecord,
+  InsertWorkJournal,
+  InsertEntryRequest,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
+
+let _db: ReturnType<typeof drizzle> | null = null;
+
+export async function getDb() {
+  if (!_db && process.env.DATABASE_URL) {
+    try {
+      const client = postgres(process.env.DATABASE_URL);
+      _db = drizzle(client);
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
+    }
+  }
+  return _db;
+}
+
+// ============================================================
+// 사용자 관리
+// ============================================================
+
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.id) {
+    throw new Error("User ID is required for upsert");
+  }
+
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert user: database not available");
+    return;
+  }
+
+  try {
+    const values: InsertUser = { id: user.id };
+    const updateSet: Record<string, unknown> = {};
+
+    const textFields = ["name", "email", "loginMethod", "companyId"] as const;
+    type TextField = (typeof textFields)[number];
+
+    const assignNullable = (field: TextField) => {
+      const value = user[field];
+      if (value === undefined) return;
+      const normalized = value ?? null;
+      values[field] = normalized;
+      updateSet[field] = normalized;
+    };
+
+    textFields.forEach(assignNullable);
+
+    if (user.lastSignedIn !== undefined) {
+      values.lastSignedIn = user.lastSignedIn;
+      updateSet.lastSignedIn = user.lastSignedIn;
+    }
+
+    if (user.role === undefined) {
+      if (user.id === ENV.ownerId) {
+        user.role = "admin";
+        values.role = "admin";
+        updateSet.role = "admin";
+      }
+    } else {
+      values.role = user.role;
+      updateSet.role = user.role;
+    }
+
+    if (Object.keys(updateSet).length === 0) {
+      updateSet.lastSignedIn = new Date();
+    }
+
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.id,
+      set: updateSet,
+    });
+  } catch (error) {
+    console.error("[Database] Failed to upsert user:", error);
+    throw error;
+  }
+}
+
+export async function getUser(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAllUsers() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(users);
+}
+
+export async function updateUserRole(userId: string, role: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(users).set({ role: role as any }).where(eq(users.id, userId));
+}
+
+// ============================================================
+// 장비 종류 관리
+// ============================================================
+
+export async function createEquipType(data: InsertEquipType) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(equipTypes).values(data);
+}
+
+export async function getAllEquipTypes() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(equipTypes);
+}
+
+export async function getEquipTypeById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(equipTypes).where(eq(equipTypes.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateEquipType(id: string, data: Partial<InsertEquipType>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(equipTypes).set(data).where(eq(equipTypes.id, id));
+}
+
+export async function deleteEquipType(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(equipTypes).where(eq(equipTypes.id, id));
+}
+
+// ============================================================
+// 장비별 필수 서류 관리
+// ============================================================
+
+export async function createTypeDoc(data: InsertTypeDoc) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(typeDocs).values(data);
+}
+
+export async function getAllTypeDocs() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(typeDocs);
+}
+
+export async function getTypeDocsByEquipType(equipTypeId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(typeDocs).where(eq(typeDocs.equipTypeId, equipTypeId));
+}
+
+export async function deleteTypeDoc(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(typeDocs).where(eq(typeDocs.id, id));
+}
+
+// ============================================================
+// 인력 유형 관리
+// ============================================================
+
+export async function createWorkerType(data: InsertWorkerType) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(workerTypes).values(data);
+}
+
+export async function getAllWorkerTypes() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(workerTypes);
+}
+
+export async function getWorkerTypeById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(workerTypes).where(eq(workerTypes.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateWorkerType(id: string, data: Partial<InsertWorkerType>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(workerTypes).set(data).where(eq(workerTypes.id, id));
+}
+
+export async function deleteWorkerType(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(workerTypes).where(eq(workerTypes.id, id));
+}
+
+// ============================================================
+// 인력별 필수 서류 관리
+// ============================================================
+
+export async function createWorkerDoc(data: InsertWorkerDoc) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(workerDocs).values(data);
+}
+
+export async function getAllWorkerDocs() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(workerDocs);
+}
+
+export async function getWorkerDocsByWorkerType(workerTypeId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(workerDocs).where(eq(workerDocs.workerTypeId, workerTypeId));
+}
+
+export async function deleteWorkerDoc(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(workerDocs).where(eq(workerDocs.id, id));
+}
+
+// ============================================================
+// 안전점검표 템플릿 관리
+// ============================================================
+
+export async function createChecklistForm(data: InsertChecklistForm) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(checklistForms).values(data);
+}
+
+export async function getAllChecklistForms() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(checklistForms);
+}
+
+export async function getChecklistFormById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(checklistForms).where(eq(checklistForms.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateChecklistForm(id: string, data: Partial<InsertChecklistForm>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(checklistForms).set(data).where(eq(checklistForms.id, id));
+}
+
+export async function deleteChecklistForm(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(checklistForms).where(eq(checklistForms.id, id));
+}
+
+// ============================================================
+// 장비 관리
+// ============================================================
+
+export async function createEquipment(data: InsertEquipment) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(equipment).values(data);
+}
+
+export async function getAllEquipment() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(equipment);
+}
+
+export async function getEquipmentById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(equipment).where(eq(equipment.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getEquipmentByOwner(ownerId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(equipment).where(eq(equipment.ownerId, ownerId));
+}
+
+export async function updateEquipment(id: string, data: Partial<InsertEquipment>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(equipment).set(data).where(eq(equipment.id, id));
+}
+
+export async function deleteEquipment(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(equipment).where(eq(equipment.id, id));
+}
+
+// ============================================================
+// 인력 관리
+// ============================================================
+
+export async function createWorker(data: InsertWorker) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(workers).values(data);
+}
+
+export async function getAllWorkers() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(workers);
+}
+
+export async function getWorkerById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(workers).where(eq(workers.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getWorkersByOwner(ownerId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(workers).where(eq(workers.ownerId, ownerId));
+}
+
+export async function updateWorker(id: string, data: Partial<InsertWorker>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(workers).set(data).where(eq(workers.id, id));
+}
+
+export async function deleteWorker(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(workers).where(eq(workers.id, id));
+}
+
+// ============================================================
+// 서류 관리
+// ============================================================
+
+export async function createDocsCompliance(data: InsertDocsCompliance) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(docsCompliance).values(data);
+}
+
+export async function getAllDocsCompliance() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(docsCompliance);
+}
+
+export async function getDocsComplianceByTarget(targetType: string, targetId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(docsCompliance)
+    .where(and(eq(docsCompliance.targetType, targetType as any), eq(docsCompliance.targetId, targetId)));
+}
+
+export async function getExpiringDocs(daysAhead: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const today = new Date();
+  const futureDate = new Date();
+  futureDate.setDate(today.getDate() + daysAhead);
+
+  return await db
+    .select()
+    .from(docsCompliance)
+    .where(and(gte(docsCompliance.expiryDate, today), lte(docsCompliance.expiryDate, futureDate)));
+}
+
+export async function updateDocsCompliance(id: string, data: Partial<InsertDocsCompliance>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(docsCompliance).set(data).where(eq(docsCompliance.id, id));
+}
+
+export async function deleteDocsCompliance(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(docsCompliance).where(eq(docsCompliance.id, id));
+}
+
+// ============================================================
+// 안전점검 기록 관리
+// ============================================================
+
+export async function createCheckRecord(data: InsertCheckRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(checkRecords).values(data);
+}
+
+export async function getCheckRecordsByEquipment(equipmentId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(checkRecords)
+    .where(eq(checkRecords.equipmentId, equipmentId))
+    .orderBy(desc(checkRecords.inspectionDate));
+}
+
+export async function getCheckRecordById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(checkRecords).where(eq(checkRecords.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// ============================================================
+// 작업 확인서 관리
+// ============================================================
+
+export async function createWorkJournal(data: InsertWorkJournal) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(workJournal).values(data);
+}
+
+export async function getAllWorkJournals() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(workJournal).orderBy(desc(workJournal.workDate));
+}
+
+export async function getWorkJournalsByWorker(workerId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(workJournal)
+    .where(eq(workJournal.workerId, workerId))
+    .orderBy(desc(workJournal.workDate));
+}
+
+export async function getWorkJournalById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(workJournal).where(eq(workJournal.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateWorkJournal(id: string, data: Partial<InsertWorkJournal>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(workJournal).set(data).where(eq(workJournal.id, id));
+}
+
+export async function deleteWorkJournal(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(workJournal).where(eq(workJournal.id, id));
+}
+
+
+// ============================================================
+// 반입 요청 관리
+// ============================================================
+
+export async function createEntryRequest(data: InsertEntryRequest) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(entryRequests).values(data);
+}
+
+export async function getAllEntryRequests() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(entryRequests).orderBy(desc(entryRequests.createdAt));
+}
+
+export async function getEntryRequestById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(entryRequests).where(eq(entryRequests.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateEntryRequest(id: string, data: Partial<InsertEntryRequest>) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(entryRequests).set(data).where(eq(entryRequests.id, id));
+}
+
+export async function deleteEntryRequest(id: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(entryRequests).where(eq(entryRequests.id, id));
+}
