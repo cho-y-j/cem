@@ -1,15 +1,27 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import express from "express";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { appRouter } from "../server/routers";
+import { createContext } from "../server/_core/context";
 
 const app = express();
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// tRPC middleware
+app.use(
+  "/trpc",
+  createExpressMiddleware({
+    router: appRouter,
+    createContext,
+  })
+);
+
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
-    message: "ERMS API is running (Express)",
+    message: "ERMS API is running (Express + tRPC)",
     timestamp: new Date().toISOString(),
     env: {
       hasDatabase: !!process.env.DATABASE_URL,
