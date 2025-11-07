@@ -9,6 +9,9 @@ public/
 *.dist
 api/index.js
 api/index.ts
+index.html
+assets/
+manifest.json
 
 # Environment variables
 .env
