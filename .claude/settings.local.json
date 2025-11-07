@@ -35,7 +35,9 @@
       "Bash(npm install:*)",
       "Bash(gh:*)",
       "Bash(git branch:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(esbuild:*)",
+      "Bash(pnpm esbuild:*)"
     ],
     "deny": [],
     "ask": []
