@@ -58,6 +58,11 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // Vercel serverless 함수 핸들러
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    // Vercel은 /api로 요청을 전달하므로 /api를 제거하여 Express가 /로 처리하도록 함
+    if (req.url?.startsWith("/api")) {
+      req.url = req.url.substring(4) || "/";
+    }
+
     // Express 앱을 요청/응답에 연결
     await new Promise<void>((resolve) => {
       app(req as any, res as any, (err: any) => {
