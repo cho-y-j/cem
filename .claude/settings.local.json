@@ -33,7 +33,9 @@
       "Bash(git rm:*)",
       "Bash(vercel --version:*)",
       "Bash(npm install:*)",
-      "Bash(gh:*)"
+      "Bash(gh:*)",
+      "Bash(git branch:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
