@@ -14,12 +14,27 @@ app.get("/", (req, res) => {
     status: "ok",
     message: "ERMS API is running (Express version)",
     timestamp: new Date().toISOString(),
+    url: req.url,
+    originalUrl: req.originalUrl,
+    path: req.path,
     env: {
       hasDatabase: !!process.env.DATABASE_URL,
       hasSupabase: !!process.env.SUPABASE_URL,
       hasJwtSecret: !!process.env.JWT_SECRET,
       nodeVersion: process.version,
     }
+  });
+});
+
+// Catch all for debugging
+app.all("*", (req, res) => {
+  res.json({
+    status: "catch-all",
+    message: "Received request",
+    url: req.url,
+    originalUrl: req.originalUrl,
+    path: req.path,
+    method: req.method,
   });
 });
 
