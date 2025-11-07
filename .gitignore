@@ -9,7 +9,8 @@ public/
 *.dist
 
 # Vercel build outputs (at root level)
-# api/index.js - KEEP: needed for Vercel deployment
+api/index.js
+# api/index.mjs - KEEP: needed for Vercel deployment
 /index.html
 /assets/
 /manifest.json
