@@ -10,7 +10,6 @@ public/
 
 # Vercel build outputs (at root level)
 api/index.js
-api/index.ts
 /index.html
 /assets/
 /manifest.json
