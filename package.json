@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/vercel.ts --platform=node --bundle --format=cjs --outfile=api/index.js --external:@vercel/node --packages=bundle && cp -r dist/public/* .",
+    "build": "vite build && esbuild server/vercel.ts --platform=node --bundle --format=cjs --outfile=api/index.js --external:@vercel/node --packages=bundle && cp -r dist/public .",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
