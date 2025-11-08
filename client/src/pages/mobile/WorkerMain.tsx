@@ -49,6 +49,12 @@ export default function WorkerMain() {
   const [emergencyDescription, setEmergencyDescription] = useState<string>("");
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState<string>("");
+  const [isClient, setIsClient] = useState(false);
+
+  // 클라이언트 사이드 마운트 확인
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
   useEffect(() => {
@@ -453,7 +459,8 @@ export default function WorkerMain() {
     startWorkMutation.mutate({ equipmentId: assignedEquipment.id });
   };
 
-  if (isLoadingEquipment || isLoadingSession) {
+  // 클라이언트 마운트 전이거나 로딩 중일 때
+  if (!isClient || isLoadingEquipment || isLoadingSession) {
     return (
       <MobileLayout title="장비 운전자" showMenu={false}>
         <div className="flex items-center justify-center h-screen">
