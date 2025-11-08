@@ -39,7 +39,9 @@
       "Bash(esbuild:*)",
       "Bash(pnpm esbuild:*)",
       "Bash(pnpm db:push:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(psql:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []

@@ -321,12 +321,36 @@ export const checkInRouter = router({
       endDate: tomorrow.toISOString(),
     });
 
+    console.log('[getTodayStats] Today check-ins:', {
+      count: todayCheckIns.length,
+      startDate: today.toISOString(),
+      endDate: tomorrow.toISOString(),
+    });
+
     // 출근 대상: 활성 deployment의 worker 수 조회
     const supabase = db.getSupabase();
-    const { data: activeDeployments } = await supabase
+    if (!supabase) {
+      console.error('[getTodayStats] Supabase client is null');
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "데이터베이스 연결에 실패했습니다.",
+      });
+    }
+
+    const { data: activeDeployments, error: deploymentsError } = await supabase
       .from("deployments")
       .select("worker_id")
       .eq("status", "active");
+
+    console.log('[getTodayStats] Active deployments query result:', {
+      count: activeDeployments?.length || 0,
+      error: deploymentsError,
+      userRole,
+    });
+
+    if (deploymentsError) {
+      console.error('[getTodayStats] Deployment query error:', deploymentsError);
+    }
 
     const expectedWorkers = activeDeployments?.length || 0;
 

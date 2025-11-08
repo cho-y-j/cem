@@ -31,3 +31,4 @@ WHERE zone_type IS NULL;
 -- 완료 메시지
 SELECT 'Migration completed: Polygon support added to work_zones table' AS status;
 
+

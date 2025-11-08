@@ -49,15 +49,11 @@ export default function WorkerMain() {
   const [emergencyDescription, setEmergencyDescription] = useState<string>("");
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState<string>("");
-  const [isClient, setIsClient] = useState(false);
-
-  // 클라이언트 사이드 마운트 확인
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const [isMounted, setIsMounted] = useState(false);
 
   // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
   useEffect(() => {
+    setIsMounted(true);
     if (typeof window !== 'undefined') {
       const isAvailable =
         'PublicKeyCredential' in window &&
@@ -68,17 +64,6 @@ export default function WorkerMain() {
       console.log('[WorkerMain] PublicKeyCredential:', 'PublicKeyCredential' in window);
     }
   }, []);
-
-  // 출근 시간 표시 (클라이언트 사이드에서만 포맷팅)
-  useEffect(() => {
-    if (todayCheckInStatus?.checkIn?.checkInTime) {
-      const timeStr = new Date(todayCheckInStatus.checkIn.checkInTime).toLocaleTimeString('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      setCheckInTimeDisplay(timeStr);
-    }
-  }, [todayCheckInStatus?.checkIn?.checkInTime]);
 
   // 배정된 장비 조회
   const { data: assignedEquipment, isLoading: isLoadingEquipment } = trpc.mobile.worker.getMyAssignedEquipment.useQuery();
@@ -99,6 +84,17 @@ export default function WorkerMain() {
 
   // 오늘 출근 상태 조회
   const { data: todayCheckInStatus, refetch: refetchCheckIn } = trpc.checkIn.getTodayStatus.useQuery();
+
+  // 출근 시간 포맷팅 (클라이언트에서만)
+  useEffect(() => {
+    if (isMounted && todayCheckInStatus?.checkIn?.checkInTime) {
+      const timeStr = new Date(todayCheckInStatus.checkIn.checkInTime).toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      setCheckInTimeDisplay(timeStr);
+    }
+  }, [isMounted, todayCheckInStatus?.checkIn?.checkInTime]);
 
   // 출근 체크
   const checkInMutation = trpc.checkIn.create.useMutation({
@@ -459,8 +455,8 @@ export default function WorkerMain() {
     startWorkMutation.mutate({ equipmentId: assignedEquipment.id });
   };
 
-  // 클라이언트 마운트 전이거나 로딩 중일 때
-  if (!isClient || isLoadingEquipment || isLoadingSession) {
+  // 로딩 중일 때
+  if (isLoadingEquipment || isLoadingSession) {
     return (
       <MobileLayout title="장비 운전자" showMenu={false}>
         <div className="flex items-center justify-center h-screen">

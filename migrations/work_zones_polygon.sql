@@ -23,3 +23,4 @@ WHERE table_name = 'work_zones'
   AND column_name IN ('zone_type', 'polygon_coordinates', 'center_lat', 'center_lng', 'radius_meters')
 ORDER BY column_name;
 
+
