@@ -319,14 +319,25 @@ export default function WorkZones() {
     }
   }, []);
 
-  // 지도 클릭 핸들러 (폴리곤 모드)
+  // 지도 클릭 핸들러
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (formData.zoneType === "polygon" && e.latLng) {
-      const lat = e.latLng.lat();
-      const lng = e.latLng.lng();
+    if (!e.latLng) return;
+    
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    if (formData.zoneType === "polygon") {
+      // 폴리곤 모드: 점 추가
       setFormData(prev => ({
         ...prev,
         polygonPoints: [...prev.polygonPoints, { lat, lng }],
+      }));
+    } else if (formData.zoneType === "circle") {
+      // 원형 모드: 중심점 이동
+      setFormData(prev => ({
+        ...prev,
+        centerLat: lat,
+        centerLng: lng,
       }));
     }
   }, [formData.zoneType]);
@@ -538,19 +549,19 @@ export default function WorkZones() {
 
         {/* 작업 구역 생성/수정 다이얼로그 */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="max-w-7xl w-[98vw] max-h-[98vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>
                 {editingZone ? "작업 구역 수정" : "새 작업 구역 생성"}
               </DialogTitle>
               <DialogDescription>
                 {formData.zoneType === "circle" 
-                  ? "지도에서 마커를 드래그하여 중심점을 설정하고 반경을 조정하세요"
-                  : "지도에서 클릭하여 점을 추가하고 폴리곤을 그리세요 (최소 3개 점 필요)"}
+                  ? "📍 지도를 클릭하여 중심점을 설정하고 반경을 조정하세요"
+                  : "📍 지도를 클릭하여 점을 추가하세요 (최소 3개 점 필요). 점을 드래그하여 위치를 조정할 수 있습니다."}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2">
               {/* 구역 타입 선택 */}
               <div className="space-y-2">
                 <Label>구역 타입 *</Label>
@@ -608,10 +619,24 @@ export default function WorkZones() {
               {/* Google Maps */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>작업 구역 위치</Label>
+                  <div className="space-y-1">
+                    <Label>작업 구역 위치</Label>
+                    {formData.zoneType === "circle" && (
+                      <p className="text-xs text-muted-foreground">
+                        💡 지도를 클릭하면 중심점이 이동합니다
+                      </p>
+                    )}
+                    {formData.zoneType === "polygon" && (
+                      <p className="text-xs text-muted-foreground">
+                        💡 지도를 클릭하여 점을 추가하세요 (최소 3개 필요)
+                      </p>
+                    )}
+                  </div>
                   {formData.zoneType === "polygon" && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>점 {formData.polygonPoints.length}개</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-sm">
+                        점 {formData.polygonPoints.length}개
+                      </Badge>
                       {formData.polygonPoints.length > 0 && (
                         <Button
                           type="button"
@@ -625,7 +650,7 @@ export default function WorkZones() {
                     </div>
                   )}
                 </div>
-                <div className="h-[500px] border rounded-lg overflow-hidden relative">
+                <div className="h-[600px] border rounded-lg overflow-hidden relative">
                   {GOOGLE_MAPS_API_KEY ? (
                     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
                       <Map
@@ -791,7 +816,7 @@ export default function WorkZones() {
               )}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
               <Button variant="outline" onClick={closeDialog}>
                 <X className="mr-2 h-4 w-4" />
                 취소
