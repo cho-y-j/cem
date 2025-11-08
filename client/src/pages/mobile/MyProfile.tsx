@@ -17,6 +17,7 @@ import {
   AlertCircle,
   FileText,
   Truck,
+  LogOut,
 } from "lucide-react";
 
 /**
@@ -25,7 +26,7 @@ import {
  * - 서류 업로드 (필수 서류 매칭)
  */
 export default function MyProfile() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [email, setEmail] = useState(user?.email || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -132,6 +133,20 @@ export default function MyProfile() {
   const handleFileUpload = async (file: File, docTypeId: string, targetType: "worker" | "equipment") => {
     // TODO: 실제 파일 업로드 구현
     toast.success("서류가 업로드되었습니다 (개발 중)");
+  };
+
+  const handleLogout = async () => {
+    try {
+      // localStorage에서 토큰 삭제
+      localStorage.removeItem('authToken');
+      // useAuth의 logout 함수 호출
+      await logout();
+      toast.success("로그아웃되었습니다");
+      // 로그인 페이지로 이동
+      window.location.href = "/mobile/login";
+    } catch (error) {
+      toast.error("로그아웃 중 오류가 발생했습니다");
+    }
   };
 
   return (
@@ -432,6 +447,20 @@ export default function MyProfile() {
             </ul>
           </div>
         </div>
+
+        {/* 로그아웃 버튼 */}
+        <Card className="border-red-200">
+          <CardContent className="pt-6">
+            <Button
+              onClick={handleLogout}
+              variant="destructive"
+              className="w-full h-12 text-base"
+            >
+              <LogOut className="mr-2 h-5 w-5" />
+              로그아웃
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </MobileLayout>
   );
