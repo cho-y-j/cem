@@ -48,6 +48,7 @@ export default function WorkerMain() {
   const [emergencyType, setEmergencyType] = useState<string>("");
   const [emergencyDescription, setEmergencyDescription] = useState<string>("");
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
+  const [checkInTimeDisplay, setCheckInTimeDisplay] = useState<string>("");
 
   // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
   useEffect(() => {
@@ -61,6 +62,17 @@ export default function WorkerMain() {
       console.log('[WorkerMain] PublicKeyCredential:', 'PublicKeyCredential' in window);
     }
   }, []);
+
+  // 출근 시간 표시 (클라이언트 사이드에서만 포맷팅)
+  useEffect(() => {
+    if (todayCheckInStatus?.checkIn?.checkInTime) {
+      const timeStr = new Date(todayCheckInStatus.checkIn.checkInTime).toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      setCheckInTimeDisplay(timeStr);
+    }
+  }, [todayCheckInStatus?.checkIn?.checkInTime]);
 
   // 배정된 장비 조회
   const { data: assignedEquipment, isLoading: isLoadingEquipment } = trpc.mobile.worker.getMyAssignedEquipment.useQuery();
@@ -524,12 +536,11 @@ export default function WorkerMain() {
                   <CheckCircle className="h-8 w-8 text-green-600 shrink-0" />
                   <div className="flex-1">
                     <div className="font-bold text-green-900 mb-1">출근 완료</div>
-                    <div className="text-sm text-green-700">
-                      {new Date(todayCheckInStatus.checkIn?.checkInTime || '').toLocaleTimeString('ko-KR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
+                    {checkInTimeDisplay && (
+                      <div className="text-sm text-green-700">
+                        {checkInTimeDisplay}
+                      </div>
+                    )}
                     {todayCheckInStatus.checkIn?.isWithinZone !== undefined && (
                       <div className="text-xs text-green-600 mt-1">
                         {todayCheckInStatus.checkIn.isWithinZone
