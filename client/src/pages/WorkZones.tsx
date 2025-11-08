@@ -192,18 +192,18 @@ function MapClickHandler({
   useEffect(() => {
     if (!map) return;
 
-    // 클릭 이벤트 리스너 추가
-    const listener = map.addListener("click", (e: google.maps.MapMouseEvent) => {
-      if (isDrawingMode) {
-        onMapClick(e);
-      }
-    });
+    let listener: google.maps.MapsEventListener | null = null;
 
-    // 그리기 모드에 따라 지도 동작 설정
+    // 그리기 모드에 따라 지도 동작 설정 및 클릭 리스너 추가
     if (isDrawingMode) {
       map.setOptions({
         draggable: false,
         gestureHandling: "none",
+      });
+      
+      // 클릭 이벤트 리스너 추가
+      listener = map.addListener("click", (e: google.maps.MapMouseEvent) => {
+        onMapClick(e);
       });
     } else {
       map.setOptions({
@@ -218,7 +218,7 @@ function MapClickHandler({
         google.maps.event.removeListener(listener);
       }
     };
-  }, [map, isDrawingMode, onMapClick, zoneType]);
+  }, [map, isDrawingMode, onMapClick]);
 
   return null;
 }
