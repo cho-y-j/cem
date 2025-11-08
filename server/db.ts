@@ -3311,15 +3311,35 @@ export async function getCheckIns(filters?: {
   workerId?: string;
   userId?: string;
   workZoneId?: string;
+  bpCompanyId?: string;
+  ownerCompanyId?: string;
+  workerTypeId?: string;
+  workerName?: string;
   startDate?: string;
   endDate?: string;
 }): Promise<CheckIn[]> {
   const supabase = getSupabase();
+  if (!supabase) return [];
+
+  // 기본 쿼리 - deployment와 worker 정보를 join
   let query = supabase.from('check_ins').select(`
     *,
     user:users!check_ins_user_id_fkey(id, name, email, role),
-    worker:workers!check_ins_worker_id_fkey(id, user_id),
-    work_zone:work_zones!check_ins_work_zone_id_fkey(id, name)
+    worker:workers!check_ins_worker_id_fkey(
+      id,
+      user_id,
+      name,
+      worker_type_id,
+      worker_type:worker_types!workers_worker_type_id_fkey(id, name)
+    ),
+    work_zone:work_zones!check_ins_work_zone_id_fkey(id, name),
+    deployment:deployments!check_ins_deployment_id_fkey(
+      id,
+      bp_company_id,
+      ep_company_id,
+      bp_company:companies!deployments_bp_company_id_fkey(id, name),
+      ep_company:companies!deployments_ep_company_id_fkey(id, name)
+    )
   `);
 
   if (filters?.workerId) {
@@ -3347,7 +3367,38 @@ export async function getCheckIns(filters?: {
     throw new Error(`Failed to get check-ins: ${error.message}`);
   }
 
-  return toCamelCaseArray(data || []);
+  let checkIns = toCamelCaseArray(data || []);
+
+  // 추가 필터링 (deployment 정보 기반)
+  if (filters?.bpCompanyId) {
+    checkIns = checkIns.filter((ci: any) => 
+      ci.deployment?.bpCompanyId === filters.bpCompanyId
+    );
+  }
+
+  if (filters?.ownerCompanyId) {
+    // ownerCompanyId는 equipment의 owner_company_id를 확인해야 함
+    // 일단 deployment의 ep_company_id로 필터링 (추후 수정 가능)
+    checkIns = checkIns.filter((ci: any) => 
+      ci.deployment?.epCompanyId === filters.ownerCompanyId
+    );
+  }
+
+  if (filters?.workerTypeId) {
+    checkIns = checkIns.filter((ci: any) => 
+      ci.worker?.workerTypeId === filters.workerTypeId
+    );
+  }
+
+  if (filters?.workerName) {
+    const nameLower = filters.workerName.toLowerCase();
+    checkIns = checkIns.filter((ci: any) => 
+      ci.worker?.name?.toLowerCase().includes(nameLower) ||
+      ci.user?.name?.toLowerCase().includes(nameLower)
+    );
+  }
+
+  return checkIns;
 }
 
 /**

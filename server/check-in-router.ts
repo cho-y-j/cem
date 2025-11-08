@@ -45,7 +45,7 @@ export const checkInRouter = router({
         });
       }
 
-      // Worker 정보 조회
+      // Worker 정보 조회 및 투입 확인
       const supabase = db.getSupabase();
       if (!supabase) {
         throw new TRPCError({
@@ -54,9 +54,10 @@ export const checkInRouter = router({
         });
       }
 
+      // 1. user_id로 worker 찾기
       const { data: worker, error: workerError } = await supabase
         .from("workers")
-        .select("id, deployment_id:deployments!worker_id(id, work_zone_id)")
+        .select("id, name, user_id")
         .eq("user_id", ctx.user.id)
         .maybeSingle();
 
@@ -75,25 +76,34 @@ export const checkInRouter = router({
         });
       }
 
-      // 작업 구역 ID 결정 (입력값 우선, 없으면 deployment에서)
-      let workZoneId = input.workZoneId;
-      let deploymentId: string | undefined;
+      // 2. 활성 투입(deployment) 확인 - 투입된 사람만 출근 가능
+      const { data: activeDeployment, error: deploymentError } = await supabase
+        .from("deployments")
+        .select("id, work_zone_id, bp_company_id, ep_company_id, equipment_id, status")
+        .eq("worker_id", worker.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (!workZoneId) {
-        // deployment에서 work_zone_id 찾기
-        const { data: deployments } = await supabase
-          .from("deployments")
-          .select("id, work_zone_id")
-          .eq("worker_id", worker.id)
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (deployments && deployments.length > 0) {
-          workZoneId = deployments[0].work_zone_id;
-          deploymentId = deployments[0].id;
-        }
+      if (deploymentError) {
+        console.error("[CheckIn] Error fetching deployment:", deploymentError);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "투입 정보 조회 중 오류가 발생했습니다.",
+        });
       }
+
+      if (!activeDeployment) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "출근할 수 없습니다. 현재 활성화된 투입이 없습니다. 관리자에게 문의하세요.",
+        });
+      }
+
+      // 3. 작업 구역 ID 결정 (입력값 우선, 없으면 deployment에서)
+      let workZoneId = input.workZoneId || activeDeployment.work_zone_id;
+      const deploymentId = activeDeployment.id;
 
       let isWithinZone = false;
       let distanceFromZone: number | undefined;
@@ -185,6 +195,10 @@ export const checkInRouter = router({
       z.object({
         workerId: z.string().optional(),
         workZoneId: z.string().optional(),
+        bpCompanyId: z.string().optional(),
+        ownerCompanyId: z.string().optional(),
+        workerTypeId: z.string().optional(),
+        workerName: z.string().optional(), // 이름 검색
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         limit: z.number().min(1).max(100).default(50),
@@ -206,6 +220,10 @@ export const checkInRouter = router({
       const checkIns = await db.getCheckIns({
         workerId: input?.workerId,
         workZoneId: input?.workZoneId,
+        bpCompanyId: input?.bpCompanyId,
+        ownerCompanyId: input?.ownerCompanyId,
+        workerTypeId: input?.workerTypeId,
+        workerName: input?.workerName,
         startDate: input?.startDate,
         endDate: input?.endDate,
       });
