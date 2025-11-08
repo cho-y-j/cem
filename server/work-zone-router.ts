@@ -18,11 +18,25 @@ export const workZoneRouter = router({
       z.object({
         name: z.string().min(1, "구역 이름을 입력하세요"),
         description: z.string().optional(),
-        centerLat: z.number().min(-90).max(90, "위도는 -90 ~ 90 사이여야 합니다"),
-        centerLng: z.number().min(-180).max(180, "경도는 -180 ~ 180 사이여야 합니다"),
+        zoneType: z.enum(["circle", "polygon"]).default("circle"),
+        centerLat: z.number().min(-90).max(90, "위도는 -90 ~ 90 사이여야 합니다").optional(),
+        centerLng: z.number().min(-180).max(180, "경도는 -180 ~ 180 사이여야 합니다").optional(),
         radiusMeters: z.number().min(10).max(10000, "반경은 10 ~ 10000m 사이여야 합니다").default(100),
+        polygonCoordinates: z.string().optional(), // JSON 문자열
         companyId: z.string().optional(),
       })
+      .refine(
+        (data) => {
+          if (data.zoneType === "circle") {
+            return data.centerLat != null && data.centerLng != null;
+          } else {
+            return data.polygonCoordinates != null && JSON.parse(data.polygonCoordinates).length >= 3;
+          }
+        },
+        {
+          message: "원형 구역은 중심점이 필요하고, 다각형 구역은 최소 3개 점이 필요합니다",
+        }
+      )
     )
     .mutation(async ({ input, ctx }) => {
       // 권한 체크: admin, ep만 가능
@@ -34,14 +48,24 @@ export const workZoneRouter = router({
         });
       }
 
+      // 다각형 좌표 검증
+      if (input.zoneType === "polygon" && (!input.polygonCoordinates || JSON.parse(input.polygonCoordinates).length < 3)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "폴리곤은 최소 3개 이상의 점이 필요합니다",
+        });
+      }
+
       const id = nanoid();
       const workZone = await db.createWorkZone({
         id,
         name: input.name,
         description: input.description,
-        centerLat: input.centerLat.toString(),
-        centerLng: input.centerLng.toString(),
+        zoneType: input.zoneType,
+        centerLat: input.centerLat?.toString(),
+        centerLng: input.centerLng?.toString(),
         radiusMeters: input.radiusMeters,
+        polygonCoordinates: input.polygonCoordinates,
         companyId: input.companyId || ctx.user.companyId,
         createdBy: ctx.user.id,
         isActive: true,

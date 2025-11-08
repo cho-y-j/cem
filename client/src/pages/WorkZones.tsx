@@ -378,11 +378,14 @@ export default function WorkZones() {
 
     if (formData.zoneType === "polygon") {
       // 폴리곤 모드: 점 추가
-      setFormData(prev => ({
-        ...prev,
-        polygonPoints: [...prev.polygonPoints, { lat, lng }],
-      }));
-      toast.success(`점 ${prev.polygonPoints.length + 1}개 추가됨`);
+      setFormData(prev => {
+        const newPoints = [...prev.polygonPoints, { lat, lng }];
+        toast.success(`점 ${newPoints.length}개 추가됨`);
+        return {
+          ...prev,
+          polygonPoints: newPoints,
+        };
+      });
     } else if (formData.zoneType === "circle") {
       // 원형 모드: 중심점 이동
       setFormData(prev => ({
@@ -428,12 +431,19 @@ export default function WorkZones() {
     };
 
     if (formData.zoneType === "circle") {
+      // 원형 모드: 중심점과 반경만 전송
       data.centerLat = formData.centerLat;
       data.centerLng = formData.centerLng;
       data.radiusMeters = formData.radiusMeters;
+      // 폴리곤 관련 데이터 제거
+      delete data.polygonCoordinates;
     } else {
-      // 폴리곤 모드
+      // 폴리곤 모드: 좌표만 전송
       data.polygonCoordinates = JSON.stringify(formData.polygonPoints);
+      // 원형 관련 데이터 제거
+      delete data.centerLat;
+      delete data.centerLng;
+      delete data.radiusMeters;
     }
 
     if (editingZone) {
