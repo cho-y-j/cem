@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { APP_LOGO, APP_TITLE, getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Building2, CheckCircle, ClipboardCheck, FileText, HardHat, LayoutDashboard, LogOut, PanelLeft, Truck, Users, ArrowRightLeft, BarChart3, MapPin, AlertTriangle, Clock, PackageCheck, Shield, UserCircle } from "lucide-react";
+import { Building2, CheckCircle, ClipboardCheck, FileText, HardHat, LayoutDashboard, LogOut, PanelLeft, Truck, Users, ArrowRightLeft, BarChart3, MapPin, AlertTriangle, Clock, PackageCheck, Shield, UserCircle, Map } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -36,6 +36,7 @@ const menuItems = [
   { icon: PackageCheck, label: "투입 관리", path: "/deployments", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Shield, label: "안전점검 확인", path: "/safety-inspection-review", roles: ["ep", "admin"] },
   { icon: FileText, label: "작업 확인서", path: "/work-journal", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: Map, label: "작업 구역 관리", path: "/work-zones", roles: ["ep", "admin"] },
   { icon: MapPin, label: "실시간 위치 추적", path: "/location-tracking", roles: ["owner", "ep", "bp", "admin"] },
   { icon: AlertTriangle, label: "긴급 알림", path: "/emergency-alerts", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Clock, label: "작업 현황 모니터링", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin"] },

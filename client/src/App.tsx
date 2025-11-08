@@ -55,6 +55,7 @@ import MyProfile from "./pages/MyProfile";
 import MobileMyProfile from "./pages/mobile/MyProfile";
 import MobileLoginNew from "./pages/mobile/LoginNew";
 import MobileLoginCompare from "./pages/mobile/LoginCompare";
+import WorkZones from "./pages/WorkZones";
 
 function Router() {
   return (
@@ -86,6 +87,7 @@ function Router() {
         <Route path="/location-tracking" component={LocationTracking} />
         <Route path="/emergency-alerts" component={EmergencyAlerts} />
         <Route path="/work-monitoring" component={WorkMonitoring} />
+        <Route path="/work-zones" component={WorkZones} />
         <Route path="/my-profile" component={MyProfile} />
 
         <Route path="/mobile/worker" component={WorkerMain} />

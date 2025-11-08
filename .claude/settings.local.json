@@ -38,7 +38,8 @@
       "Bash(curl:*)",
       "Bash(esbuild:*)",
       "Bash(pnpm esbuild:*)",
-      "Bash(pnpm db:push:*)"
+      "Bash(pnpm db:push:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": []
