@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { APIProvider, Map, Marker, Circle } from "@vis.gl/react-google-maps";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,60 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 // 서울 시청 기본 위치
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
+
+// Circle 컴포넌트 (useMap 훅 사용)
+function Circle({
+  center,
+  radius,
+  strokeColor = "#3B82F6",
+  strokeOpacity = 0.8,
+  strokeWeight = 2,
+  fillColor = "#3B82F6",
+  fillOpacity = 0.2,
+}: {
+  center: { lat: number; lng: number };
+  radius: number;
+  strokeColor?: string;
+  strokeOpacity?: number;
+  strokeWeight?: number;
+  fillColor?: string;
+  fillOpacity?: number;
+}) {
+  const map = useMap();
+  const circleRef = useRef<google.maps.Circle | null>(null);
+
+  useEffect(() => {
+    if (!map) return;
+
+    // 기존 Circle 제거
+    if (circleRef.current) {
+      circleRef.current.setMap(null);
+    }
+
+    // 새 Circle 생성
+    const circle = new google.maps.Circle({
+      map,
+      center: { lat: center.lat, lng: center.lng },
+      radius,
+      strokeColor,
+      strokeOpacity,
+      strokeWeight,
+      fillColor,
+      fillOpacity,
+    });
+
+    circleRef.current = circle;
+
+    // cleanup
+    return () => {
+      if (circleRef.current) {
+        circleRef.current.setMap(null);
+      }
+    };
+  }, [map, center.lat, center.lng, radius, strokeColor, strokeOpacity, strokeWeight, fillColor, fillOpacity]);
+
+  return null; // 이 컴포넌트는 렌더링하지 않음
+}
 
 interface WorkZone {
   id: string;
