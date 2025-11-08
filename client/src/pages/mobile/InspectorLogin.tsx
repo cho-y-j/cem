@@ -16,12 +16,14 @@ export default function InspectorLogin() {
   const loginMutation = trpc.authPin.loginWithEmailAndPin.useMutation({
     onSuccess: (data) => {
       toast.success(`환영합니다, ${data.user.name}님!`);
-      // 로그인 성공 후 점검원 메인 화면으로 이동
-      if (data.user.role === "inspector") {
+      // 로그인 성공 후 역할에 따라 리다이렉션
+      const userRole = data.user.role?.toLowerCase();
+      if (userRole === "inspector") {
         setLocation("/mobile/inspector");
-      } else if (data.user.role === "worker") {
+      } else if (userRole === "worker") {
         setLocation("/mobile/worker");
       } else {
+        // admin, owner, bp, ep는 대시보드로 이동
         setLocation("/");
       }
     },

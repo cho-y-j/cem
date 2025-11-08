@@ -14,6 +14,12 @@
         "PGUSER": "postgres",
         "PGPASSWORD": "cho2239148!"
       }
+    },
+    "render": {
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer rnd_a0CjZ5eqUEbeB3LzH6PgwjnJRfHx"
+      }
     }
   }
 }

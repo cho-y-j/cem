@@ -35,6 +35,16 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+
+  // Health check endpoint for keeping Render server alive
+  app.get("/ping", (req, res) => {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      message: "Server is alive"
+    });
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

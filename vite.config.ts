@@ -55,6 +55,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1000, // 1MB로 경고 임계값 설정
   },
   server: {
     host: true,

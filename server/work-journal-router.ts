@@ -160,11 +160,36 @@ export const workJournalRouter = router({
     }),
 
   /**
-   * 전체 작업확인서 목록 (관리자용 또는 대시보드용)
+   * 전체 작업확인서 목록 (역할별 권한 적용)
+   * - Worker: 본인 작업확인서만 조회
+   * - Owner: 본인 소속 작업확인서만 조회
+   * - BP: 본인 회사 작업확인서만 조회
+   * - EP/Admin: 전체 조회
    */
-  list: protectedProcedure.query(async () => {
-    const journals = await db.getAllWorkJournals();
-    return journals;
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const userRole = ctx.user.role?.toLowerCase();
+
+    // Worker: 본인 작업확인서만 조회
+    if (userRole === "worker") {
+      return await db.getWorkJournals({
+        workerId: ctx.user.id,
+      });
+    }
+
+    // Owner: 본인 소속 작업확인서만 조회
+    if (userRole === "owner") {
+      return await db.getWorkJournalsByOwnerId(ctx.user.id);
+    }
+
+    // BP: 본인 회사 작업확인서만 조회
+    if (userRole === "bp" && ctx.user.companyId) {
+      return await db.getWorkJournals({
+        bpCompanyId: ctx.user.companyId,
+      });
+    }
+
+    // EP/Admin: 전체 조회
+    return await db.getAllWorkJournals();
   }),
 
   /**

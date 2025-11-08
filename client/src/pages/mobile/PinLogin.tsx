@@ -21,30 +21,54 @@ export default function PinLogin() {
   const [rememberMe, setRememberMe] = useState(true);
 
   // 자동 로그인 체크
+  const userQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: !!localStorage.getItem('authToken'),
+    retry: false,
+  });
+
   useEffect(() => {
     const token = localStorage.getItem('authToken');
-    if (token) {
-      // 토큰이 있으면 자동으로 메인 화면으로 이동
-      console.log('[MobileLogin] Auto-login with saved token');
-      setLocation("/mobile/worker");
+    if (token && userQuery.data) {
+      // 토큰이 있고 사용자 정보를 가져왔으면 역할에 따라 리다이렉션
+      const userRole = userQuery.data.role?.toLowerCase();
+      let redirectTo = "/";
+
+      if (userRole === "worker") {
+        redirectTo = "/mobile/worker";
+      } else if (userRole === "inspector") {
+        redirectTo = "/mobile/inspector";
+      }
+
+      console.log(`[MobileLogin] Auto-login to ${redirectTo} (role: ${userRole})`);
+      setLocation(redirectTo);
     }
-  }, [setLocation]);
+  }, [setLocation, userQuery.data]);
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
       console.log('[PinLogin] Login success:', data);
       toast.success(`환영합니다, ${data.user.name}님!`);
-      
+
       if (rememberMe) {
         // 토큰 저장 (자동 로그인)
         localStorage.setItem('authToken', data.token || '');
         console.log('[PinLogin] Token saved for auto-login');
       }
-      
-      // Worker 메인 화면으로 이동 (약간의 딜레이 추가)
+
+      // 역할에 따라 적절한 페이지로 리다이렉션
+      const userRole = data.user.role?.toLowerCase();
+      let redirectTo = "/";
+
+      if (userRole === "worker") {
+        redirectTo = "/mobile/worker";
+      } else if (userRole === "inspector") {
+        redirectTo = "/mobile/inspector";
+      }
+      // admin, owner, bp, ep는 대시보드(/)로 이동
+
       setTimeout(() => {
-        console.log('[PinLogin] Redirecting to /mobile/worker');
-        setLocation("/mobile/worker");
+        console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
+        setLocation(redirectTo);
       }, 100);
     },
     onError: (error) => {
