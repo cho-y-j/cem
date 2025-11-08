@@ -450,13 +450,17 @@ export default function WorkZones() {
                             <>
                               <span className="flex items-center gap-1">
                                 <span className="font-medium">위도:</span>
-                                <span className="font-mono">{parseFloat(zone.centerLat).toFixed(6)}</span>
+                                <span className="font-mono">
+                                  {zone.centerLat ? parseFloat(zone.centerLat).toFixed(6) : "-"}
+                                </span>
                               </span>
                               <span className="flex items-center gap-1">
                                 <span className="font-medium">경도:</span>
-                                <span className="font-mono">{parseFloat(zone.centerLng).toFixed(6)}</span>
+                                <span className="font-mono">
+                                  {zone.centerLng ? parseFloat(zone.centerLng).toFixed(6) : "-"}
+                                </span>
                               </span>
-                              {zone.radiusMeters && (
+                              {zone.radiusMeters != null && (
                                 <span className="flex items-center gap-1">
                                   <span className="font-medium">반경:</span>
                                   <span className="font-semibold text-foreground">{zone.radiusMeters}m</span>
@@ -466,7 +470,14 @@ export default function WorkZones() {
                           )}
                           {zone.zoneType === "polygon" && zone.polygonCoordinates && (
                             <span className="text-xs">
-                              {JSON.parse(zone.polygonCoordinates).length}개 점
+                              {(() => {
+                                try {
+                                  const coords = JSON.parse(zone.polygonCoordinates);
+                                  return Array.isArray(coords) ? `${coords.length}개 점` : "-";
+                                } catch {
+                                  return "-";
+                                }
+                              })()}
                             </span>
                           )}
                         </div>
@@ -614,21 +625,25 @@ export default function WorkZones() {
                         {formData.zoneType === "circle" ? (
                           <>
                             {/* 드래그 가능한 마커 */}
-                            <Marker
-                              position={{ lat: formData.centerLat, lng: formData.centerLng }}
-                              draggable={true}
-                              onDragEnd={handleMarkerDrag}
-                            />
-                            {/* 작업 구역 원 */}
-                            <Circle
-                              center={{ lat: formData.centerLat, lng: formData.centerLng }}
-                              radius={formData.radiusMeters}
-                              strokeColor="#3B82F6"
-                              strokeOpacity={0.8}
-                              strokeWeight={2}
-                              fillColor="#3B82F6"
-                              fillOpacity={0.2}
-                            />
+                            {formData.centerLat != null && formData.centerLng != null && (
+                              <>
+                                <Marker
+                                  position={{ lat: formData.centerLat, lng: formData.centerLng }}
+                                  draggable={true}
+                                  onDragEnd={handleMarkerDrag}
+                                />
+                                {/* 작업 구역 원 */}
+                                <Circle
+                                  center={{ lat: formData.centerLat, lng: formData.centerLng }}
+                                  radius={formData.radiusMeters || 100}
+                                  strokeColor="#3B82F6"
+                                  strokeOpacity={0.8}
+                                  strokeWeight={2}
+                                  fillColor="#3B82F6"
+                                  fillOpacity={0.2}
+                                />
+                              </>
+                            )}
                           </>
                         ) : (
                           <>
