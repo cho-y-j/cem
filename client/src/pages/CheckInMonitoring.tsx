@@ -1,29 +1,55 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, MapPin, Clock, Users, Calendar, RefreshCw, Search, Download } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckCircle, XCircle, MapPin, Clock, Users, Calendar, RefreshCw, Search, Download, Filter, X } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { toast } from "sonner";
 
 export default function CheckInMonitoring() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [bpCompanyId, setBpCompanyId] = useState<string>("");
+  const [ownerCompanyId, setOwnerCompanyId] = useState<string>("");
+  const [workerTypeId, setWorkerTypeId] = useState<string>("");
 
-  // 오늘 출근 통계
-  const { data: todayStats, refetch, isLoading } = trpc.checkIn.getTodayStats.useQuery();
+  // 회사 목록 조회
+  const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery({ companyType: "bp" });
+  const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery({ companyType: "owner" });
 
-  // 필터링된 출근 기록
-  const filteredCheckIns = todayStats?.checkIns?.filter((checkIn) => {
-    if (!searchQuery) return true;
-    const searchLower = searchQuery.toLowerCase();
-    const userName = (checkIn as any).user?.name || '';
-    const workZoneName = (checkIn as any).workZone?.name || '';
-    return userName.toLowerCase().includes(searchLower) ||
-           workZoneName.toLowerCase().includes(searchLower);
-  }) || [];
+  // 사용자 종류 목록 조회
+  const { data: workerTypes = [] } = trpc.workerTypes.list.useQuery();
+
+  // 날짜 범위 계산
+  const startDate = dateFilter ? new Date(dateFilter).toISOString() : undefined;
+  const endDate = dateFilter ? new Date(new Date(dateFilter).setDate(new Date(dateFilter).getDate() + 1)).toISOString() : undefined;
+
+  // 출근 기록 조회 (필터 적용)
+  const { data: checkIns = [], refetch, isLoading } = trpc.checkIn.list.useQuery({
+    bpCompanyId: bpCompanyId || undefined,
+    ownerCompanyId: ownerCompanyId || undefined,
+    workerTypeId: workerTypeId || undefined,
+    workerName: searchQuery || undefined,
+    startDate,
+    endDate,
+    limit: 100,
+  });
+
+  // 오늘 출근 통계 (필터 적용 전)
+  const { data: todayStats } = trpc.checkIn.getTodayStats.useQuery();
+
+  // 필터링된 출근 기록 (클라이언트 측 추가 필터링)
+  const filteredCheckIns = useMemo(() => {
+    return checkIns.filter((checkIn) => {
+      // 이름 검색은 서버에서 처리되지만, 추가 필터링 가능
+      return true;
+    });
+  }, [checkIns]);
 
   const formatTime = (dateStr: string | Date) => {
     return format(new Date(dateStr), "HH:mm", { locale: ko });
@@ -33,12 +59,30 @@ export default function CheckInMonitoring() {
     return format(new Date(dateStr), "yyyy년 MM월 dd일 (EEE)", { locale: ko });
   };
 
+  // 필터 초기화
+  const resetFilters = () => {
+    setSearchQuery("");
+    setBpCompanyId("");
+    setOwnerCompanyId("");
+    setWorkerTypeId("");
+  };
+
+  // 활성 필터 개수
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery) count++;
+    if (bpCompanyId) count++;
+    if (ownerCompanyId) count++;
+    if (workerTypeId) count++;
+    return count;
+  }, [searchQuery, bpCompanyId, ownerCompanyId, workerTypeId]);
+
   // 엑셀 다운로드
   const handleExportToExcel = async () => {
     try {
       const result = await trpc.checkIn.exportToExcel.query({
-        startDate: dateFilter ? new Date(dateFilter).toISOString() : undefined,
-        endDate: dateFilter ? new Date(new Date(dateFilter).setDate(new Date(dateFilter).getDate() + 1)).toISOString() : undefined,
+        startDate,
+        endDate,
       });
 
       // Base64를 Blob으로 변환
@@ -97,29 +141,118 @@ export default function CheckInMonitoring() {
         </div>
       </div>
 
-      {/* 날짜 선택 */}
-      <div className="flex gap-4 items-center">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="w-48"
-          />
-        </div>
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="작업자 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
-            />
+      {/* 필터 섹션 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">필터</CardTitle>
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {activeFilterCount}개 활성
+                </Badge>
+              )}
+            </div>
+            {activeFilterCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-8"
+              >
+                <X className="h-3 w-3 mr-1" />
+                필터 초기화
+              </Button>
+            )}
           </div>
-        </div>
-      </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {/* 날짜 선택 */}
+            <div className="space-y-2">
+              <Label>날짜</Label>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* 이름 검색 */}
+            <div className="space-y-2">
+              <Label>이름 검색</Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="작업자 이름..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            {/* BP 회사 필터 */}
+            <div className="space-y-2">
+              <Label>BP 회사</Label>
+              <Select value={bpCompanyId} onValueChange={setBpCompanyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">전체</SelectItem>
+                  {bpCompanies.map((company: any) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Owner 회사 필터 */}
+            <div className="space-y-2">
+              <Label>Owner 회사</Label>
+              <Select value={ownerCompanyId} onValueChange={setOwnerCompanyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">전체</SelectItem>
+                  {ownerCompanies.map((company: any) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 사용자 종류 필터 */}
+            <div className="space-y-2">
+              <Label>사용자 종류</Label>
+              <Select value={workerTypeId} onValueChange={setWorkerTypeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">전체</SelectItem>
+                  {workerTypes.map((type: any) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 통계 카드 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -240,7 +373,9 @@ export default function CheckInMonitoring() {
         <CardHeader>
           <CardTitle>출근 기록</CardTitle>
           <CardDescription>
-            오늘 출근한 작업자 목록 ({filteredCheckIns.length}명)
+            {dateFilter === format(new Date(), "yyyy-MM-dd") 
+              ? `오늘 출근한 작업자 목록` 
+              : `${dateFilter} 출근한 작업자 목록`} ({filteredCheckIns.length}명)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -260,11 +395,16 @@ export default function CheckInMonitoring() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
                       <Users className="h-5 w-5 text-primary" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium">
-                        {(checkIn as any).user?.name || `작업자 ${checkIn.userId}`}
+                        {(checkIn as any).worker?.name || (checkIn as any).user?.name || `작업자 ${checkIn.userId}`}
+                        {(checkIn as any).worker?.workerType?.name && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {(checkIn as any).worker.workerType.name}
+                          </Badge>
+                        )}
                       </div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-3 mt-1">
+                      <div className="text-sm text-muted-foreground flex items-center gap-3 mt-1 flex-wrap">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatTime(checkIn.checkInTime)}
@@ -278,6 +418,16 @@ export default function CheckInMonitoring() {
                         {checkIn.distanceFromZone !== null && checkIn.distanceFromZone !== undefined && (
                           <span className="text-xs">
                             ({checkIn.distanceFromZone}m)
+                          </span>
+                        )}
+                        {(checkIn as any).deployment?.bpCompany?.name && (
+                          <span className="text-xs">
+                            BP: {(checkIn as any).deployment.bpCompany.name}
+                          </span>
+                        )}
+                        {(checkIn as any).deployment?.epCompany?.name && (
+                          <span className="text-xs">
+                            EP: {(checkIn as any).deployment.epCompany.name}
                           </span>
                         )}
                       </div>
