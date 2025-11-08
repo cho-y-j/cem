@@ -55,6 +55,7 @@ import MyProfile from "./pages/MyProfile";
 import MobileMyProfile from "./pages/mobile/MyProfile";
 import MobileLoginNew from "./pages/mobile/LoginNew";
 import MobileLoginCompare from "./pages/mobile/LoginCompare";
+import BiometricSetup from "./pages/mobile/BiometricSetup";
 import WorkZones from "./pages/WorkZones";
 import CheckInMonitoring from "./pages/CheckInMonitoring";
 
@@ -94,6 +95,7 @@ function Router() {
 
         <Route path="/mobile/worker" component={WorkerMain} />
         <Route path="/mobile/profile" component={MobileMyProfile} />
+        <Route path="/mobile/biometric-setup" component={BiometricSetup} />
         <Route path="/mobile/inspector" component={InspectorMain} />
         <Route path="/mobile/inspector/inspection/:equipmentId" component={SafetyInspectionNew} />
         <Route path="/mobile/inspector/history" component={SafetyInspectionHistory} />

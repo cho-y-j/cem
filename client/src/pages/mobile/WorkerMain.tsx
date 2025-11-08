@@ -23,10 +23,13 @@ import {
   Loader2,
   ClipboardCheck,
   CheckCircle,
+  Fingerprint,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import { startAuthentication } from '@simplewebauthn/browser';
 
 export default function WorkerMain() {
   const { user } = useAuth();
@@ -314,7 +317,7 @@ export default function WorkerMain() {
     }
   };
 
-  // 출근 체크 핸들러
+  // 출근 체크 핸들러 (PIN)
   const handleCheckIn = () => {
     if ("geolocation" in navigator) {
       toast.info("GPS 위치를 확인하는 중...");
@@ -340,6 +343,73 @@ export default function WorkerMain() {
       );
     } else {
       toast.error("이 기기는 위치 정보를 지원하지 않습니다.");
+    }
+  };
+
+  // 생체 인증 출근 핸들러
+  const handleBiometricCheckIn = async () => {
+    try {
+      // 1. GPS 위치 가져오기
+      if (!("geolocation" in navigator)) {
+        toast.error("이 기기는 위치 정보를 지원하지 않습니다.");
+        return;
+      }
+
+      toast.info("생체 인증 및 GPS 확인 중...");
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+
+            // 2. 인증 챌린지 가져오기
+            const authOptions = await trpc.webauthn.generateAuthenticationChallenge.query();
+
+            // 3. 생체 인증 (지문/얼굴 스캔)
+            toast.info("생체 인증을 진행해주세요...");
+            const authResponse = await startAuthentication(authOptions);
+
+            // 4. 서버 검증
+            const authResult = await trpc.webauthn.verifyAuthentication.mutate({
+              response: authResponse,
+            });
+
+            if (authResult.verified) {
+              // 5. 출근 체크 (생체 인증 성공)
+              checkInMutation.mutate({
+                lat: latitude,
+                lng: longitude,
+                authMethod: "webauthn",
+                webauthnCredentialId: authResult.credentialId,
+              });
+            } else {
+              toast.error("생체 인증에 실패했습니다.");
+            }
+          } catch (error: any) {
+            console.error('[BiometricCheckIn] Error:', error);
+
+            if (error.name === 'NotAllowedError') {
+              toast.error("생체 인증이 취소되었습니다.");
+            } else if (error.message?.includes("등록된 생체 인증이 없습니다")) {
+              toast.error("생체 인증이 등록되지 않았습니다. 설정에서 먼저 등록해주세요.");
+            } else {
+              toast.error(`생체 인증 실패: ${error.message}`);
+            }
+          }
+        },
+        (error) => {
+          console.error('[BiometricCheckIn] GPS Error:', error);
+          toast.error("위치 정보를 가져올 수 없습니다. GPS를 활성화해주세요.");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    } catch (error: any) {
+      console.error('[BiometricCheckIn] Outer error:', error);
+      toast.error(`출근 실패: ${error.message}`);
     }
   };
 
@@ -375,6 +445,8 @@ export default function WorkerMain() {
           <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white p-6 mb-4">
             <div className="text-center space-y-4">
               <div className="text-lg font-semibold">오늘 아직 출근하지 않았습니다</div>
+
+              {/* PIN 출근 버튼 */}
               <Button
                 size="lg"
                 className="w-full h-16 text-xl font-bold bg-white text-indigo-700 hover:bg-gray-100 shadow-lg active:scale-95 transition-transform"
@@ -393,9 +465,37 @@ export default function WorkerMain() {
                   </>
                 )}
               </Button>
+
+              {/* 생체 인증 출근 버튼 */}
+              {window.PublicKeyCredential && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full h-14 text-lg font-semibold bg-white/10 text-white border-white/30 hover:bg-white/20 shadow-lg active:scale-95 transition-transform"
+                  onClick={handleBiometricCheckIn}
+                  disabled={checkInMutation.isPending}
+                >
+                  <Fingerprint className="mr-2 h-5 w-5" />
+                  생체 인증으로 출근
+                </Button>
+              )}
+
               <div className="text-xs opacity-80">
                 📍 현재 위치가 자동으로 기록됩니다
               </div>
+
+              {/* 생체 인증 설정 링크 */}
+              {window.PublicKeyCredential && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/80 hover:text-white hover:bg-white/10"
+                  onClick={() => setLocation("/mobile/biometric-setup")}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  생체 인증 설정
+                </Button>
+              )}
             </div>
           </div>
         ) : (

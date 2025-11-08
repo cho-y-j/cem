@@ -81,7 +81,7 @@ export const checkInRouter = router({
       
       const { data: activeDeployment, error: deploymentError } = await supabase
         .from("deployments")
-        .select("id, work_zone_id, bp_company_id, ep_company_id, equipment_id, status")
+        .select("id, bp_company_id, ep_company_id, equipment_id, status")
         .eq("worker_id", worker.id)
         .eq("status", "active")
         .order("created_at", { ascending: false })
@@ -106,7 +106,6 @@ export const checkInRouter = router({
       console.log("[CheckIn] Deployment query result:", {
         found: !!activeDeployment,
         deploymentId: activeDeployment?.id,
-        workZoneId: activeDeployment?.work_zone_id,
       });
 
       if (!activeDeployment) {
@@ -130,9 +129,29 @@ export const checkInRouter = router({
         });
       }
 
-      // 3. 작업 구역 ID 결정 (입력값 우선, 없으면 deployment에서)
-      let workZoneId = input.workZoneId || activeDeployment.work_zone_id;
+      // 3. 작업 구역 ID 결정
+      // Note: work_zone_id는 deployments 테이블에 없으므로 입력값 또는 BP 회사의 활성 구역 사용
+      let workZoneId = input.workZoneId;
       const deploymentId = activeDeployment.id;
+
+      // workZoneId가 없으면 BP 회사의 활성 작업 구역 찾기
+      if (!workZoneId && activeDeployment.bp_company_id) {
+        console.log("[CheckIn] Finding active work zone for BP company:", activeDeployment.bp_company_id);
+        const { data: activeWorkZone } = await supabase
+          .from("work_zones")
+          .select("id")
+          .eq("company_id", activeDeployment.bp_company_id)
+          .eq("is_active", true)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeWorkZone) {
+          workZoneId = activeWorkZone.id;
+          console.log("[CheckIn] Auto-selected work zone:", workZoneId);
+        }
+      }
 
       let isWithinZone = false;
       let distanceFromZone: number | undefined;

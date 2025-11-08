@@ -3,89 +3,168 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import * as db from "./db";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+  type VerifiedRegistrationResponse,
+  type VerifiedAuthenticationResponse,
+} from '@simplewebauthn/server';
+import type {
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from '@simplewebauthn/types';
+
+/**
+ * WebAuthn 설정
+ * 프로덕션에서는 환경 변수로 관리
+ */
+const RP_NAME = process.env.RP_NAME || "ERMS 건설장비관리";
+const RP_ID = process.env.RP_ID || "localhost";
+const ORIGIN = process.env.ORIGIN || "http://localhost:3000";
+
+// 챌린지 임시 저장소 (프로덕션에서는 Redis/DB 사용)
+const challenges = new Map<string, string>();
 
 /**
  * WebAuthn 생체 인증 API
  * FIDO2 표준 기반 지문/얼굴 인식
- *
- * 참고: 실제 WebAuthn 구현은 다음 라이브러리 사용 권장:
- * - @simplewebauthn/server
- * - @simplewebauthn/browser (client-side)
  */
 export const webauthnRouter = router({
   /**
    * 등록 챌린지 생성
-   * WebAuthn 등록을 시작하기 위한 챌린지(난수) 생성
+   * WebAuthn 등록을 시작하기 위한 옵션 생성
    */
   generateRegistrationChallenge: protectedProcedure
     .query(async ({ ctx }) => {
-      // TODO: Implement WebAuthn registration challenge
-      // 1. 난수 생성 (crypto.randomBytes)
-      // 2. 유저 정보와 함께 반환
-      // 3. 챌린지를 세션/DB에 임시 저장
+      try {
+        const user = ctx.user;
 
-      const challenge = nanoid(32);
+        // SimpleWebAuthn을 사용하여 등록 옵션 생성
+        const options = await generateRegistrationOptions({
+          rpName: RP_NAME,
+          rpID: RP_ID,
+          userName: user.email || user.name || user.id,
+          userDisplayName: user.name || user.email || "사용자",
+          // Uint8Array로 변환
+          userID: new TextEncoder().encode(user.id),
+          timeout: 60000,
+          attestationType: 'none',
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform', // 기기 내장 생체 인식
+            requireResidentKey: false,
+            residentKey: 'preferred',
+            userVerification: 'required', // 생체 인증 필수
+          },
+          supportedAlgorithmIDs: [-7, -257], // ES256, RS256
+        });
 
-      return {
-        challenge,
-        rp: {
-          name: "Construction Equipment Management",
-          id: "localhost", // 프로덕션에서는 도메인 사용
-        },
-        user: {
-          id: ctx.user.id,
-          name: ctx.user.email || ctx.user.name,
-          displayName: ctx.user.name,
-        },
-        pubKeyCredParams: [
-          { alg: -7, type: "public-key" as const }, // ES256
-          { alg: -257, type: "public-key" as const }, // RS256
-        ],
-        timeout: 60000,
-        attestation: "none" as const,
-        authenticatorSelection: {
-          authenticatorAttachment: "platform" as const, // 기기 내장 (지문/얼굴)
-          requireResidentKey: false,
-          userVerification: "preferred" as const,
-        },
-      };
+        // 챌린지 임시 저장 (60초 후 자동 삭제)
+        challenges.set(user.id, options.challenge);
+        setTimeout(() => challenges.delete(user.id), 60000);
+
+        console.log(`[WebAuthn] Registration challenge generated for user ${user.id}`);
+
+        return options;
+      } catch (error) {
+        console.error('[WebAuthn] Error generating registration challenge:', error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "등록 챌린지 생성에 실패했습니다.",
+        });
+      }
     }),
 
   /**
-   * 등록 완료 (크레덴셜 저장)
+   * 등록 완료 (크레덴셜 검증 및 저장)
    */
   registerCredential: protectedProcedure
     .input(z.object({
-      credentialId: z.string(),
-      publicKey: z.string(),
+      response: z.any(), // RegistrationResponseJSON
       deviceName: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // TODO: Implement credential verification and storage
-      // 1. 챌린지 검증
-      // 2. 공개키 검증
-      // 3. DB에 저장
+      try {
+        const user = ctx.user;
+        const expectedChallenge = challenges.get(user.id);
 
-      const supabase = db.getSupabase();
-      const { error } = await supabase.from('webauthn_credentials').insert({
-        id: input.credentialId,
-        user_id: ctx.user.id,
-        public_key: input.publicKey,
-        counter: 0,
-        device_name: input.deviceName || "Unknown Device",
-        device_type: "platform",
-        created_at: new Date().toISOString(),
-      });
+        if (!expectedChallenge) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "챌린지가 만료되었거나 존재하지 않습니다. 다시 시도해주세요.",
+          });
+        }
 
-      if (error) {
+        // 등록 응답 검증
+        let verification: VerifiedRegistrationResponse;
+        try {
+          verification = await verifyRegistrationResponse({
+            response: input.response as RegistrationResponseJSON,
+            expectedChallenge,
+            expectedOrigin: ORIGIN,
+            expectedRPID: RP_ID,
+            requireUserVerification: true,
+          });
+        } catch (error: any) {
+          console.error('[WebAuthn] Registration verification failed:', error);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `등록 검증 실패: ${error.message}`,
+          });
+        }
+
+        if (!verification.verified || !verification.registrationInfo) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "등록 검증에 실패했습니다.",
+          });
+        }
+
+        const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+
+        // Base64URL 인코딩 (저장용)
+        const credentialIdBase64 = Buffer.from(credentialID).toString('base64url');
+        const publicKeyBase64 = Buffer.from(credentialPublicKey).toString('base64');
+
+        // DB에 크레덴셜 저장
+        const supabase = db.getSupabase();
+        const { error } = await supabase.from('webauthn_credentials').insert({
+          id: credentialIdBase64,
+          user_id: user.id,
+          public_key: publicKeyBase64,
+          counter: counter,
+          device_name: input.deviceName || "Unknown Device",
+          device_type: "platform",
+          created_at: new Date().toISOString(),
+        });
+
+        if (error) {
+          console.error('[WebAuthn] Database error:', error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "크레덴셜 저장에 실패했습니다.",
+          });
+        }
+
+        // 사용된 챌린지 삭제
+        challenges.delete(user.id);
+
+        console.log(`[WebAuthn] Credential registered successfully for user ${user.id}`);
+
+        return {
+          verified: true,
+          credentialId: credentialIdBase64,
+        };
+      } catch (error: any) {
+        if (error instanceof TRPCError) throw error;
+
         console.error('[WebAuthn] registerCredential error:', error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "크레덴셜 저장에 실패했습니다.",
+          message: error.message || "크레덴셜 등록에 실패했습니다.",
         });
       }
-
-      return { success: true };
     }),
 
   /**
@@ -93,27 +172,58 @@ export const webauthnRouter = router({
    */
   generateAuthenticationChallenge: protectedProcedure
     .query(async ({ ctx }) => {
-      // TODO: Implement WebAuthn authentication challenge
-      const challenge = nanoid(32);
+      try {
+        const user = ctx.user;
 
-      // 사용자의 등록된 크레덴셜 조회
-      const supabase = db.getSupabase();
-      const { data: credentials } = await supabase
-        .from('webauthn_credentials')
-        .select('id')
-        .eq('user_id', ctx.user.id);
+        // 사용자의 등록된 크레덴셜 조회
+        const supabase = db.getSupabase();
+        const { data: credentials, error } = await supabase
+          .from('webauthn_credentials')
+          .select('id')
+          .eq('user_id', user.id);
 
-      return {
-        challenge,
-        timeout: 60000,
-        rpId: "localhost",
-        allowCredentials: credentials?.map((c: any) => ({
-          id: c.id,
-          type: "public-key" as const,
-          transports: ["internal"] as const[],
-        })) || [],
-        userVerification: "preferred" as const,
-      };
+        if (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "크레덴셜 조회에 실패했습니다.",
+          });
+        }
+
+        if (!credentials || credentials.length === 0) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "등록된 생체 인증이 없습니다. 먼저 생체 인증을 등록해주세요.",
+          });
+        }
+
+        // SimpleWebAuthn을 사용하여 인증 옵션 생성
+        const options = await generateAuthenticationOptions({
+          rpID: RP_ID,
+          timeout: 60000,
+          allowCredentials: credentials.map((c: any) => ({
+            id: Buffer.from(c.id, 'base64url'),
+            type: 'public-key',
+            transports: ['internal'],
+          })),
+          userVerification: 'required',
+        });
+
+        // 챌린지 임시 저장 (60초 후 자동 삭제)
+        challenges.set(user.id, options.challenge);
+        setTimeout(() => challenges.delete(user.id), 60000);
+
+        console.log(`[WebAuthn] Authentication challenge generated for user ${user.id}`);
+
+        return options;
+      } catch (error: any) {
+        if (error instanceof TRPCError) throw error;
+
+        console.error('[WebAuthn] Error generating authentication challenge:', error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "인증 챌린지 생성에 실패했습니다.",
+        });
+      }
     }),
 
   /**
@@ -121,18 +231,97 @@ export const webauthnRouter = router({
    */
   verifyAuthentication: protectedProcedure
     .input(z.object({
-      credentialId: z.string(),
-      signature: z.string(),
-      authenticatorData: z.string(),
-      clientDataJSON: z.string(),
+      response: z.any(), // AuthenticationResponseJSON
     }))
     .mutation(async ({ input, ctx }) => {
-      // TODO: Implement authentication verification
-      // 1. 챌린지 검증
-      // 2. 서명 검증
-      // 3. 카운터 업데이트
+      try {
+        const user = ctx.user;
+        const expectedChallenge = challenges.get(user.id);
 
-      return { verified: true };
+        if (!expectedChallenge) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "챌린지가 만료되었거나 존재하지 않습니다. 다시 시도해주세요.",
+          });
+        }
+
+        const response = input.response as AuthenticationResponseJSON;
+
+        // 크레덴셜 조회
+        const credentialIdBase64 = Buffer.from(response.rawId, 'base64url').toString('base64url');
+        const supabase = db.getSupabase();
+        const { data: credential, error: credError } = await supabase
+          .from('webauthn_credentials')
+          .select('*')
+          .eq('id', credentialIdBase64)
+          .eq('user_id', user.id)
+          .single();
+
+        if (credError || !credential) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "등록된 크레덴셜을 찾을 수 없습니다.",
+          });
+        }
+
+        // 인증 응답 검증
+        let verification: VerifiedAuthenticationResponse;
+        try {
+          verification = await verifyAuthenticationResponse({
+            response,
+            expectedChallenge,
+            expectedOrigin: ORIGIN,
+            expectedRPID: RP_ID,
+            authenticator: {
+              credentialID: Buffer.from(credential.id, 'base64url'),
+              credentialPublicKey: Buffer.from(credential.public_key, 'base64'),
+              counter: credential.counter,
+            },
+            requireUserVerification: true,
+          });
+        } catch (error: any) {
+          console.error('[WebAuthn] Authentication verification failed:', error);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `인증 검증 실패: ${error.message}`,
+          });
+        }
+
+        if (!verification.verified) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "인증에 실패했습니다.",
+          });
+        }
+
+        // 카운터 업데이트 (리플레이 공격 방지)
+        const { authenticationInfo } = verification;
+        await supabase
+          .from('webauthn_credentials')
+          .update({
+            counter: authenticationInfo.newCounter,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq('id', credentialIdBase64);
+
+        // 사용된 챌린지 삭제
+        challenges.delete(user.id);
+
+        console.log(`[WebAuthn] Authentication verified successfully for user ${user.id}`);
+
+        return {
+          verified: true,
+          credentialId: credentialIdBase64,
+        };
+      } catch (error: any) {
+        if (error instanceof TRPCError) throw error;
+
+        console.error('[WebAuthn] verifyAuthentication error:', error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error.message || "인증 검증에 실패했습니다.",
+        });
+      }
     }),
 
   /**
@@ -162,7 +351,7 @@ export const webauthnRouter = router({
     .input(z.object({
       credentialId: z.string(),
     }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = db.getSupabase();
       const { error } = await supabase
         .from('webauthn_credentials')
@@ -171,11 +360,14 @@ export const webauthnRouter = router({
         .eq('user_id', ctx.user.id);
 
       if (error) {
+        console.error('[WebAuthn] deleteCredential error:', error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "크레덴셜 삭제에 실패했습니다.",
         });
       }
+
+      console.log(`[WebAuthn] Credential deleted: ${input.credentialId}`);
 
       return { success: true };
     }),
