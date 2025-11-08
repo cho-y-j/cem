@@ -23,6 +23,8 @@ import { workJournalRouter } from "./work-journal-router";
 import { safetyInspectionRouter } from "./safety-inspection-router";
 import { driverInspectionRouter } from "./driver-inspection-router";
 import { workZoneRouter } from "./work-zone-router";
+import { checkInRouter } from "./check-in-router";
+import { webauthnRouter } from "./webauthn-router";
 import { imageToPdf, createEntryRequestPdf } from "./pdf-utils";
 
 // ============================================================
@@ -1151,6 +1153,12 @@ export const appRouter = router({
 
   // 작업 구역 관리 API (GPS 기반 출근 체크)
   workZones: workZoneRouter,
+
+  // 출근 체크 API (GPS + 작업 구역 검증)
+  checkIn: checkInRouter,
+
+  // WebAuthn 생체 인증 API (지문/얼굴 인식)
+  webauthn: webauthnRouter,
 
   // 기존 entryRequests 라우터 (백업용 - 삭제 예정)
   entryRequestsOld: router({

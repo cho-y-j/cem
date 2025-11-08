@@ -22,6 +22,7 @@ import {
   PackageCheck,
   Loader2,
   ClipboardCheck,
+  CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,23 @@ export default function WorkerMain() {
   // 현재 작업 세션 조회
   const { data: currentSession, refetch: refetchSession, isLoading: isLoadingSession } =
     trpc.mobile.worker.getCurrentSession.useQuery();
+
+  // 오늘 출근 상태 조회
+  const { data: todayCheckInStatus, refetch: refetchCheckIn } = trpc.checkIn.getTodayStatus.useQuery();
+
+  // 출근 체크
+  const checkInMutation = trpc.checkIn.create.useMutation({
+    onSuccess: (data) => {
+      const distanceMsg = data.isWithinZone
+        ? `작업 구역 내에서 출근하셨습니다 (${data.distanceFromZone}m)`
+        : `작업 구역 밖에서 출근하셨습니다 (${data.distanceFromZone}m 떨어짐)`;
+      toast.success(`출근이 완료되었습니다!\n${distanceMsg}`);
+      refetchCheckIn();
+    },
+    onError: (error) => {
+      toast.error("출근 체크 실패: " + error.message);
+    },
+  });
 
   // 작업 시작
   const startWorkMutation = trpc.mobile.worker.startWorkSession.useMutation({
@@ -296,16 +314,45 @@ export default function WorkerMain() {
     }
   };
 
+  // 출근 체크 핸들러
+  const handleCheckIn = () => {
+    if ("geolocation" in navigator) {
+      toast.info("GPS 위치를 확인하는 중...");
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log('[CheckIn] GPS Position:', position.coords.latitude, position.coords.longitude);
+          checkInMutation.mutate({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            authMethod: "pin",
+          });
+        },
+        (error) => {
+          console.error('[CheckIn] GPS Error:', error);
+          toast.error("위치 정보를 가져올 수 없습니다. GPS를 활성화해주세요.");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    } else {
+      toast.error("이 기기는 위치 정보를 지원하지 않습니다.");
+    }
+  };
+
   // 작업 시작 핸들러
   const handleStartWork = () => {
     console.log('[WorkerMain] handleStartWork called');
     console.log('[WorkerMain] assignedEquipment:', assignedEquipment);
-    
+
     if (!assignedEquipment) {
       toast.error("배정된 장비가 없습니다. 관리자에게 문의하세요.");
       return;
     }
-    
+
     console.log('[WorkerMain] Starting work session with equipment:', assignedEquipment.id);
     startWorkMutation.mutate({ equipmentId: assignedEquipment.id });
   };
@@ -323,6 +370,62 @@ export default function WorkerMain() {
   return (
     <MobileLayout title="작업 관리" showMenu={false}>
       <div className="pb-24">
+        {/* 출근 체크 섹션 */}
+        {!todayCheckInStatus?.hasCheckedIn ? (
+          <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white p-6 mb-4">
+            <div className="text-center space-y-4">
+              <div className="text-lg font-semibold">오늘 아직 출근하지 않았습니다</div>
+              <Button
+                size="lg"
+                className="w-full h-16 text-xl font-bold bg-white text-indigo-700 hover:bg-gray-100 shadow-lg active:scale-95 transition-transform"
+                onClick={handleCheckIn}
+                disabled={checkInMutation.isPending}
+              >
+                {checkInMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                    GPS 확인 중...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-3 h-6 w-6" />
+                    출근하기
+                  </>
+                )}
+              </Button>
+              <div className="text-xs opacity-80">
+                📍 현재 위치가 자동으로 기록됩니다
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-4 mb-4">
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-8 w-8 text-green-600 shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-bold text-green-900 mb-1">출근 완료</div>
+                    <div className="text-sm text-green-700">
+                      {new Date(todayCheckInStatus.checkIn?.checkInTime || '').toLocaleTimeString('ko-KR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                    {todayCheckInStatus.checkIn?.isWithinZone !== undefined && (
+                      <div className="text-xs text-green-600 mt-1">
+                        {todayCheckInStatus.checkIn.isWithinZone
+                          ? `✓ 작업 구역 내 (${todayCheckInStatus.checkIn.distanceFromZone}m)`
+                          : `⚠ 작업 구역 밖 (${todayCheckInStatus.checkIn.distanceFromZone}m)`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* 작업 상태 카드 - 큰 화면 상단 */}
         {currentSession && (
           <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 mb-4">

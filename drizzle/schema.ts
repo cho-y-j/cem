@@ -737,12 +737,16 @@ export const workZones = pgTable("work_zones", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
 
-  // GPS 좌표 (중심점)
-  centerLat: decimal("center_lat", { precision: 10, scale: 8 }).notNull(),
-  centerLng: decimal("center_lng", { precision: 11, scale: 8 }).notNull(),
+  // 구역 타입: 'circle' (원형) 또는 'polygon' (다각형)
+  zoneType: varchar("zone_type", { length: 20 }).notNull().default("circle"),
 
-  // 반경 (미터)
-  radiusMeters: integer("radius_meters").notNull().default(100),
+  // 원형 구역용 (기존)
+  centerLat: decimal("center_lat", { precision: 10, scale: 8 }), // 원형일 때만 필수
+  centerLng: decimal("center_lng", { precision: 11, scale: 8 }), // 원형일 때만 필수
+  radiusMeters: integer("radius_meters").default(100), // 원형일 때만 사용
+
+  // 폴리곤 구역용 (새로 추가)
+  polygonCoordinates: text("polygon_coordinates"), // JSON 배열: [{lat, lng}, ...]
 
   // 연결 정보
   companyId: varchar("company_id", { length: 64 }), // 소속 회사

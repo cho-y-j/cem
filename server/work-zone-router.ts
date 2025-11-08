@@ -102,9 +102,13 @@ export const workZoneRouter = router({
         id: z.string(),
         name: z.string().min(1).optional(),
         description: z.string().optional(),
+        zoneType: z.enum(["circle", "polygon"]).optional(),
+        // 원형 구역용
         centerLat: z.number().min(-90).max(90).optional(),
         centerLng: z.number().min(-180).max(180).optional(),
         radiusMeters: z.number().min(10).max(10000).optional(),
+        // 폴리곤 구역용
+        polygonCoordinates: z.string().optional(), // JSON 문자열
         isActive: z.boolean().optional(),
       })
     )
@@ -127,6 +131,25 @@ export const workZoneRouter = router({
       }
       if (updateData.centerLng !== undefined) {
         dataToUpdate.centerLng = updateData.centerLng.toString();
+      }
+
+      // 폴리곤 좌표 검증
+      if (updateData.polygonCoordinates !== undefined) {
+        try {
+          const coords = JSON.parse(updateData.polygonCoordinates);
+          if (!Array.isArray(coords) || coords.length < 3) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "폴리곤은 최소 3개 이상의 점이 필요합니다",
+            });
+          }
+        } catch (e) {
+          if (e instanceof TRPCError) throw e;
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "폴리곤 좌표 형식이 올바르지 않습니다",
+          });
+        }
       }
 
       const workZone = await db.updateWorkZone(id, dataToUpdate);

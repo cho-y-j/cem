@@ -8,7 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { MapPin, Plus, Edit, Trash2, Save, X, MoreVertical } from "lucide-react";
+import { MapPin, Plus, Edit, Trash2, Save, X, MoreVertical, Circle, Shapes } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,13 +79,99 @@ function Circle({
   return null; // 이 컴포넌트는 렌더링하지 않음
 }
 
+// Polygon 컴포넌트 (useMap 훅 사용)
+function Polygon({
+  paths,
+  strokeColor = "#3B82F6",
+  strokeOpacity = 0.8,
+  strokeWeight = 2,
+  fillColor = "#3B82F6",
+  fillOpacity = 0.2,
+  editable = false,
+  onPathChange,
+}: {
+  paths: Array<{ lat: number; lng: number }>;
+  strokeColor?: string;
+  strokeOpacity?: number;
+  strokeWeight?: number;
+  fillColor?: string;
+  fillOpacity?: number;
+  editable?: boolean;
+  onPathChange?: (paths: Array<{ lat: number; lng: number }>) => void;
+}) {
+  const map = useMap();
+  const polygonRef = useRef<google.maps.Polygon | null>(null);
+
+  useEffect(() => {
+    if (!map || paths.length < 3) return;
+
+    // 기존 Polygon 제거
+    if (polygonRef.current) {
+      google.maps.event.clearInstanceListeners(polygonRef.current);
+      polygonRef.current.setMap(null);
+    }
+
+    // 새 Polygon 생성
+    const polygon = new google.maps.Polygon({
+      map,
+      paths: paths.map(p => ({ lat: p.lat, lng: p.lng })),
+      strokeColor,
+      strokeOpacity,
+      strokeWeight,
+      fillColor,
+      fillOpacity,
+      editable,
+      draggable: false,
+    });
+
+    // 경로 변경 이벤트 리스너
+    if (editable && onPathChange) {
+      polygon.addListener("set_at", () => {
+        const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
+          lat: latLng.lat(),
+          lng: latLng.lng(),
+        }));
+        onPathChange(newPaths);
+      });
+      polygon.addListener("insert_at", () => {
+        const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
+          lat: latLng.lat(),
+          lng: latLng.lng(),
+        }));
+        onPathChange(newPaths);
+      });
+      polygon.addListener("remove_at", () => {
+        const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
+          lat: latLng.lat(),
+          lng: latLng.lng(),
+        }));
+        onPathChange(newPaths);
+      });
+    }
+
+    polygonRef.current = polygon;
+
+    // cleanup
+    return () => {
+      if (polygonRef.current) {
+        google.maps.event.clearInstanceListeners(polygonRef.current);
+        polygonRef.current.setMap(null);
+      }
+    };
+  }, [map, paths, strokeColor, strokeOpacity, strokeWeight, fillColor, fillOpacity, editable, onPathChange]);
+
+  return null;
+}
+
 interface WorkZone {
   id: string;
   name: string;
   description?: string | null;
-  centerLat: string;
-  centerLng: string;
-  radiusMeters: number;
+  zoneType?: "circle" | "polygon";
+  centerLat?: string | null;
+  centerLng?: string | null;
+  radiusMeters?: number | null;
+  polygonCoordinates?: string | null; // JSON 문자열: [{lat, lng}, ...]
   isActive: boolean;
 }
 
@@ -95,9 +183,11 @@ export default function WorkZones() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    zoneType: "circle" as "circle" | "polygon",
     centerLat: DEFAULT_CENTER.lat,
     centerLng: DEFAULT_CENTER.lng,
     radiusMeters: 100,
+    polygonPoints: [] as Array<{ lat: number; lng: number }>, // 폴리곤 점들
   });
 
   // 지도 중심 (폼과 별도로 관리)
@@ -146,23 +236,50 @@ export default function WorkZones() {
     if (zone) {
       // 수정 모드
       setEditingZone(zone);
+      const zoneType = zone.zoneType || "circle";
+      let polygonPoints: Array<{ lat: number; lng: number }> = [];
+      
+      if (zoneType === "polygon" && zone.polygonCoordinates) {
+        try {
+          polygonPoints = JSON.parse(zone.polygonCoordinates);
+        } catch (e) {
+          console.error("Failed to parse polygon coordinates:", e);
+        }
+      }
+
       setFormData({
         name: zone.name,
         description: zone.description || "",
-        centerLat: parseFloat(zone.centerLat),
-        centerLng: parseFloat(zone.centerLng),
-        radiusMeters: zone.radiusMeters,
+        zoneType,
+        centerLat: zone.centerLat ? parseFloat(zone.centerLat) : DEFAULT_CENTER.lat,
+        centerLng: zone.centerLng ? parseFloat(zone.centerLng) : DEFAULT_CENTER.lng,
+        radiusMeters: zone.radiusMeters || 100,
+        polygonPoints,
       });
-      setMapCenter({ lat: parseFloat(zone.centerLat), lng: parseFloat(zone.centerLng) });
+      
+      // 지도 중심 설정
+      if (zoneType === "polygon" && polygonPoints.length > 0) {
+        // 폴리곤의 중심 계산
+        const avgLat = polygonPoints.reduce((sum, p) => sum + p.lat, 0) / polygonPoints.length;
+        const avgLng = polygonPoints.reduce((sum, p) => sum + p.lng, 0) / polygonPoints.length;
+        setMapCenter({ lat: avgLat, lng: avgLng });
+      } else {
+        setMapCenter({ 
+          lat: zone.centerLat ? parseFloat(zone.centerLat) : DEFAULT_CENTER.lat, 
+          lng: zone.centerLng ? parseFloat(zone.centerLng) : DEFAULT_CENTER.lng 
+        });
+      }
     } else {
       // 생성 모드
       setEditingZone(null);
       setFormData({
         name: "",
         description: "",
+        zoneType: "circle",
         centerLat: DEFAULT_CENTER.lat,
         centerLng: DEFAULT_CENTER.lng,
         radiusMeters: 100,
+        polygonPoints: [],
       });
       setMapCenter(DEFAULT_CENTER);
     }
@@ -188,6 +305,26 @@ export default function WorkZones() {
     }
   }, []);
 
+  // 지도 클릭 핸들러 (폴리곤 모드)
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (formData.zoneType === "polygon" && e.latLng) {
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      setFormData(prev => ({
+        ...prev,
+        polygonPoints: [...prev.polygonPoints, { lat, lng }],
+      }));
+    }
+  }, [formData.zoneType]);
+
+  // 폴리곤 점 삭제
+  const removePolygonPoint = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      polygonPoints: prev.polygonPoints.filter((_, i) => i !== index),
+    }));
+  };
+
   // 저장 핸들러
   const handleSave = () => {
     if (!formData.name.trim()) {
@@ -195,13 +332,32 @@ export default function WorkZones() {
       return;
     }
 
-    const data = {
+    // 폴리곤 모드일 때 최소 3개 점 필요
+    if (formData.zoneType === "polygon" && formData.polygonPoints.length < 3) {
+      toast.error("폴리곤은 최소 3개 이상의 점이 필요합니다");
+      return;
+    }
+
+    // 원형 모드일 때 중심점과 반경 필요
+    if (formData.zoneType === "circle" && (!formData.centerLat || !formData.centerLng)) {
+      toast.error("중심점을 설정해주세요");
+      return;
+    }
+
+    const data: any = {
       name: formData.name,
       description: formData.description || undefined,
-      centerLat: formData.centerLat,
-      centerLng: formData.centerLng,
-      radiusMeters: formData.radiusMeters,
+      zoneType: formData.zoneType,
     };
+
+    if (formData.zoneType === "circle") {
+      data.centerLat = formData.centerLat;
+      data.centerLng = formData.centerLng;
+      data.radiusMeters = formData.radiusMeters;
+    } else {
+      // 폴리곤 모드
+      data.polygonCoordinates = JSON.stringify(formData.polygonPoints);
+    }
 
     if (editingZone) {
       // 수정
@@ -224,7 +380,7 @@ export default function WorkZones() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 w-full">
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
@@ -287,18 +443,32 @@ export default function WorkZones() {
                           </p>
                         )}
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <span className="font-medium">위도:</span>
-                            <span className="font-mono">{parseFloat(zone.centerLat).toFixed(6)}</span>
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="font-medium">경도:</span>
-                            <span className="font-mono">{parseFloat(zone.centerLng).toFixed(6)}</span>
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="font-medium">반경:</span>
-                            <span className="font-semibold text-foreground">{zone.radiusMeters}m</span>
-                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {zone.zoneType === "polygon" ? "다각형" : "원형"}
+                          </Badge>
+                          {zone.zoneType === "circle" && zone.centerLat && zone.centerLng && (
+                            <>
+                              <span className="flex items-center gap-1">
+                                <span className="font-medium">위도:</span>
+                                <span className="font-mono">{parseFloat(zone.centerLat).toFixed(6)}</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="font-medium">경도:</span>
+                                <span className="font-mono">{parseFloat(zone.centerLng).toFixed(6)}</span>
+                              </span>
+                              {zone.radiusMeters && (
+                                <span className="flex items-center gap-1">
+                                  <span className="font-medium">반경:</span>
+                                  <span className="font-semibold text-foreground">{zone.radiusMeters}m</span>
+                                </span>
+                              )}
+                            </>
+                          )}
+                          {zone.zoneType === "polygon" && zone.polygonCoordinates && (
+                            <span className="text-xs">
+                              {JSON.parse(zone.polygonCoordinates).length}개 점
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -343,17 +513,51 @@ export default function WorkZones() {
 
         {/* 작업 구역 생성/수정 다이얼로그 */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingZone ? "작업 구역 수정" : "새 작업 구역 생성"}
               </DialogTitle>
               <DialogDescription>
-                지도에서 마커를 드래그하여 중심점을 설정하고 반경을 조정하세요
+                {formData.zoneType === "circle" 
+                  ? "지도에서 마커를 드래그하여 중심점을 설정하고 반경을 조정하세요"
+                  : "지도에서 클릭하여 점을 추가하고 폴리곤을 그리세요 (최소 3개 점 필요)"}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
+              {/* 구역 타입 선택 */}
+              <div className="space-y-2">
+                <Label>구역 타입 *</Label>
+                <RadioGroup
+                  value={formData.zoneType}
+                  onValueChange={(value) => {
+                    setFormData({ 
+                      ...formData, 
+                      zoneType: value as "circle" | "polygon",
+                      // 타입 변경 시 초기화
+                      polygonPoints: value === "polygon" ? [] : formData.polygonPoints,
+                    });
+                  }}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="circle" id="circle" />
+                    <Label htmlFor="circle" className="flex items-center gap-2 cursor-pointer">
+                      <Circle className="h-4 w-4" />
+                      원형 구역
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="polygon" id="polygon" />
+                    <Label htmlFor="polygon" className="flex items-center gap-2 cursor-pointer">
+                      <Shapes className="h-4 w-4" />
+                      다각형 구역
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
               {/* 기본 정보 */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -378,8 +582,25 @@ export default function WorkZones() {
 
               {/* Google Maps */}
               <div className="space-y-2">
-                <Label>작업 구역 위치</Label>
-                <div className="h-[400px] border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <Label>작업 구역 위치</Label>
+                  {formData.zoneType === "polygon" && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>점 {formData.polygonPoints.length}개</span>
+                      {formData.polygonPoints.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFormData(prev => ({ ...prev, polygonPoints: [] }))}
+                        >
+                          모두 삭제
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="h-[500px] border rounded-lg overflow-hidden relative">
                   {GOOGLE_MAPS_API_KEY ? (
                     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
                       <Map
@@ -387,24 +608,63 @@ export default function WorkZones() {
                         defaultZoom={15}
                         gestureHandling="greedy"
                         disableDefaultUI={false}
+                        onClick={handleMapClick}
+                        clickableIcons={false}
                       >
-                        {/* 드래그 가능한 마커 */}
-                        <Marker
-                          position={{ lat: formData.centerLat, lng: formData.centerLng }}
-                          draggable={true}
-                          onDragEnd={handleMarkerDrag}
-                        />
-
-                        {/* 작업 구역 원 */}
-                        <Circle
-                          center={{ lat: formData.centerLat, lng: formData.centerLng }}
-                          radius={formData.radiusMeters}
-                          strokeColor="#3B82F6"
-                          strokeOpacity={0.8}
-                          strokeWeight={2}
-                          fillColor="#3B82F6"
-                          fillOpacity={0.2}
-                        />
+                        {formData.zoneType === "circle" ? (
+                          <>
+                            {/* 드래그 가능한 마커 */}
+                            <Marker
+                              position={{ lat: formData.centerLat, lng: formData.centerLng }}
+                              draggable={true}
+                              onDragEnd={handleMarkerDrag}
+                            />
+                            {/* 작업 구역 원 */}
+                            <Circle
+                              center={{ lat: formData.centerLat, lng: formData.centerLng }}
+                              radius={formData.radiusMeters}
+                              strokeColor="#3B82F6"
+                              strokeOpacity={0.8}
+                              strokeWeight={2}
+                              fillColor="#3B82F6"
+                              fillOpacity={0.2}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            {/* 폴리곤 점들 마커 */}
+                            {formData.polygonPoints.map((point, index) => (
+                              <Marker
+                                key={index}
+                                position={{ lat: point.lat, lng: point.lng }}
+                                label={{ text: `${index + 1}`, color: "white" }}
+                                icon={{
+                                  path: google.maps.SymbolPath.CIRCLE,
+                                  scale: 8,
+                                  fillColor: "#3B82F6",
+                                  fillOpacity: 1,
+                                  strokeColor: "white",
+                                  strokeWeight: 2,
+                                }}
+                              />
+                            ))}
+                            {/* 폴리곤 */}
+                            {formData.polygonPoints.length >= 3 && (
+                              <Polygon
+                                paths={formData.polygonPoints}
+                                strokeColor="#3B82F6"
+                                strokeOpacity={0.8}
+                                strokeWeight={2}
+                                fillColor="#3B82F6"
+                                fillOpacity={0.2}
+                                editable={true}
+                                onPathChange={(newPaths) => {
+                                  setFormData(prev => ({ ...prev, polygonPoints: newPaths }));
+                                }}
+                              />
+                            )}
+                          </>
+                        )}
                       </Map>
                     </APIProvider>
                   ) : (
@@ -416,58 +676,90 @@ export default function WorkZones() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  📍 마커를 드래그하여 중심점을 이동할 수 있습니다
+                  {formData.zoneType === "circle" 
+                    ? "📍 마커를 드래그하여 중심점을 이동할 수 있습니다"
+                    : "📍 지도를 클릭하여 점을 추가하세요. 점을 드래그하여 위치를 조정할 수 있습니다"}
                 </p>
               </div>
 
-              {/* 좌표 정보 */}
-              <div className="grid gap-4 md:grid-cols-2">
+              {/* 폴리곤 점 목록 */}
+              {formData.zoneType === "polygon" && formData.polygonPoints.length > 0 && (
                 <div className="space-y-2">
-                  <Label>위도 (Latitude)</Label>
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={formData.centerLat}
-                    onChange={(e) => setFormData({ ...formData, centerLat: parseFloat(e.target.value) })}
-                  />
+                  <Label>폴리곤 점 목록</Label>
+                  <div className="max-h-32 overflow-y-auto border rounded-lg p-2 space-y-1">
+                    {formData.polygonPoints.map((point, index) => (
+                      <div key={index} className="flex items-center justify-between text-sm p-2 hover:bg-accent rounded">
+                        <span className="font-mono">
+                          {index + 1}. 위도: {point.lat.toFixed(6)}, 경도: {point.lng.toFixed(6)}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removePolygonPoint(index)}
+                          className="h-6 px-2 text-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>경도 (Longitude)</Label>
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={formData.centerLng}
-                    onChange={(e) => setFormData({ ...formData, centerLng: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
+              )}
 
-              {/* 반경 조정 */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>반경 (미터)</Label>
-                  <span className="text-sm font-semibold">{formData.radiusMeters}m</span>
-                </div>
-                <Slider
-                  value={[formData.radiusMeters]}
-                  onValueChange={([value]) => setFormData({ ...formData, radiusMeters: value })}
-                  min={10}
-                  max={1000}
-                  step={10}
-                />
-                <div className="flex gap-2">
-                  {[50, 100, 200, 500].map((value) => (
-                    <Button
-                      key={value}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFormData({ ...formData, radiusMeters: value })}
-                    >
-                      {value}m
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              {/* 원형 모드일 때만 좌표 정보와 반경 표시 */}
+              {formData.zoneType === "circle" && (
+                <>
+                  {/* 좌표 정보 */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>위도 (Latitude)</Label>
+                      <Input
+                        type="number"
+                        step="0.000001"
+                        value={formData.centerLat}
+                        onChange={(e) => setFormData({ ...formData, centerLat: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>경도 (Longitude)</Label>
+                      <Input
+                        type="number"
+                        step="0.000001"
+                        value={formData.centerLng}
+                        onChange={(e) => setFormData({ ...formData, centerLng: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 반경 조정 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>반경 (미터)</Label>
+                      <span className="text-sm font-semibold">{formData.radiusMeters}m</span>
+                    </div>
+                    <Slider
+                      value={[formData.radiusMeters]}
+                      onValueChange={([value]) => setFormData({ ...formData, radiusMeters: value })}
+                      min={10}
+                      max={1000}
+                      step={10}
+                    />
+                    <div className="flex gap-2">
+                      {[50, 100, 200, 500].map((value) => (
+                        <Button
+                          key={value}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFormData({ ...formData, radiusMeters: value })}
+                        >
+                          {value}m
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <DialogFooter>
