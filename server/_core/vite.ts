@@ -48,20 +48,49 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
+  // 프로덕션에서는 빌드된 파일이 루트 디렉토리에 있음 (package.json의 build 스크립트: cp -r dist/* .)
+  // process.cwd()를 사용하여 현재 작업 디렉토리(프로젝트 루트)를 가져옴
+  const projectRoot = process.cwd();
   const distPath =
     process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
-      : path.resolve(import.meta.dirname, "public");
-  if (!fs.existsSync(distPath)) {
+      ? path.resolve(projectRoot, "dist")
+      : projectRoot; // 프로덕션에서는 루트 디렉토리
+  
+  console.log(`[Static] Serving from: ${distPath}`);
+  console.log(`[Static] NODE_ENV: ${process.env.NODE_ENV}`);
+  
+  // index.html 파일 존재 여부 확인
+  const indexPath = path.resolve(distPath, "index.html");
+  if (!fs.existsSync(indexPath)) {
     console.error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
+      `[Static] ERROR: Could not find index.html at: ${indexPath}`
     );
+    console.error(
+      `[Static] Current working directory: ${projectRoot}`
+    );
+    console.error(
+      `[Static] Directory contents: ${fs.existsSync(distPath) ? fs.readdirSync(distPath).join(", ") : "directory does not exist"}`
+    );
+    // 에러를 던지지 않고 계속 진행 (서버가 시작되도록)
   }
 
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send(`
+        <html>
+          <body>
+            <h1>404 - Build files not found</h1>
+            <p>Expected index.html at: ${indexPath}</p>
+            <p>Current directory: ${projectRoot}</p>
+            <p>Please make sure the build completed successfully.</p>
+          </body>
+        </html>
+      `);
+    }
   });
 }
