@@ -47,26 +47,31 @@ function Circle({
   const circleRef = useRef<google.maps.Circle | null>(null);
 
   useEffect(() => {
-    if (!map) return;
+    // center와 map이 유효한지 확인
+    if (!map || !center || center.lat == null || center.lng == null || !radius) return;
 
     // 기존 Circle 제거
     if (circleRef.current) {
       circleRef.current.setMap(null);
     }
 
-    // 새 Circle 생성
-    const circle = new google.maps.Circle({
-      map,
-      center: { lat: center.lat, lng: center.lng },
-      radius,
-      strokeColor,
-      strokeOpacity,
-      strokeWeight,
-      fillColor,
-      fillOpacity,
-    });
+    try {
+      // 새 Circle 생성
+      const circle = new google.maps.Circle({
+        map,
+        center: { lat: center.lat, lng: center.lng },
+        radius,
+        strokeColor,
+        strokeOpacity,
+        strokeWeight,
+        fillColor,
+        fillOpacity,
+      });
 
-    circleRef.current = circle;
+      circleRef.current = circle;
+    } catch (error) {
+      console.error("[Circle] Error creating circle:", error);
+    }
 
     // cleanup
     return () => {
@@ -74,7 +79,7 @@ function Circle({
         circleRef.current.setMap(null);
       }
     };
-  }, [map, center.lat, center.lng, radius, strokeColor, strokeOpacity, strokeWeight, fillColor, fillOpacity]);
+  }, [map, center?.lat, center?.lng, radius, strokeColor, strokeOpacity, strokeWeight, fillColor, fillOpacity]);
 
   return null; // 이 컴포넌트는 렌더링하지 않음
 }
@@ -103,7 +108,12 @@ function Polygon({
   const polygonRef = useRef<google.maps.Polygon | null>(null);
 
   useEffect(() => {
-    if (!map || paths.length < 3) return;
+    // map과 paths가 유효한지 확인
+    if (!map || !paths || paths.length < 3) return;
+    
+    // 모든 경로 점이 유효한지 확인
+    const validPaths = paths.filter(p => p && p.lat != null && p.lng != null);
+    if (validPaths.length < 3) return;
 
     // 기존 Polygon 제거
     if (polygonRef.current) {
@@ -111,45 +121,49 @@ function Polygon({
       polygonRef.current.setMap(null);
     }
 
-    // 새 Polygon 생성
-    const polygon = new google.maps.Polygon({
-      map,
-      paths: paths.map(p => ({ lat: p.lat, lng: p.lng })),
-      strokeColor,
-      strokeOpacity,
-      strokeWeight,
-      fillColor,
-      fillOpacity,
-      editable,
-      draggable: false,
-    });
+    try {
+      // 새 Polygon 생성
+      const polygon = new google.maps.Polygon({
+        map,
+        paths: validPaths.map(p => ({ lat: p.lat, lng: p.lng })),
+        strokeColor,
+        strokeOpacity,
+        strokeWeight,
+        fillColor,
+        fillOpacity,
+        editable,
+        draggable: false,
+      });
 
-    // 경로 변경 이벤트 리스너
-    if (editable && onPathChange) {
-      polygon.addListener("set_at", () => {
-        const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
-          lat: latLng.lat(),
-          lng: latLng.lng(),
-        }));
-        onPathChange(newPaths);
-      });
-      polygon.addListener("insert_at", () => {
-        const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
-          lat: latLng.lat(),
-          lng: latLng.lng(),
-        }));
-        onPathChange(newPaths);
-      });
-      polygon.addListener("remove_at", () => {
-        const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
-          lat: latLng.lat(),
-          lng: latLng.lng(),
-        }));
-        onPathChange(newPaths);
-      });
+      // 경로 변경 이벤트 리스너
+      if (editable && onPathChange) {
+        polygon.addListener("set_at", () => {
+          const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
+            lat: latLng.lat(),
+            lng: latLng.lng(),
+          }));
+          onPathChange(newPaths);
+        });
+        polygon.addListener("insert_at", () => {
+          const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
+            lat: latLng.lat(),
+            lng: latLng.lng(),
+          }));
+          onPathChange(newPaths);
+        });
+        polygon.addListener("remove_at", () => {
+          const newPaths = polygon.getPath().getArray().map((latLng: google.maps.LatLng) => ({
+            lat: latLng.lat(),
+            lng: latLng.lng(),
+          }));
+          onPathChange(newPaths);
+        });
+      }
+
+      polygonRef.current = polygon;
+    } catch (error) {
+      console.error("[Polygon] Error creating polygon:", error);
     }
-
-    polygonRef.current = polygon;
 
     // cleanup
     return () => {
