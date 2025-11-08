@@ -722,7 +722,7 @@ export default function WorkerMain() {
         {/* 빠른 메뉴 */}
         <div className="px-4 mt-6 space-y-3">
           <div className="text-sm font-medium text-gray-700 mb-2">빠른 메뉴</div>
-          
+
           {/* 운전자 점검표 */}
           <Button
             size="lg"
@@ -737,6 +737,22 @@ export default function WorkerMain() {
               <div className="text-xs text-gray-500 font-normal">일일/주간/월간 점검</div>
             </div>
           </Button>
+
+          {/* 생체 인증 설정 */}
+          {isBiometricAvailable && (
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full h-16 text-base font-bold border-2 border-purple-400 hover:bg-purple-50 active:scale-95 transition-transform"
+              onClick={() => setLocation("/mobile/biometric-setup")}
+            >
+              <Fingerprint className="mr-2 h-6 w-6 text-purple-600" />
+              <div className="text-left flex-1">
+                <div>생체 인증 설정</div>
+                <div className="text-xs text-gray-500 font-normal">지문/얼굴 인식 등록</div>
+              </div>
+            </Button>
+          )}
         </div>
 
         {/* 긴급 상황 버튼 */}

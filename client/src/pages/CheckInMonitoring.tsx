@@ -43,6 +43,9 @@ export default function CheckInMonitoring() {
   // 오늘 출근 통계 (필터 적용 전)
   const { data: todayStats } = trpc.checkIn.getTodayStats.useQuery();
 
+  // 디버깅: 출근 통계 로그
+  console.log('[CheckInMonitoring] Today stats:', todayStats);
+
   // 필터링된 출근 기록 (클라이언트 측 추가 필터링)
   const filteredCheckIns = useMemo(() => {
     return checkIns.filter((checkIn) => {
