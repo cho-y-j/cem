@@ -3207,6 +3207,8 @@ export async function deleteWorkZone(id: string): Promise<void> {
 
 /**
  * GPS 좌표가 작업 구역 내에 있는지 확인
+ * 원형 구역: 중심점과 반경으로 계산
+ * 다각형 구역: Ray casting 알고리즘으로 내부 여부 확인
  */
 export async function isWithinWorkZone(
   workZoneId: string,
@@ -3218,17 +3220,65 @@ export async function isWithinWorkZone(
     throw new Error('Work zone not found');
   }
 
-  const distance = calculateDistance(
-    Number(workZone.centerLat),
-    Number(workZone.centerLng),
-    lat,
-    lng
-  );
+  const zoneType = workZone.zoneType || 'circle';
 
-  return {
-    isWithin: distance <= workZone.radiusMeters,
-    distance: Math.round(distance),
-  };
+  if (zoneType === 'polygon') {
+    // 다각형 구역 처리
+    if (!workZone.polygonCoordinates) {
+      throw new Error('Polygon coordinates not found');
+    }
+
+    let polygonPoints: Array<{ lat: number; lng: number }>;
+    try {
+      polygonPoints = JSON.parse(workZone.polygonCoordinates);
+    } catch (e) {
+      throw new Error('Invalid polygon coordinates format');
+    }
+
+    if (polygonPoints.length < 3) {
+      throw new Error('Polygon must have at least 3 points');
+    }
+
+    // Ray casting 알고리즘으로 점이 다각형 내부에 있는지 확인
+    let isInside = false;
+    for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
+      const xi = polygonPoints[i].lng;
+      const yi = polygonPoints[i].lat;
+      const xj = polygonPoints[j].lng;
+      const yj = polygonPoints[j].lat;
+
+      const intersect = ((yi > lng) !== (yj > lng)) &&
+        (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      if (intersect) isInside = !isInside;
+    }
+
+    // 다각형의 중심점까지의 거리 계산 (표시용)
+    const centerLat = polygonPoints.reduce((sum, p) => sum + p.lat, 0) / polygonPoints.length;
+    const centerLng = polygonPoints.reduce((sum, p) => sum + p.lng, 0) / polygonPoints.length;
+    const distance = calculateDistance(centerLat, centerLng, lat, lng);
+
+    return {
+      isWithin: isInside,
+      distance: Math.round(distance),
+    };
+  } else {
+    // 원형 구역 처리
+    if (!workZone.centerLat || !workZone.centerLng) {
+      throw new Error('Circle zone must have center coordinates');
+    }
+
+    const distance = calculateDistance(
+      Number(workZone.centerLat),
+      Number(workZone.centerLng),
+      lat,
+      lng
+    );
+
+    return {
+      isWithin: distance <= (workZone.radiusMeters || 100),
+      distance: Math.round(distance),
+    };
+  }
 }
 
 // ============================================================

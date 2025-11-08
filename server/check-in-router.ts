@@ -46,12 +46,27 @@ export const checkInRouter = router({
       }
 
       // Worker 정보 조회
-      const supabase = db.getSupabaseClient();
-      const { data: worker } = await supabase
+      const supabase = db.getSupabase();
+      if (!supabase) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "데이터베이스 연결에 실패했습니다.",
+        });
+      }
+
+      const { data: worker, error: workerError } = await supabase
         .from("workers")
         .select("id, deployment_id:deployments!worker_id(id, work_zone_id)")
         .eq("user_id", ctx.user.id)
-        .single();
+        .maybeSingle();
+
+      if (workerError) {
+        console.error("[CheckIn] Error fetching worker:", workerError);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Worker 정보 조회 중 오류가 발생했습니다.",
+        });
+      }
 
       if (!worker) {
         throw new TRPCError({

@@ -66,7 +66,7 @@ export const webauthnRouter = router({
       // 2. 공개키 검증
       // 3. DB에 저장
 
-      const supabase = db.getSupabaseClient();
+      const supabase = db.getSupabase();
       const { error } = await supabase.from('webauthn_credentials').insert({
         id: input.credentialId,
         user_id: ctx.user.id,
@@ -97,7 +97,7 @@ export const webauthnRouter = router({
       const challenge = nanoid(32);
 
       // 사용자의 등록된 크레덴셜 조회
-      const supabase = db.getSupabaseClient();
+      const supabase = db.getSupabase();
       const { data: credentials } = await supabase
         .from('webauthn_credentials')
         .select('id')
@@ -140,7 +140,7 @@ export const webauthnRouter = router({
    */
   myCredentials: protectedProcedure
     .query(async ({ ctx }) => {
-      const supabase = db.getSupabaseClient();
+      const supabase = db.getSupabase();
       const { data, error } = await supabase
         .from('webauthn_credentials')
         .select('*')
@@ -163,7 +163,7 @@ export const webauthnRouter = router({
       credentialId: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const supabase = db.getSupabaseClient();
+      const supabase = db.getSupabase();
       const { error } = await supabase
         .from('webauthn_credentials')
         .delete()
