@@ -723,3 +723,118 @@ export const safetyInspectionResults = pgTable("safety_inspection_results", {
 export type SafetyInspectionResult = typeof safetyInspectionResults.$inferSelect;
 export type InsertSafetyInspectionResult = typeof safetyInspectionResults.$inferInsert;
 
+// ============================================================
+// 출근 체크 시스템 (Check-In System)
+// ============================================================
+
+/**
+ * 작업 구역 (Work Zones)
+ * EP/Admin이 Google Maps로 작업 구역을 설정
+ * GPS 좌표 중심점 + 반경으로 정의
+ */
+export const workZones = pgTable("work_zones", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+
+  // GPS 좌표 (중심점)
+  centerLat: decimal("center_lat", { precision: 10, scale: 8 }).notNull(),
+  centerLng: decimal("center_lng", { precision: 11, scale: 8 }).notNull(),
+
+  // 반경 (미터)
+  radiusMeters: integer("radius_meters").notNull().default(100),
+
+  // 연결 정보
+  companyId: varchar("company_id", { length: 64 }), // 소속 회사
+
+  // 생성 정보
+  createdBy: varchar("created_by", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+
+  // 상태
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
+export type WorkZone = typeof workZones.$inferSelect;
+export type InsertWorkZone = typeof workZones.$inferInsert;
+
+/**
+ * 출근 기록 (Check-Ins)
+ * Worker의 출근 시간, GPS 위치, 생체 인증 여부 기록
+ * 업무 시작(work session)과는 별개
+ */
+export const checkIns = pgTable("check_ins", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+
+  // 연결 정보
+  workerId: varchar("worker_id", { length: 64 }).notNull(),
+  userId: varchar("user_id", { length: 64 }).notNull(),
+  deploymentId: varchar("deployment_id", { length: 64 }),
+  workZoneId: varchar("work_zone_id", { length: 64 }),
+
+  // 출근 시간
+  checkInTime: timestamp("check_in_time").notNull(),
+
+  // GPS 위치
+  checkInLat: decimal("check_in_lat", { precision: 10, scale: 8 }),
+  checkInLng: decimal("check_in_lng", { precision: 11, scale: 8 }),
+
+  // 위치 검증
+  distanceFromZone: integer("distance_from_zone"), // 작업 구역 중심으로부터 거리(미터)
+  isWithinZone: boolean("is_within_zone").default(false), // 작업 구역 내 출근 여부
+
+  // 인증 방식
+  authMethod: varchar("auth_method", { length: 50 }), // "webauthn", "pin", "password"
+  webauthnVerified: boolean("webauthn_verified").default(false), // 생체 인증 완료 여부
+  webauthnCredentialId: varchar("webauthn_credential_id", { length: 255 }), // 사용된 인증 자격증명 ID
+
+  // 추가 정보
+  deviceInfo: text("device_info"), // 기기 정보 (User-Agent)
+  notes: text("notes"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type CheckIn = typeof checkIns.$inferSelect;
+export type InsertCheckIn = typeof checkIns.$inferInsert;
+
+/**
+ * WebAuthn 자격증명 (WebAuthn Credentials)
+ * FIDO2/WebAuthn 공개키 저장
+ * 지문, 얼굴 인식 등 생체 인증에 사용
+ */
+export const webauthnCredentials = pgTable("webauthn_credentials", {
+  // Credential ID (WebAuthn에서 생성, base64 인코딩)
+  id: varchar("id", { length: 255 }).primaryKey(),
+
+  // 사용자 정보
+  userId: varchar("user_id", { length: 64 }).notNull(),
+
+  // 공개키 (base64 인코딩)
+  publicKey: text("public_key").notNull(),
+
+  // 재생 공격 방지 카운터
+  counter: integer("counter").default(0).notNull(),
+
+  // 기기 정보
+  deviceName: varchar("device_name", { length: 255 }), // 사용자가 지정한 기기 이름
+  deviceType: varchar("device_type", { length: 50 }), // "platform" (TouchID, FaceID), "cross-platform" (USB key)
+
+  // 전송 방식 (배열로 저장: usb, nfc, ble, internal)
+  transports: text("transports").array(),
+
+  // AAGUID (Authenticator Attestation GUID)
+  aaguid: varchar("aaguid", { length: 64 }),
+
+  // 생성 및 사용 정보
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+
+  // 상태
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
+export type WebauthnCredential = typeof webauthnCredentials.$inferSelect;
+export type InsertWebauthnCredential = typeof webauthnCredentials.$inferInsert;
+

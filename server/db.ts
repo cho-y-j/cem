@@ -31,6 +31,12 @@ import {
   InsertEntryRequestItem,
   Deployment,
   InsertDeployment,
+  WorkZone,
+  InsertWorkZone,
+  CheckIn,
+  InsertCheckIn,
+  WebauthnCredential,
+  InsertWebauthnCredential,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -3062,5 +3068,258 @@ export async function getAllActiveLocations(filters?: {
   }
 
   return toCamelCaseArray(result);
+}
+
+// ============================================================
+// 작업 구역 (Work Zones) - GPS 기반 출근 체크
+// ============================================================
+
+/**
+ * GPS 거리 계산 (Haversine 공식)
+ * 두 GPS 좌표 사이의 거리를 미터 단위로 계산
+ */
+export function calculateDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371e3; // 지구 반경 (미터)
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // 미터
+}
+
+/**
+ * 작업 구역 생성
+ */
+export async function createWorkZone(data: InsertWorkZone): Promise<WorkZone> {
+  const supabase = getSupabaseClient();
+  const { data: result, error } = await supabase
+    .from('work_zones')
+    .insert(toSnakeCase(data))
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[DB] createWorkZone error:', error);
+    throw new Error(`Failed to create work zone: ${error.message}`);
+  }
+
+  return toCamelCase(result);
+}
+
+/**
+ * 작업 구역 목록 조회
+ */
+export async function getWorkZones(filters?: {
+  companyId?: string;
+  isActive?: boolean;
+}): Promise<WorkZone[]> {
+  const supabase = getSupabaseClient();
+  let query = supabase.from('work_zones').select('*');
+
+  if (filters?.companyId) {
+    query = query.eq('company_id', filters.companyId);
+  }
+  if (filters?.isActive !== undefined) {
+    query = query.eq('is_active', filters.isActive);
+  }
+
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[DB] getWorkZones error:', error);
+    throw new Error(`Failed to get work zones: ${error.message}`);
+  }
+
+  return toCamelCaseArray(data || []);
+}
+
+/**
+ * 작업 구역 단건 조회
+ */
+export async function getWorkZoneById(id: string): Promise<WorkZone | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('work_zones')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    console.error('[DB] getWorkZoneById error:', error);
+    throw new Error(`Failed to get work zone: ${error.message}`);
+  }
+
+  return toCamelCase(data);
+}
+
+/**
+ * 작업 구역 수정
+ */
+export async function updateWorkZone(
+  id: string,
+  data: Partial<InsertWorkZone>
+): Promise<WorkZone> {
+  const supabase = getSupabaseClient();
+  const { data: result, error } = await supabase
+    .from('work_zones')
+    .update({ ...toSnakeCase(data), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[DB] updateWorkZone error:', error);
+    throw new Error(`Failed to update work zone: ${error.message}`);
+  }
+
+  return toCamelCase(result);
+}
+
+/**
+ * 작업 구역 삭제 (소프트 삭제)
+ */
+export async function deleteWorkZone(id: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from('work_zones')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) {
+    console.error('[DB] deleteWorkZone error:', error);
+    throw new Error(`Failed to delete work zone: ${error.message}`);
+  }
+}
+
+/**
+ * GPS 좌표가 작업 구역 내에 있는지 확인
+ */
+export async function isWithinWorkZone(
+  workZoneId: string,
+  lat: number,
+  lng: number
+): Promise<{ isWithin: boolean; distance: number }> {
+  const workZone = await getWorkZoneById(workZoneId);
+  if (!workZone) {
+    throw new Error('Work zone not found');
+  }
+
+  const distance = calculateDistance(
+    Number(workZone.centerLat),
+    Number(workZone.centerLng),
+    lat,
+    lng
+  );
+
+  return {
+    isWithin: distance <= workZone.radiusMeters,
+    distance: Math.round(distance),
+  };
+}
+
+// ============================================================
+// 출근 기록 (Check-Ins)
+// ============================================================
+
+/**
+ * 출근 기록 생성
+ */
+export async function createCheckIn(data: InsertCheckIn): Promise<CheckIn> {
+  const supabase = getSupabaseClient();
+  const { data: result, error } = await supabase
+    .from('check_ins')
+    .insert(toSnakeCase(data))
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[DB] createCheckIn error:', error);
+    throw new Error(`Failed to create check-in: ${error.message}`);
+  }
+
+  return toCamelCase(result);
+}
+
+/**
+ * 출근 기록 조회
+ */
+export async function getCheckIns(filters?: {
+  workerId?: string;
+  userId?: string;
+  workZoneId?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<CheckIn[]> {
+  const supabase = getSupabaseClient();
+  let query = supabase.from('check_ins').select('*');
+
+  if (filters?.workerId) {
+    query = query.eq('worker_id', filters.workerId);
+  }
+  if (filters?.userId) {
+    query = query.eq('user_id', filters.userId);
+  }
+  if (filters?.workZoneId) {
+    query = query.eq('work_zone_id', filters.workZoneId);
+  }
+  if (filters?.startDate) {
+    query = query.gte('check_in_time', filters.startDate);
+  }
+  if (filters?.endDate) {
+    query = query.lte('check_in_time', filters.endDate);
+  }
+
+  query = query.order('check_in_time', { ascending: false });
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[DB] getCheckIns error:', error);
+    throw new Error(`Failed to get check-ins: ${error.message}`);
+  }
+
+  return toCamelCaseArray(data || []);
+}
+
+/**
+ * 오늘 출근 기록 조회
+ */
+export async function getTodayCheckIn(userId: string): Promise<CheckIn | null> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('check_ins')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('check_in_time', today.toISOString())
+    .lt('check_in_time', tomorrow.toISOString())
+    .order('check_in_time', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[DB] getTodayCheckIn error:', error);
+    throw new Error(`Failed to get today check-in: ${error.message}`);
+  }
+
+  return data ? toCamelCase(data) : null;
 }
 
