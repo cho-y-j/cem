@@ -77,6 +77,8 @@ export const checkInRouter = router({
       }
 
       // 2. 활성 투입(deployment) 확인 - 투입된 사람만 출근 가능
+      console.log("[CheckIn] Checking deployment for worker:", worker.id);
+      
       const { data: activeDeployment, error: deploymentError } = await supabase
         .from("deployments")
         .select("id, work_zone_id, bp_company_id, ep_company_id, equipment_id, status")
@@ -87,14 +89,41 @@ export const checkInRouter = router({
         .maybeSingle();
 
       if (deploymentError) {
-        console.error("[CheckIn] Error fetching deployment:", deploymentError);
+        console.error("[CheckIn] Error fetching deployment:", {
+          error: deploymentError,
+          workerId: worker.id,
+          errorCode: deploymentError.code,
+          errorMessage: deploymentError.message,
+          errorDetails: deploymentError.details,
+          errorHint: deploymentError.hint,
+        });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "투입 정보 조회 중 오류가 발생했습니다.",
+          message: `투입 정보 조회 중 오류가 발생했습니다: ${deploymentError.message || "알 수 없는 오류"}`,
         });
       }
 
+      console.log("[CheckIn] Deployment query result:", {
+        found: !!activeDeployment,
+        deploymentId: activeDeployment?.id,
+        workZoneId: activeDeployment?.work_zone_id,
+      });
+
       if (!activeDeployment) {
+        // 디버깅: 모든 deployment 확인
+        const { data: allDeployments, error: allDeploymentsError } = await supabase
+          .from("deployments")
+          .select("id, worker_id, status, created_at")
+          .eq("worker_id", worker.id)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        
+        console.log("[CheckIn] All deployments for worker:", {
+          count: allDeployments?.length || 0,
+          deployments: allDeployments,
+          error: allDeploymentsError,
+        });
+
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "출근할 수 없습니다. 현재 활성화된 투입이 없습니다. 관리자에게 문의하세요.",

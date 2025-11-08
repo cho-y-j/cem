@@ -14,9 +14,9 @@ import { toast } from "sonner";
 export default function CheckInMonitoring() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [bpCompanyId, setBpCompanyId] = useState<string>("");
-  const [ownerCompanyId, setOwnerCompanyId] = useState<string>("");
-  const [workerTypeId, setWorkerTypeId] = useState<string>("");
+  const [bpCompanyId, setBpCompanyId] = useState<string | undefined>(undefined);
+  const [ownerCompanyId, setOwnerCompanyId] = useState<string | undefined>(undefined);
+  const [workerTypeId, setWorkerTypeId] = useState<string | undefined>(undefined);
 
   // 회사 목록 조회
   const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery({ companyType: "bp" });
@@ -62,9 +62,9 @@ export default function CheckInMonitoring() {
   // 필터 초기화
   const resetFilters = () => {
     setSearchQuery("");
-    setBpCompanyId("");
-    setOwnerCompanyId("");
-    setWorkerTypeId("");
+    setBpCompanyId(undefined);
+    setOwnerCompanyId(undefined);
+    setWorkerTypeId(undefined);
   };
 
   // 활성 필터 개수
@@ -200,12 +200,12 @@ export default function CheckInMonitoring() {
             {/* BP 회사 필터 */}
             <div className="space-y-2">
               <Label>BP 회사</Label>
-              <Select value={bpCompanyId} onValueChange={setBpCompanyId}>
+              <Select value={bpCompanyId || "all"} onValueChange={(value) => setBpCompanyId(value === "all" ? undefined : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">전체</SelectItem>
+                  <SelectItem value="all">전체</SelectItem>
                   {bpCompanies.map((company: any) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
@@ -218,12 +218,12 @@ export default function CheckInMonitoring() {
             {/* Owner 회사 필터 */}
             <div className="space-y-2">
               <Label>Owner 회사</Label>
-              <Select value={ownerCompanyId} onValueChange={setOwnerCompanyId}>
+              <Select value={ownerCompanyId || "all"} onValueChange={(value) => setOwnerCompanyId(value === "all" ? undefined : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">전체</SelectItem>
+                  <SelectItem value="all">전체</SelectItem>
                   {ownerCompanies.map((company: any) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
@@ -236,12 +236,12 @@ export default function CheckInMonitoring() {
             {/* 사용자 종류 필터 */}
             <div className="space-y-2">
               <Label>사용자 종류</Label>
-              <Select value={workerTypeId} onValueChange={setWorkerTypeId}>
+              <Select value={workerTypeId || "all"} onValueChange={(value) => setWorkerTypeId(value === "all" ? undefined : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">전체</SelectItem>
+                  <SelectItem value="all">전체</SelectItem>
                   {workerTypes.map((type: any) => (
                     <SelectItem key={type.id} value={type.id}>
                       {type.name}

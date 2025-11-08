@@ -3321,10 +3321,9 @@ export async function getCheckIns(filters?: {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  // 기본 쿼리 - deployment와 worker 정보를 join
+  // 기본 쿼리 - 직접 조인 사용 (foreign key 이름이 정확하지 않을 수 있음)
   let query = supabase.from('check_ins').select(`
     *,
-    user:users!check_ins_user_id_fkey(id, name, email, role),
     worker:workers!check_ins_worker_id_fkey(
       id,
       user_id,
@@ -3368,6 +3367,29 @@ export async function getCheckIns(filters?: {
   }
 
   let checkIns = toCamelCaseArray(data || []);
+
+  // user 정보 별도 조회 (foreign key 관계 문제로 인해)
+  const userIds = [...new Set(checkIns.map((ci: any) => ci.userId).filter(Boolean))];
+  const userMap = new Map();
+  
+  if (userIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email, role')
+      .in('id', userIds);
+    
+    if (users) {
+      users.forEach((user: any) => {
+        userMap.set(user.id, toCamelCase(user));
+      });
+    }
+  }
+
+  // user 정보 추가
+  checkIns = checkIns.map((ci: any) => ({
+    ...ci,
+    user: userMap.get(ci.userId) || null,
+  }));
 
   // 추가 필터링 (deployment 정보 기반)
   if (filters?.bpCompanyId) {
