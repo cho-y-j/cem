@@ -8,7 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { MapPin, Plus, Edit, Trash2, Save, X } from "lucide-react";
+import { MapPin, Plus, Edit, Trash2, Save, X, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import DashboardLayout from "@/components/DashboardLayout";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
@@ -232,67 +239,107 @@ export default function WorkZones() {
           </Button>
         </div>
 
-        {/* 작업 구역 목록 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {workZones.map((zone) => (
-            <Card key={zone.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-blue-600" />
-                    <CardTitle className="text-base">{zone.name}</CardTitle>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openDialog(zone)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(zone)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
-                </div>
-                {zone.description && (
-                  <CardDescription className="text-xs">{zone.description}</CardDescription>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">위도</span>
-                  <span className="font-mono">{parseFloat(zone.centerLat).toFixed(6)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">경도</span>
-                  <span className="font-mono">{parseFloat(zone.centerLng).toFixed(6)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">반경</span>
-                  <span className="font-semibold">{zone.radiusMeters}m</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {workZones.length === 0 && (
-            <Card className="col-span-full">
-              <CardContent className="flex flex-col items-center justify-center py-12">
+        {/* 작업 구역 목록 - 행 형식 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>작업 구역 목록</CardTitle>
+            <CardDescription>
+              등록된 작업 구역 {workZones.length}개
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {workZones.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
                 <MapPin className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-4">등록된 작업 구역이 없습니다</p>
                 <Button onClick={() => openDialog()}>
                   <Plus className="mr-2 h-4 w-4" />
                   첫 작업 구역 만들기
                 </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {workZones.map((zone) => (
+                  <div
+                    key={zone.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100">
+                        <MapPin className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-semibold text-base">{zone.name}</h3>
+                          {zone.isActive ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                              활성
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-gray-300 text-gray-600">
+                              비활성
+                            </Badge>
+                          )}
+                        </div>
+                        {zone.description && (
+                          <p className="text-sm text-muted-foreground mb-2 truncate">
+                            {zone.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">위도:</span>
+                            <span className="font-mono">{parseFloat(zone.centerLat).toFixed(6)}</span>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">경도:</span>
+                            <span className="font-mono">{parseFloat(zone.centerLng).toFixed(6)}</span>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">반경:</span>
+                            <span className="font-semibold text-foreground">{zone.radiusMeters}m</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDialog(zone)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        수정
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openDialog(zone)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            수정
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(zone)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            삭제
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* 작업 구역 생성/수정 다이얼로그 */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
