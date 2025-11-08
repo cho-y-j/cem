@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { MapPin, Plus, Edit, Trash2, Save, X, MoreVertical, Circle, Shapes } from "lucide-react";
+import { MapPin, Plus, Edit, Trash2, Save, X, MoreVertical, Circle, Shapes, MousePointer2, Hand } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -207,6 +207,9 @@ export default function WorkZones() {
   // 지도 중심 (폼과 별도로 관리)
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
 
+  // 그리기 모드 (점 찍기/중심점 이동 활성화)
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+
   // 작업 구역 목록 조회
   const { data: workZones = [], refetch } = trpc.workZones.list.useQuery();
 
@@ -297,6 +300,7 @@ export default function WorkZones() {
       });
       setMapCenter(DEFAULT_CENTER);
     }
+    setIsDrawingMode(false); // 다이얼로그 열 때 그리기 모드 초기화
     setIsDialogOpen(true);
   };
 
@@ -321,7 +325,8 @@ export default function WorkZones() {
 
   // 지도 클릭 핸들러
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (!e.latLng) return;
+    // 그리기 모드가 아닐 때는 클릭 무시
+    if (!isDrawingMode || !e.latLng) return;
     
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
@@ -332,6 +337,7 @@ export default function WorkZones() {
         ...prev,
         polygonPoints: [...prev.polygonPoints, { lat, lng }],
       }));
+      toast.success(`점 ${formData.polygonPoints.length + 1}개 추가됨`);
     } else if (formData.zoneType === "circle") {
       // 원형 모드: 중심점 이동
       setFormData(prev => ({
@@ -339,8 +345,9 @@ export default function WorkZones() {
         centerLat: lat,
         centerLng: lng,
       }));
+      toast.success("중심점이 이동되었습니다");
     }
-  }, [formData.zoneType]);
+  }, [formData.zoneType, isDrawingMode, formData.polygonPoints.length]);
 
   // 폴리곤 점 삭제
   const removePolygonPoint = (index: number) => {
@@ -621,34 +628,52 @@ export default function WorkZones() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <Label>작업 구역 위치</Label>
-                    {formData.zoneType === "circle" && (
-                      <p className="text-xs text-muted-foreground">
-                        💡 지도를 클릭하면 중심점이 이동합니다
+                    {isDrawingMode ? (
+                      <p className="text-xs text-blue-600 font-medium">
+                        ✏️ 그리기 모드: 지도를 클릭하여 {formData.zoneType === "circle" ? "중심점을 설정" : "점을 추가"}하세요
                       </p>
-                    )}
-                    {formData.zoneType === "polygon" && (
+                    ) : (
                       <p className="text-xs text-muted-foreground">
-                        💡 지도를 클릭하여 점을 추가하세요 (최소 3개 필요)
+                        👆 "그리기 시작" 버튼을 클릭한 후 지도에서 점을 찍으세요
                       </p>
                     )}
                   </div>
-                  {formData.zoneType === "polygon" && (
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    {formData.zoneType === "polygon" && (
                       <Badge variant="outline" className="text-sm">
                         점 {formData.polygonPoints.length}개
                       </Badge>
-                      {formData.polygonPoints.length > 0 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setFormData(prev => ({ ...prev, polygonPoints: [] }))}
-                        >
-                          모두 삭제
-                        </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant={isDrawingMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setIsDrawingMode(!isDrawingMode)}
+                      className="flex items-center gap-2"
+                    >
+                      {isDrawingMode ? (
+                        <>
+                          <Hand className="h-4 w-4" />
+                          그리기 종료
+                        </>
+                      ) : (
+                        <>
+                          <MousePointer2 className="h-4 w-4" />
+                          그리기 시작
+                        </>
                       )}
-                    </div>
-                  )}
+                    </Button>
+                    {formData.zoneType === "polygon" && formData.polygonPoints.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData(prev => ({ ...prev, polygonPoints: [] }))}
+                      >
+                        모두 삭제
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="h-[600px] border rounded-lg overflow-hidden relative">
                   {GOOGLE_MAPS_API_KEY ? (
@@ -656,7 +681,7 @@ export default function WorkZones() {
                       <Map
                         defaultCenter={mapCenter}
                         defaultZoom={15}
-                        gestureHandling="greedy"
+                        gestureHandling={isDrawingMode ? "none" : "greedy"}
                         disableDefaultUI={false}
                         onClick={handleMapClick}
                         clickableIcons={false}
