@@ -48,6 +48,17 @@ export default function WorkerMain() {
   const [emergencyType, setEmergencyType] = useState<string>("");
   const [emergencyDescription, setEmergencyDescription] = useState<string>("");
 
+  // WebAuthn 지원 여부 체크
+  const isBiometricAvailable = typeof window !== 'undefined' &&
+    'PublicKeyCredential' in window &&
+    (window.location.protocol === 'https:' || window.location.hostname === 'localhost');
+
+  useEffect(() => {
+    console.log('[WorkerMain] Biometric available:', isBiometricAvailable);
+    console.log('[WorkerMain] Protocol:', window.location.protocol);
+    console.log('[WorkerMain] PublicKeyCredential:', 'PublicKeyCredential' in window);
+  }, [isBiometricAvailable]);
+
   // 배정된 장비 조회
   const { data: assignedEquipment, isLoading: isLoadingEquipment } = trpc.mobile.worker.getMyAssignedEquipment.useQuery();
 
@@ -467,7 +478,7 @@ export default function WorkerMain() {
               </Button>
 
               {/* 생체 인증 출근 버튼 */}
-              {window.PublicKeyCredential && (
+              {isBiometricAvailable ? (
                 <Button
                   size="lg"
                   variant="outline"
@@ -478,6 +489,10 @@ export default function WorkerMain() {
                   <Fingerprint className="mr-2 h-5 w-5" />
                   생체 인증으로 출근
                 </Button>
+              ) : (
+                <div className="text-xs opacity-60 text-center">
+                  💡 생체 인증은 HTTPS에서만 사용 가능합니다
+                </div>
               )}
 
               <div className="text-xs opacity-80">
@@ -485,7 +500,7 @@ export default function WorkerMain() {
               </div>
 
               {/* 생체 인증 설정 링크 */}
-              {window.PublicKeyCredential && (
+              {isBiometricAvailable && (
                 <Button
                   variant="ghost"
                   size="sm"

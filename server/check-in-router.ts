@@ -129,43 +129,61 @@ export const checkInRouter = router({
         });
       }
 
-      // 3. 작업 구역 ID 결정
-      // Note: work_zone_id는 deployments 테이블에 없으므로 입력값 또는 BP 회사의 활성 구역 사용
+      // 3. 작업 구역 ID 결정 및 GPS 검증
       let workZoneId = input.workZoneId;
       const deploymentId = activeDeployment.id;
-
-      // workZoneId가 없으면 BP 회사의 활성 작업 구역 찾기
-      if (!workZoneId && activeDeployment.bp_company_id) {
-        console.log("[CheckIn] Finding active work zone for BP company:", activeDeployment.bp_company_id);
-        const { data: activeWorkZone } = await supabase
-          .from("work_zones")
-          .select("id")
-          .eq("company_id", activeDeployment.bp_company_id)
-          .eq("is_active", true)
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (activeWorkZone) {
-          workZoneId = activeWorkZone.id;
-          console.log("[CheckIn] Auto-selected work zone:", workZoneId);
-        }
-      }
-
       let isWithinZone = false;
       let distanceFromZone: number | undefined;
 
-      // 작업 구역이 있으면 GPS 검증
-      if (workZoneId) {
+      // workZoneId가 없으면 가장 가까운 활성 작업 구역 찾기
+      if (!workZoneId) {
+        console.log("[CheckIn] Finding nearest active work zone");
+        console.log("[CheckIn] Current GPS position:", input.lat, input.lng);
+
+        // 모든 활성 작업 구역 조회
+        const { data: activeWorkZones } = await supabase
+          .from("work_zones")
+          .select("*")
+          .eq("is_active", true)
+          .is("deleted_at", null);
+
+        console.log("[CheckIn] Found active work zones:", activeWorkZones?.length || 0);
+
+        if (activeWorkZones && activeWorkZones.length > 0) {
+          // 각 작업 구역까지의 거리 계산
+          let nearestZone = null;
+          let minDistance = Infinity;
+
+          for (const zone of activeWorkZones) {
+            const result = await db.isWithinWorkZone(zone.id, input.lat, input.lng);
+            console.log(`[CheckIn] Zone "${zone.name}" (${zone.id}): distance=${result.distance}m, within=${result.isWithin}`);
+
+            if (result.distance < minDistance) {
+              minDistance = result.distance;
+              nearestZone = zone;
+              isWithinZone = result.isWithin;
+              distanceFromZone = result.distance;
+            }
+          }
+
+          if (nearestZone) {
+            workZoneId = nearestZone.id;
+            console.log(`[CheckIn] Selected nearest work zone: "${nearestZone.name}" (${workZoneId}), distance=${distanceFromZone}m, within=${isWithinZone}`);
+          }
+        } else {
+          console.warn("[CheckIn] No active work zones found");
+        }
+      } else {
+        // workZoneId가 명시적으로 제공된 경우
         const result = await db.isWithinWorkZone(workZoneId, input.lat, input.lng);
         isWithinZone = result.isWithin;
         distanceFromZone = result.distance;
+        console.log(`[CheckIn] Using provided work zone: ${workZoneId}, distance=${distanceFromZone}m, within=${isWithinZone}`);
+      }
 
-        // 작업 구역 밖이면 경고 (하지만 출근은 허용 - 관리자가 나중에 확인)
-        if (!isWithinZone) {
-          console.warn(`[CheckIn] Worker ${ctx.user.id} checked in outside work zone (${distanceFromZone}m away)`);
-        }
+      // 작업 구역 밖이면 경고 (하지만 출근은 허용 - 관리자가 나중에 확인)
+      if (!isWithinZone && workZoneId) {
+        console.warn(`[CheckIn] Worker ${ctx.user.id} checked in outside work zone (${distanceFromZone}m away)`);
       }
 
       // 출근 기록 생성
@@ -303,6 +321,15 @@ export const checkInRouter = router({
       endDate: tomorrow.toISOString(),
     });
 
+    // 출근 대상: 활성 deployment의 worker 수 조회
+    const supabase = db.getSupabase();
+    const { data: activeDeployments } = await supabase
+      .from("deployments")
+      .select("worker_id")
+      .eq("status", "active");
+
+    const expectedWorkers = activeDeployments?.length || 0;
+
     // 통계 계산
     const total = todayCheckIns.length;
     const withinZone = todayCheckIns.filter(c => c.isWithinZone).length;
@@ -316,8 +343,13 @@ export const checkInRouter = router({
     }).length;
     const afternoon = total - morning;
 
+    // 출근율 계산
+    const attendanceRate = expectedWorkers > 0 ? (total / expectedWorkers) * 100 : 0;
+
     return {
       total,
+      expectedWorkers,
+      attendanceRate: Math.round(attendanceRate * 10) / 10, // 소수점 1자리
       withinZone,
       outsideZone,
       withWebauthn,

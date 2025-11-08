@@ -255,7 +255,23 @@ export default function CheckInMonitoring() {
       </Card>
 
       {/* 통계 카드 */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {/* 출근율 */}
+        <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-indigo-900">출근율</CardTitle>
+            <Users className="h-4 w-4 text-indigo-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-900">
+              {todayStats?.total || 0}/{todayStats?.expectedWorkers || 0}명
+            </div>
+            <p className="text-xs text-indigo-700 font-semibold">
+              {todayStats?.attendanceRate || 0}%
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">총 출근자</CardTitle>
@@ -303,7 +319,7 @@ export default function CheckInMonitoring() {
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{todayStats?.withWebauthn || 0}명</div>
             <p className="text-xs text-muted-foreground">
-              향후 WebAuthn 지원 예정
+              지문/얼굴 인식 출근
             </p>
           </CardContent>
         </Card>
