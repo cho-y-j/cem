@@ -663,13 +663,14 @@ export default function WorkZones() {
                       >
                         {formData.zoneType === "circle" ? (
                           <>
-                            {/* 드래그 가능한 마커 */}
+                            {/* 중심점 마커 (드래그 가능, 클릭으로도 이동 가능) */}
                             {formData.centerLat != null && formData.centerLng != null && (
                               <>
                                 <Marker
                                   position={{ lat: formData.centerLat, lng: formData.centerLng }}
                                   draggable={true}
                                   onDragEnd={handleMarkerDrag}
+                                  title="중심점 (드래그 또는 지도 클릭으로 이동)"
                                 />
                                 {/* 작업 구역 원 */}
                                 <Circle
@@ -729,11 +730,14 @@ export default function WorkZones() {
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {formData.zoneType === "circle" 
-                    ? "📍 마커를 드래그하여 중심점을 이동할 수 있습니다"
-                    : "📍 지도를 클릭하여 점을 추가하세요. 점을 드래그하여 위치를 조정할 수 있습니다"}
-                </p>
+                {formData.zoneType === "polygon" && formData.polygonPoints.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>💡 팁:</strong> 폴리곤의 점을 드래그하여 위치를 조정할 수 있습니다. 
+                      {formData.polygonPoints.length < 3 && " 최소 3개 점이 필요합니다."}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* 폴리곤 점 목록 */}
