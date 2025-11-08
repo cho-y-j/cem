@@ -296,7 +296,7 @@ export default function WorkZones() {
 
         {/* 작업 구역 생성/수정 다이얼로그 */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingZone ? "작업 구역 수정" : "새 작업 구역 생성"}

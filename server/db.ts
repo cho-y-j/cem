@@ -3102,7 +3102,7 @@ export function calculateDistance(
  * 작업 구역 생성
  */
 export async function createWorkZone(data: InsertWorkZone): Promise<WorkZone> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabase();
   const { data: result, error } = await supabase
     .from('work_zones')
     .insert(toSnakeCase(data))
@@ -3124,7 +3124,7 @@ export async function getWorkZones(filters?: {
   companyId?: string;
   isActive?: boolean;
 }): Promise<WorkZone[]> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabase();
   let query = supabase.from('work_zones').select('*');
 
   if (filters?.companyId) {
@@ -3150,7 +3150,7 @@ export async function getWorkZones(filters?: {
  * 작업 구역 단건 조회
  */
 export async function getWorkZoneById(id: string): Promise<WorkZone | null> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('work_zones')
     .select('*')
@@ -3173,7 +3173,7 @@ export async function updateWorkZone(
   id: string,
   data: Partial<InsertWorkZone>
 ): Promise<WorkZone> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabase();
   const { data: result, error } = await supabase
     .from('work_zones')
     .update({ ...toSnakeCase(data), updated_at: new Date().toISOString() })
@@ -3193,7 +3193,7 @@ export async function updateWorkZone(
  * 작업 구역 삭제 (소프트 삭제)
  */
 export async function deleteWorkZone(id: string): Promise<void> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabase();
   const { error } = await supabase
     .from('work_zones')
     .update({ is_active: false, updated_at: new Date().toISOString() })
@@ -3239,7 +3239,7 @@ export async function isWithinWorkZone(
  * 출근 기록 생성
  */
 export async function createCheckIn(data: InsertCheckIn): Promise<CheckIn> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabase();
   const { data: result, error } = await supabase
     .from('check_ins')
     .insert(toSnakeCase(data))
@@ -3264,8 +3264,13 @@ export async function getCheckIns(filters?: {
   startDate?: string;
   endDate?: string;
 }): Promise<CheckIn[]> {
-  const supabase = getSupabaseClient();
-  let query = supabase.from('check_ins').select('*');
+  const supabase = getSupabase();
+  let query = supabase.from('check_ins').select(`
+    *,
+    user:users!check_ins_user_id_fkey(id, name, email, role),
+    worker:workers!check_ins_worker_id_fkey(id, user_id),
+    work_zone:work_zones!check_ins_work_zone_id_fkey(id, name)
+  `);
 
   if (filters?.workerId) {
     query = query.eq('worker_id', filters.workerId);
@@ -3304,7 +3309,7 @@ export async function getTodayCheckIn(userId: string): Promise<CheckIn | null> {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const supabase = getSupabaseClient();
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('check_ins')
     .select('*')
