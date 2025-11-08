@@ -177,6 +177,52 @@ function Polygon({
   return null;
 }
 
+// Map 클릭 이벤트 핸들러 컴포넌트
+function MapClickHandler({
+  isDrawingMode,
+  onMapClick,
+  zoneType,
+}: {
+  isDrawingMode: boolean;
+  onMapClick: (e: google.maps.MapMouseEvent) => void;
+  zoneType: "circle" | "polygon";
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    // 클릭 이벤트 리스너 추가
+    const listener = map.addListener("click", (e: google.maps.MapMouseEvent) => {
+      if (isDrawingMode) {
+        onMapClick(e);
+      }
+    });
+
+    // 그리기 모드에 따라 지도 동작 설정
+    if (isDrawingMode) {
+      map.setOptions({
+        draggable: false,
+        gestureHandling: "none",
+      });
+    } else {
+      map.setOptions({
+        draggable: true,
+        gestureHandling: "greedy",
+      });
+    }
+
+    // cleanup
+    return () => {
+      if (listener) {
+        google.maps.event.removeListener(listener);
+      }
+    };
+  }, [map, isDrawingMode, onMapClick, zoneType]);
+
+  return null;
+}
+
 interface WorkZone {
   id: string;
   name: string;
@@ -325,8 +371,7 @@ export default function WorkZones() {
 
   // 지도 클릭 핸들러
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    // 그리기 모드가 아닐 때는 클릭 무시
-    if (!isDrawingMode || !e.latLng) return;
+    if (!e.latLng) return;
     
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
@@ -337,7 +382,7 @@ export default function WorkZones() {
         ...prev,
         polygonPoints: [...prev.polygonPoints, { lat, lng }],
       }));
-      toast.success(`점 ${formData.polygonPoints.length + 1}개 추가됨`);
+      toast.success(`점 ${prev.polygonPoints.length + 1}개 추가됨`);
     } else if (formData.zoneType === "circle") {
       // 원형 모드: 중심점 이동
       setFormData(prev => ({
@@ -347,7 +392,7 @@ export default function WorkZones() {
       }));
       toast.success("중심점이 이동되었습니다");
     }
-  }, [formData.zoneType, isDrawingMode, formData.polygonPoints.length]);
+  }, [formData.zoneType]);
 
   // 폴리곤 점 삭제
   const removePolygonPoint = (index: number) => {
@@ -675,16 +720,24 @@ export default function WorkZones() {
                     )}
                   </div>
                 </div>
-                <div className="h-[600px] border rounded-lg overflow-hidden relative">
+                <div 
+                  className="h-[600px] border rounded-lg overflow-hidden relative"
+                  style={{ cursor: isDrawingMode ? 'crosshair' : 'default' }}
+                >
                   {GOOGLE_MAPS_API_KEY ? (
                     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+                      <MapClickHandler 
+                        isDrawingMode={isDrawingMode}
+                        onMapClick={handleMapClick}
+                        zoneType={formData.zoneType}
+                      />
                       <Map
                         defaultCenter={mapCenter}
                         defaultZoom={15}
                         gestureHandling={isDrawingMode ? "none" : "greedy"}
                         disableDefaultUI={false}
-                        onClick={handleMapClick}
                         clickableIcons={false}
+                        style={{ cursor: isDrawingMode ? 'crosshair' : 'default' }}
                       >
                         {formData.zoneType === "circle" ? (
                           <>
