@@ -47,17 +47,20 @@ export default function WorkerMain() {
   const [emergencyDialogOpen, setEmergencyDialogOpen] = useState(false);
   const [emergencyType, setEmergencyType] = useState<string>("");
   const [emergencyDescription, setEmergencyDescription] = useState<string>("");
+  const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
 
-  // WebAuthn 지원 여부 체크
-  const isBiometricAvailable = typeof window !== 'undefined' &&
-    'PublicKeyCredential' in window &&
-    (window.location.protocol === 'https:' || window.location.hostname === 'localhost');
-
+  // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
   useEffect(() => {
-    console.log('[WorkerMain] Biometric available:', isBiometricAvailable);
-    console.log('[WorkerMain] Protocol:', window.location.protocol);
-    console.log('[WorkerMain] PublicKeyCredential:', 'PublicKeyCredential' in window);
-  }, [isBiometricAvailable]);
+    if (typeof window !== 'undefined') {
+      const isAvailable =
+        'PublicKeyCredential' in window &&
+        (window.location.protocol === 'https:' || window.location.hostname === 'localhost');
+      setIsBiometricAvailable(isAvailable);
+      console.log('[WorkerMain] Biometric available:', isAvailable);
+      console.log('[WorkerMain] Protocol:', window.location.protocol);
+      console.log('[WorkerMain] PublicKeyCredential:', 'PublicKeyCredential' in window);
+    }
+  }, []);
 
   // 배정된 장비 조회
   const { data: assignedEquipment, isLoading: isLoadingEquipment } = trpc.mobile.worker.getMyAssignedEquipment.useQuery();
