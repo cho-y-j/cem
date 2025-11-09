@@ -453,20 +453,21 @@ export const webauthnRouter = router({
           credentialIds: credentials.map((c: any) => c.id),
         });
 
-        // allowCredentials의 id는 Uint8Array 또는 base64url 문자열이어야 함
-        // DB에 저장된 c.id는 이미 base64url 문자열이므로 그대로 사용
+        // allowCredentials의 id는 Uint8Array여야 함
+        // DB에 저장된 c.id는 base64url 문자열이므로 Uint8Array로 변환
         const allowCredentials = credentials.map((c: any) => {
-          // c.id가 이미 base64url 문자열인지 확인
           let credentialId: Uint8Array;
           try {
-            // base64url 문자열을 Uint8Array로 변환
             if (typeof c.id === 'string') {
-              // base64url 디코딩
-              credentialId = Buffer.from(c.id, 'base64url');
+              // base64url 문자열을 Buffer로 디코딩한 후 Uint8Array로 변환
+              const buffer = Buffer.from(c.id, 'base64url');
+              credentialId = new Uint8Array(buffer);
             } else if (Buffer.isBuffer(c.id)) {
               credentialId = new Uint8Array(c.id);
+            } else if (c.id instanceof Uint8Array) {
+              credentialId = c.id;
             } else {
-              throw new Error(`Unexpected credential ID type: ${typeof c.id}`);
+              throw new Error(`Unexpected credential ID type: ${typeof c.id}, value: ${JSON.stringify(c.id)}`);
             }
             
             console.log('[WebAuthn] Credential ID prepared:', {
@@ -474,12 +475,14 @@ export const webauthnRouter = router({
               originalType: typeof c.id,
               credentialIdLength: credentialId.length,
               credentialIdType: credentialId instanceof Uint8Array,
+              isUint8Array: credentialId instanceof Uint8Array,
             });
           } catch (err: any) {
             console.error('[WebAuthn] Error preparing credential ID:', {
               credentialId: c.id,
               credentialIdType: typeof c.id,
               error: err.message,
+              stack: err.stack,
             });
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
