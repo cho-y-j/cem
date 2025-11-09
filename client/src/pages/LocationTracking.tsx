@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { APIProvider, Map, Marker, Polyline, useMap } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
 import { MapPin, Loader2, AlertCircle, Filter, X, Route, BarChart3, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,56 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+
+// Polyline 컴포넌트 (useMap 훅 사용)
+function PolylineComponent({
+  path,
+  strokeColor = "#FF0000",
+  strokeOpacity = 0.8,
+  strokeWeight = 3,
+}: {
+  path: Array<{ lat: number; lng: number }>;
+  strokeColor?: string;
+  strokeOpacity?: number;
+  strokeWeight?: number;
+}) {
+  const map = useMap();
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
+
+  useEffect(() => {
+    if (!map || !path || path.length < 2) return;
+
+    // 기존 Polyline 제거
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+    }
+
+    try {
+      // 새 Polyline 생성
+      const polyline = new google.maps.Polyline({
+        map,
+        path: path.map((p) => ({ lat: p.lat, lng: p.lng })),
+        strokeColor,
+        strokeOpacity,
+        strokeWeight,
+        geodesic: true,
+      });
+
+      polylineRef.current = polyline;
+    } catch (error) {
+      console.error("[Polyline] Error creating polyline:", error);
+    }
+
+    // cleanup
+    return () => {
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+      }
+    };
+  }, [map, path, strokeColor, strokeOpacity, strokeWeight]);
+
+  return null;
+}
 
 export default function LocationTracking() {
   const { user } = useAuth();
