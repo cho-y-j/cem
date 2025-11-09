@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, MapPin, Clock, Users, Calendar, RefreshCw, Search, Download, Filter, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CheckCircle, XCircle, MapPin, Clock, Users, Calendar, RefreshCw, Search, Download, Filter, X, ListChecks, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function CheckInMonitoring() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -17,6 +19,10 @@ export default function CheckInMonitoring() {
   const [bpCompanyId, setBpCompanyId] = useState<string | undefined>(undefined);
   const [ownerCompanyId, setOwnerCompanyId] = useState<string | undefined>(undefined);
   const [workerTypeId, setWorkerTypeId] = useState<string | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState("expected"); // "expected" or "checkins"
+
+  // 사용자 정보 가져오기
+  const { user } = useAuth();
 
   // 회사 목록 조회
   const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery({ companyType: "bp" });
@@ -40,11 +46,16 @@ export default function CheckInMonitoring() {
     limit: 100,
   });
 
-  // 오늘 출근 통계 (필터 적용 전)
-  const { data: todayStats } = trpc.checkIn.getTodayStats.useQuery();
+  // 오늘 출근 통계 (사용자 역할에 따라 필터링 적용)
+  const { data: todayStats } = trpc.checkIn.getTodayStats.useQuery(undefined, {
+    // Admin은 전체 조회, EP/BP/Owner는 자신과 관련된 데이터만 조회
+  });
 
   // 디버깅: 출근 통계 로그
   console.log('[CheckInMonitoring] Today stats:', todayStats);
+  console.log('[CheckInMonitoring] Expected workers list:', todayStats?.expectedWorkersList);
+  console.log('[CheckInMonitoring] Date filter:', dateFilter);
+  console.log('[CheckInMonitoring] Is today?', dateFilter === format(new Date(), "yyyy-MM-dd"));
 
   // 필터링된 출근 기록 (클라이언트 측 추가 필터링)
   const filteredCheckIns = useMemo(() => {
@@ -387,96 +398,226 @@ export default function CheckInMonitoring() {
         </Card>
       </div>
 
-      {/* 출근 기록 목록 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>출근 기록</CardTitle>
-          <CardDescription>
-            {dateFilter === format(new Date(), "yyyy-MM-dd") 
-              ? `오늘 출근한 작업자 목록` 
-              : `${dateFilter} 출근한 작업자 목록`} ({filteredCheckIns.length}명)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredCheckIns.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">아직 출근한 작업자가 없습니다</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredCheckIns.map((checkIn) => (
-                <div
-                  key={checkIn.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                      <Users className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        {(checkIn as any).worker?.name || (checkIn as any).user?.name || `작업자 ${checkIn.userId}`}
-                        {(checkIn as any).worker?.workerType?.name && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {(checkIn as any).worker.workerType.name}
+      {/* 출근 대상 목록과 출근 기록 (탭 방식) */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="expected" className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4" />
+            출근 대상 목록
+          </TabsTrigger>
+          <TabsTrigger value="checkins" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            출근 기록
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="expected" className="mt-4">
+          {/* 출근 대상 목록 (오늘 날짜일 때만 표시) */}
+          {dateFilter === format(new Date(), "yyyy-MM-dd") ? (
+            todayStats?.expectedWorkersList && todayStats.expectedWorkersList.length > 0 ? (
+              <Card>
+              <CardHeader>
+                <CardTitle>출근 대상 목록</CardTitle>
+                <CardDescription>
+                  오늘 출근해야 하는 작업자 목록 ({todayStats.expectedWorkersList.length}명)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                  {todayStats.expectedWorkersList.map((worker: any, index: number) => (
+                    <div
+                      key={worker.workerId || index}
+                      className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                        worker.hasCheckedIn 
+                          ? 'bg-green-50 border-green-200' 
+                          : 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 ${
+                          worker.hasCheckedIn ? 'bg-green-100' : 'bg-yellow-100'
+                        }`}>
+                          {worker.hasCheckedIn ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-yellow-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">
+                            {worker.workerName || worker.userName || `작업자 ${worker.workerId}`}
+                            {worker.workerType && (
+                              <Badge variant="outline" className="ml-1 text-xs">
+                                {worker.workerType.name}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
+                            {worker.deployment?.epCompany?.name && (
+                              <span className="truncate">
+                                EP: {worker.deployment.epCompany.name}
+                              </span>
+                            )}
+                            {worker.deployment?.bpCompany?.name && (
+                              <span className="truncate">
+                                BP: {worker.deployment.bpCompany.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {worker.hasCheckedIn ? (
+                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+                            <CheckCircle className="mr-1 h-3 w-3" />
+                            완료
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 text-xs">
+                            <Clock className="mr-1 h-3 w-3" />
+                            대기
                           </Badge>
                         )}
                       </div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-3 mt-1 flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatTime(checkIn.checkInTime)}
-                        </span>
-                        {(checkIn as any).workZone?.name && (
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>출근 대상 목록</CardTitle>
+                <CardDescription>
+                  오늘 출근 대상이 없습니다
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    {todayStats?.expectedWorkers === 0 
+                      ? "출근 대상이 없습니다. 활성 deployment와 work zone을 확인해주세요." 
+                      : "출근 대상 목록을 불러오는 중..."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>출근 대상 목록</CardTitle>
+              <CardDescription>
+                출근 대상 목록은 오늘 날짜에서만 확인할 수 있습니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  오늘 날짜를 선택해주세요
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        </TabsContent>
+
+        <TabsContent value="checkins" className="mt-4">
+          {/* 출근 기록 목록 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>출근 기록</CardTitle>
+            <CardDescription>
+              {dateFilter === format(new Date(), "yyyy-MM-dd") 
+                ? `오늘 출근한 작업자 목록` 
+                : `${dateFilter} 출근한 작업자 목록`} ({filteredCheckIns.length}명)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredCheckIns.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">아직 출근한 작업자가 없습니다</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {filteredCheckIns.map((checkIn) => (
+                  <div
+                    key={checkIn.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 flex-shrink-0">
+                        <Users className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">
+                          {(checkIn as any).worker?.name || (checkIn as any).user?.name || `작업자 ${checkIn.userId}`}
+                          {(checkIn as any).worker?.workerType?.name && (
+                            <Badge variant="outline" className="ml-1 text-xs">
+                              {(checkIn as any).worker.workerType.name}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
                           <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {(checkIn as any).workZone.name}
+                            <Clock className="h-3 w-3" />
+                            {formatTime(checkIn.checkInTime)}
                           </span>
-                        )}
-                        {checkIn.distanceFromZone !== null && checkIn.distanceFromZone !== undefined && (
-                          <span className="text-xs">
-                            ({checkIn.distanceFromZone}m)
-                          </span>
-                        )}
-                        {(checkIn as any).deployment?.bpCompany?.name && (
-                          <span className="text-xs">
-                            BP: {(checkIn as any).deployment.bpCompany.name}
-                          </span>
-                        )}
-                        {(checkIn as any).deployment?.epCompany?.name && (
-                          <span className="text-xs">
-                            EP: {(checkIn as any).deployment.epCompany.name}
-                          </span>
-                        )}
+                          {(checkIn as any).workZone?.name && (
+                            <span className="flex items-center gap-1 truncate">
+                              <MapPin className="h-3 w-3" />
+                              {(checkIn as any).workZone.name}
+                            </span>
+                          )}
+                          {checkIn.distanceFromZone !== null && checkIn.distanceFromZone !== undefined && (
+                            <span className="text-xs">
+                              ({checkIn.distanceFromZone}m)
+                            </span>
+                          )}
+                          {(checkIn as any).deployment?.bpCompany?.name && (
+                            <span className="text-xs truncate">
+                              BP: {(checkIn as any).deployment.bpCompany.name}
+                            </span>
+                          )}
+                          {(checkIn as any).deployment?.epCompany?.name && (
+                            <span className="text-xs truncate">
+                              EP: {(checkIn as any).deployment.epCompany.name}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    {checkIn.isWithinZone ? (
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                        <CheckCircle className="mr-1 h-3 w-3" />
-                        구역 내
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
-                        <XCircle className="mr-1 h-3 w-3" />
-                        구역 외
-                      </Badge>
-                    )}
-                    {checkIn.webauthnVerified && (
-                      <Badge variant="outline" className="border-blue-200 text-blue-700">
-                        생체인증
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {checkIn.isWithinZone ? (
+                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                          구역 내
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 text-xs">
+                          <XCircle className="mr-1 h-3 w-3" />
+                          구역 외
+                        </Badge>
+                      )}
+                      {checkIn.webauthnVerified && (
+                        <Badge variant="outline" className="border-blue-200 text-blue-700 text-xs">
+                          생체
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

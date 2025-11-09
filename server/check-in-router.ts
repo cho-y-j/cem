@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import * as db from "./db";
+import { toCamelCase, toCamelCaseArray } from "./db-utils";
 // xlsx는 CommonJS 모듈이므로 동적 import 사용 (ESM 호환성)
 
 /**
@@ -142,37 +143,67 @@ export const checkInRouter = router({
         console.log("[CheckIn] Current GPS position:", input.lat, input.lng);
 
         // deployment의 ep_company_id와 일치하는 활성 작업 구역만 조회
-        const { data: activeWorkZones } = await supabase
+        const { data: activeWorkZones, error: workZonesError } = await supabase
           .from("work_zones")
           .select("*")
           .eq("is_active", true)
           .eq("company_id", activeDeployment.ep_company_id); // EP 회사 ID와 일치하는 구역만
 
-        console.log("[CheckIn] Found active work zones for EP company:", activeWorkZones?.length || 0);
+        console.log("[CheckIn] Found active work zones for EP company:", {
+          count: activeWorkZones?.length || 0,
+          epCompanyId: activeDeployment.ep_company_id,
+          workZones: activeWorkZones,
+          error: workZonesError,
+        });
+
+        if (workZonesError) {
+          console.error("[CheckIn] Error fetching work zones:", workZonesError);
+        }
 
         if (activeWorkZones && activeWorkZones.length > 0) {
-          // 각 작업 구역까지의 거리 계산
+          // 각 작업 구역까지의 거리 계산 및 구역 내 여부 확인
           let nearestZone = null;
           let minDistance = Infinity;
+          let nearestWithinZone = null;
+          let minDistanceWithin = Infinity;
 
           for (const zone of activeWorkZones) {
+            try {
             const result = await db.isWithinWorkZone(zone.id, input.lat, input.lng);
-            console.log(`[CheckIn] Zone "${zone.name}" (${zone.id}): distance=${result.distance}m, within=${result.isWithin}`);
+              console.log(`[CheckIn] Zone "${zone.name}" (${zone.id}): distance=${result.distance}m, within=${result.isWithin}, zoneType=${zone.zone_type || 'circle'}`);
 
+              // 가장 가까운 구역 추적
             if (result.distance < minDistance) {
               minDistance = result.distance;
               nearestZone = zone;
-              isWithinZone = result.isWithin;
+              }
+
+              // 구역 내에 있는 가장 가까운 구역 추적 (우선순위)
+              if (result.isWithin && result.distance < minDistanceWithin) {
+                minDistanceWithin = result.distance;
+                nearestWithinZone = zone;
+                isWithinZone = true;
               distanceFromZone = result.distance;
+              }
+            } catch (error) {
+              console.error(`[CheckIn] Error checking zone ${zone.id}:`, error);
             }
           }
 
-          if (nearestZone) {
+          // 구역 내에 있는 구역이 있으면 그것을 선택, 없으면 가장 가까운 구역 선택
+          if (nearestWithinZone) {
+            workZoneId = nearestWithinZone.id;
+            console.log(`[CheckIn] ✅ Selected work zone (within): "${nearestWithinZone.name}" (${workZoneId}), distance=${distanceFromZone}m, within=${isWithinZone}`);
+          } else if (nearestZone) {
             workZoneId = nearestZone.id;
-            console.log(`[CheckIn] Selected nearest work zone: "${nearestZone.name}" (${workZoneId}), distance=${distanceFromZone}m, within=${isWithinZone}`);
+            // 가장 가까운 구역까지의 거리 재계산
+            const result = await db.isWithinWorkZone(nearestZone.id, input.lat, input.lng);
+            isWithinZone = result.isWithin;
+            distanceFromZone = result.distance;
+            console.log(`[CheckIn] ⚠️ Selected nearest work zone (outside): "${nearestZone.name}" (${workZoneId}), distance=${distanceFromZone}m, within=${isWithinZone}`);
           }
         } else {
-          console.warn(`[CheckIn] No active work zones found for EP company: ${activeDeployment.ep_company_id}`);
+          console.warn(`[CheckIn] ❌ No active work zones found for EP company: ${activeDeployment.ep_company_id}`);
         }
       } else {
         // workZoneId가 명시적으로 제공된 경우
@@ -372,6 +403,14 @@ export const checkInRouter = router({
       endDate: tomorrow.toISOString(),
       userRole,
       filters: checkInFilters,
+      checkIns: todayCheckIns.map((ci: any) => ({
+        id: ci.id,
+        workerId: ci.workerId,
+        workerName: ci.worker?.name,
+        isWithinZone: ci.isWithinZone,
+        deploymentId: ci.deploymentId,
+        deploymentEpCompanyId: ci.deployment?.epCompanyId,
+      })),
     });
 
     // 출근 대상: 활성 deployment의 worker 수 조회 (권한별 필터링 및 work_zone 연결)
@@ -419,7 +458,6 @@ export const checkInRouter = router({
     }
 
     // Supabase는 snake_case를 반환하므로 camelCase로 변환
-    const { toCamelCaseArray } = await import('./db-utils');
     const activeDeployments = activeDeploymentsRaw ? toCamelCaseArray(activeDeploymentsRaw) : [];
     
     console.log('[getTodayStats] Active deployments (converted):', JSON.stringify(activeDeployments, null, 2));
@@ -463,8 +501,7 @@ export const checkInRouter = router({
       }
 
       // Supabase는 snake_case를 반환하므로 camelCase로 변환
-      const { toCamelCaseArray: toCamelCaseArray2 } = await import('./db-utils');
-      const workZones = workZonesRaw ? toCamelCaseArray2(workZonesRaw) : [];
+      const workZones = workZonesRaw ? toCamelCaseArray(workZonesRaw) : [];
       
       console.log('[getTodayStats] Work zones (converted):', JSON.stringify(workZones, null, 2));
 
@@ -493,14 +530,184 @@ export const checkInRouter = router({
       return validDeployments.length;
     })();
 
+    // 출근 대상 worker 목록 조회
+    const expectedWorkersList = await (async () => {
+      if (!activeDeployments || activeDeployments.length === 0) return [];
+      
+      const epCompanyIds = [...new Set(
+        activeDeployments.map((d: any) => d.epCompanyId || d.ep_company_id).filter(Boolean)
+      )];
+      
+      if (epCompanyIds.length === 0) return [];
+      
+      const { data: workZonesRaw } = await supabase
+        .from("work_zones")
+        .select("company_id, id, name, is_active")
+        .eq("is_active", true)
+        .in("company_id", epCompanyIds);
+
+      const workZones = workZonesRaw ? toCamelCaseArray(workZonesRaw) : [];
+      const validEpCompanyIds = new Set(
+        workZones.map((wz: any) => wz.companyId || wz.company_id).filter(Boolean)
+      );
+      
+      const validDeployments = activeDeployments.filter((d: any) => {
+        const epCompanyId = d.epCompanyId || d.ep_company_id;
+        return epCompanyId && validEpCompanyIds.has(epCompanyId);
+      });
+
+      // worker_id 목록 수집
+      const workerIds = [...new Set(validDeployments.map((d: any) => d.workerId || d.worker_id).filter(Boolean))];
+      
+      if (workerIds.length === 0) return [];
+
+      // worker 정보 조회
+      const { data: workers } = await supabase
+        .from('workers')
+        .select('id, name, user_id, worker_type_id')
+        .in('id', workerIds);
+
+      if (!workers) return [];
+
+      // worker_type 정보 조회
+      const workerTypeIds = [...new Set(workers.map((w: any) => w.worker_type_id).filter(Boolean))];
+      const workerTypeMap = new Map();
+      
+      if (workerTypeIds.length > 0) {
+        const { data: workerTypes } = await supabase
+          .from('worker_types')
+          .select('id, name')
+          .in('id', workerTypeIds);
+        
+        if (workerTypes) {
+          workerTypes.forEach((wt: any) => {
+            workerTypeMap.set(wt.id, toCamelCase(wt));
+          });
+        }
+      }
+
+      // user 정보 조회
+      const userIds = [...new Set(workers.map((w: any) => w.user_id).filter(Boolean))];
+      const userMap = new Map();
+      
+      if (userIds.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, name, email')
+          .in('id', userIds);
+        
+        if (users) {
+          users.forEach((u: any) => {
+            userMap.set(u.id, toCamelCase(u));
+          });
+        }
+      }
+
+      // company 정보 조회
+      const allCompanyIds = new Set<string>();
+      validDeployments.forEach((d: any) => {
+        if (d.epCompanyId || d.ep_company_id) allCompanyIds.add(d.epCompanyId || d.ep_company_id);
+        if (d.bpCompanyId || d.bp_company_id) allCompanyIds.add(d.bpCompanyId || d.bp_company_id);
+      });
+      
+      const companyMap = new Map();
+      if (allCompanyIds.size > 0) {
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('id, name, company_type')
+          .in('id', Array.from(allCompanyIds));
+        
+        if (companies) {
+          companies.forEach((comp: any) => {
+            companyMap.set(comp.id, toCamelCase(comp));
+          });
+        }
+      }
+
+      // deployment 정보 매핑
+      const deploymentMap = new Map();
+      validDeployments.forEach((d: any) => {
+        const workerId = d.workerId || d.worker_id;
+        if (workerId && !deploymentMap.has(workerId)) {
+          const epCompanyId = d.epCompanyId || d.ep_company_id;
+          const bpCompanyId = d.bpCompanyId || d.bp_company_id;
+          const epCompany = epCompanyId ? companyMap.get(epCompanyId) : null;
+          const bpCompany = bpCompanyId ? companyMap.get(bpCompanyId) : null;
+          
+          deploymentMap.set(workerId, {
+            id: d.id || d.deploymentId,
+            epCompanyId,
+            bpCompanyId,
+            ownerId: d.ownerId || d.owner_id,
+            epCompany: epCompany ? { id: epCompany.id, name: epCompany.name } : null,
+            bpCompany: bpCompany ? { id: bpCompany.id, name: bpCompany.name } : null,
+          });
+        }
+      });
+
+      // 오늘 출근한 worker_id 목록
+      const checkedInWorkerIds = new Set(todayCheckIns.map((ci: any) => ci.workerId).filter(Boolean));
+
+      // worker 정보 조합
+      return toCamelCaseArray(workers).map((w: any) => {
+        const workerType = w.workerTypeId ? workerTypeMap.get(w.workerTypeId) : null;
+        const user = w.userId ? userMap.get(w.userId) : null;
+        const deployment = deploymentMap.get(w.id);
+        const hasCheckedIn = checkedInWorkerIds.has(w.id);
+
+        return {
+          workerId: w.id,
+          workerName: w.name,
+          userId: w.userId,
+          userName: user?.name || null,
+          userEmail: user?.email || null,
+          workerType: workerType ? { id: workerType.id, name: workerType.name } : null,
+          deployment: deployment || null,
+          hasCheckedIn,
+        };
+      });
+    })();
+
+    // 중복 제거: 같은 worker_id의 오늘 출근 기록은 하나만 카운트
+    const uniqueCheckIns = new Map();
+    todayCheckIns.forEach((ci: any) => {
+      const key = ci.workerId;
+      if (!uniqueCheckIns.has(key)) {
+        uniqueCheckIns.set(key, ci);
+      } else {
+        // 같은 worker의 여러 출근 기록이 있으면 가장 최근 것만 사용
+        const existing = uniqueCheckIns.get(key);
+        const existingTime = new Date(existing.checkInTime).getTime();
+        const currentTime = new Date(ci.checkInTime).getTime();
+        if (currentTime > existingTime) {
+          uniqueCheckIns.set(key, ci);
+        }
+      }
+    });
+
+    const uniqueCheckInsArray = Array.from(uniqueCheckIns.values());
+
     // 통계 계산
-    const total = todayCheckIns.length;
-    const withinZone = todayCheckIns.filter(c => c.isWithinZone).length;
-    const outsideZone = total - withinZone;
-    const withWebauthn = todayCheckIns.filter(c => c.webauthnVerified).length;
+    const total = uniqueCheckInsArray.length;
+    const withinZone = uniqueCheckInsArray.filter(c => c.isWithinZone === true).length;
+    const outsideZone = uniqueCheckInsArray.filter(c => c.isWithinZone === false).length;
+    const withWebauthn = uniqueCheckInsArray.filter(c => c.webauthnVerified === true).length;
+
+    console.log('[getTodayStats] ===== 통계 계산 결과 =====');
+    console.log('[getTodayStats] Original check-ins count:', todayCheckIns.length);
+    console.log('[getTodayStats] Unique check-ins count:', total);
+    console.log('[getTodayStats] Within zone:', withinZone);
+    console.log('[getTodayStats] Outside zone:', outsideZone);
+    console.log('[getTodayStats] Check-ins details:', uniqueCheckInsArray.map((c: any) => ({
+      id: c.id,
+      workerId: c.workerId,
+      workerName: c.worker?.name,
+      isWithinZone: c.isWithinZone,
+      distanceFromZone: c.distanceFromZone,
+    })));
 
     // 시간대별 분포 (오전/오후)
-    const morning = todayCheckIns.filter(c => {
+    const morning = uniqueCheckInsArray.filter(c => {
       const hour = new Date(c.checkInTime).getHours();
       return hour < 12;
     }).length;
@@ -518,7 +725,8 @@ export const checkInRouter = router({
       withWebauthn,
       morning,
       afternoon,
-      checkIns: todayCheckIns,
+      checkIns: uniqueCheckInsArray,
+      expectedWorkersList, // 출근 대상 목록 추가
     };
   }),
 

@@ -3222,6 +3222,15 @@ export async function isWithinWorkZone(
 
   const zoneType = workZone.zoneType || 'circle';
 
+  console.log(`[isWithinWorkZone] Checking zone ${workZoneId}:`, {
+    zoneType,
+    centerLat: workZone.centerLat,
+    centerLng: workZone.centerLng,
+    radiusMeters: workZone.radiusMeters,
+    checkLat: lat,
+    checkLng: lng,
+  });
+
   if (zoneType === 'polygon') {
     // 다각형 구역 처리
     if (!workZone.polygonCoordinates) {
@@ -3240,6 +3249,7 @@ export async function isWithinWorkZone(
     }
 
     // Ray casting 알고리즘으로 점이 다각형 내부에 있는지 확인
+    // 수정: lat/lng 순서 확인 필요
     let isInside = false;
     for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
       const xi = polygonPoints[i].lng;
@@ -3247,8 +3257,9 @@ export async function isWithinWorkZone(
       const xj = polygonPoints[j].lng;
       const yj = polygonPoints[j].lat;
 
-      const intersect = ((yi > lng) !== (yj > lng)) &&
-        (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      // Ray casting: 수평선(lat 기준)과 교차하는지 확인
+      const intersect = ((yi > lat) !== (yj > lat)) &&
+        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
       if (intersect) isInside = !isInside;
     }
 
@@ -3256,6 +3267,13 @@ export async function isWithinWorkZone(
     const centerLat = polygonPoints.reduce((sum, p) => sum + p.lat, 0) / polygonPoints.length;
     const centerLng = polygonPoints.reduce((sum, p) => sum + p.lng, 0) / polygonPoints.length;
     const distance = calculateDistance(centerLat, centerLng, lat, lng);
+
+    console.log(`[isWithinWorkZone] Polygon result:`, {
+      isInside,
+      distance: Math.round(distance),
+      centerLat,
+      centerLng,
+    });
 
     return {
       isWithin: isInside,
@@ -3267,15 +3285,30 @@ export async function isWithinWorkZone(
       throw new Error('Circle zone must have center coordinates');
     }
 
-    const distance = calculateDistance(
-      Number(workZone.centerLat),
-      Number(workZone.centerLng),
-      lat,
-      lng
-    );
+    // 문자열로 저장된 좌표를 숫자로 변환
+    const centerLat = Number(workZone.centerLat);
+    const centerLng = Number(workZone.centerLng);
+    const radiusMeters = Number(workZone.radiusMeters) || 100;
+
+    console.log(`[isWithinWorkZone] Circle calculation:`, {
+      centerLat,
+      centerLng,
+      radiusMeters,
+      checkLat: lat,
+      checkLng: lng,
+    });
+
+    const distance = calculateDistance(centerLat, centerLng, lat, lng);
+    const isWithin = distance <= radiusMeters;
+
+    console.log(`[isWithinWorkZone] Circle result:`, {
+      distance: Math.round(distance),
+      radiusMeters,
+      isWithin,
+    });
 
     return {
-      isWithin: distance <= (workZone.radiusMeters || 100),
+      isWithin,
       distance: Math.round(distance),
     };
   }
@@ -3322,17 +3355,8 @@ export async function getCheckIns(filters?: {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  // 기본 쿼리 - 단순 조인만 사용 (nested join은 Supabase PostgREST 제한으로 인해 별도 조회)
-  let query = supabase.from('check_ins').select(`
-    *,
-    worker:workers!check_ins_worker_id_fkey(
-      id,
-      user_id,
-      name,
-      worker_type_id
-    ),
-    work_zone:work_zones!check_ins_work_zone_id_fkey(id, name)
-  `);
+  // 기본 쿼리 - join 없이 단순 조회 (Supabase 관계 에러 방지)
+  let query = supabase.from('check_ins').select('*');
 
   if (filters?.workerId) {
     query = query.eq('worker_id', filters.workerId);
@@ -3361,6 +3385,40 @@ export async function getCheckIns(filters?: {
 
   let checkIns = toCamelCaseArray(data || []);
 
+  // worker 정보 별도 조회 (Supabase 관계 에러 방지)
+  const workerIds = [...new Set(checkIns.map((ci: any) => ci.workerId).filter(Boolean))];
+  const workerMap = new Map();
+  
+  if (workerIds.length > 0) {
+    const { data: workers } = await supabase
+      .from('workers')
+      .select('id, user_id, name, worker_type_id')
+      .in('id', workerIds);
+    
+    if (workers) {
+      workers.forEach((w: any) => {
+        workerMap.set(w.id, toCamelCase(w));
+      });
+    }
+  }
+
+  // work_zone 정보 별도 조회
+  const workZoneIds = [...new Set(checkIns.map((ci: any) => ci.workZoneId).filter(Boolean))];
+  const workZoneMap = new Map();
+  
+  if (workZoneIds.length > 0) {
+    const { data: workZones } = await supabase
+      .from('work_zones')
+      .select('id, name')
+      .in('id', workZoneIds);
+    
+    if (workZones) {
+      workZones.forEach((wz: any) => {
+        workZoneMap.set(wz.id, toCamelCase(wz));
+      });
+    }
+  }
+
   // deployment 정보 별도 조회 (nested join 제한으로 인해)
   const deploymentIds = [...new Set(checkIns.map((ci: any) => ci.deploymentId).filter(Boolean))];
   const deploymentMap = new Map();
@@ -3377,6 +3435,16 @@ export async function getCheckIns(filters?: {
       });
     }
   }
+
+  console.log('[getCheckIns] Deployment mapping:', {
+    deploymentIds: deploymentIds.length,
+    deploymentMapSize: deploymentMap.size,
+    deployments: Array.from(deploymentMap.entries()).map(([id, dep]: [string, any]) => ({
+      id,
+      epCompanyId: dep.epCompanyId || dep.ep_company_id,
+      bpCompanyId: dep.bpCompanyId || dep.bp_company_id,
+    })),
+  });
 
   // company 정보 별도 조회
   const companyIds = new Set<string>();
@@ -3400,7 +3468,9 @@ export async function getCheckIns(filters?: {
   }
 
   // worker_type 정보 별도 조회
-  const workerTypeIds = [...new Set(checkIns.map((ci: any) => ci.worker?.workerTypeId).filter(Boolean))];
+  const workerTypeIds = [...new Set(
+    Array.from(workerMap.values()).map((w: any) => w.workerTypeId).filter(Boolean)
+  )];
   const workerTypeMap = new Map();
   
   if (workerTypeIds.length > 0) {
@@ -3435,18 +3505,21 @@ export async function getCheckIns(filters?: {
 
   // 모든 정보 조합
   checkIns = checkIns.map((ci: any) => {
+    const worker = workerMap.get(ci.workerId);
+    const workZone = workZoneMap.get(ci.workZoneId);
     const deployment = deploymentMap.get(ci.deploymentId);
     const bpCompany = deployment?.bpCompanyId ? companyMap.get(deployment.bpCompanyId) : null;
     const epCompany = deployment?.epCompanyId ? companyMap.get(deployment.epCompanyId) : null;
-    const workerType = ci.worker?.workerTypeId ? workerTypeMap.get(ci.worker.workerTypeId) : null;
+    const workerType = worker?.workerTypeId ? workerTypeMap.get(worker.workerTypeId) : null;
 
     return {
       ...ci,
       user: userMap.get(ci.userId) || null,
-      worker: ci.worker ? {
-        ...ci.worker,
+      worker: worker ? {
+        ...worker,
         workerType: workerType ? { id: workerType.id, name: workerType.name } : null,
       } : null,
+      workZone: workZone ? { id: workZone.id, name: workZone.name } : null,
       deployment: deployment ? {
         ...deployment,
         bpCompany: bpCompany ? { id: bpCompany.id, name: bpCompany.name } : null,
@@ -3457,15 +3530,37 @@ export async function getCheckIns(filters?: {
 
   // 추가 필터링 (deployment 정보 기반)
   if (filters?.bpCompanyId) {
-    checkIns = checkIns.filter((ci: any) => 
-      ci.deployment?.bpCompanyId === filters.bpCompanyId
-    );
+    const beforeCount = checkIns.length;
+    checkIns = checkIns.filter((ci: any) => {
+      const matches = ci.deployment?.bpCompanyId === filters.bpCompanyId;
+      if (!matches) {
+        console.log(`[getCheckIns] Filtered out by bpCompanyId:`, {
+          checkInId: ci.id,
+          deploymentBpCompanyId: ci.deployment?.bpCompanyId,
+          filterBpCompanyId: filters.bpCompanyId,
+        });
+      }
+      return matches;
+    });
+    console.log(`[getCheckIns] bpCompanyId filter: ${beforeCount} -> ${checkIns.length}`);
   }
 
   if (filters?.epCompanyId) {
-    checkIns = checkIns.filter((ci: any) => 
-      ci.deployment?.epCompanyId === filters.epCompanyId
-    );
+    const beforeCount = checkIns.length;
+    checkIns = checkIns.filter((ci: any) => {
+      const deploymentEpCompanyId = ci.deployment?.epCompanyId || ci.deployment?.ep_company_id;
+      const matches = deploymentEpCompanyId === filters.epCompanyId;
+      if (!matches) {
+        console.log(`[getCheckIns] Filtered out by epCompanyId:`, {
+          checkInId: ci.id,
+          deploymentEpCompanyId,
+          filterEpCompanyId: filters.epCompanyId,
+          hasDeployment: !!ci.deployment,
+        });
+      }
+      return matches;
+    });
+    console.log(`[getCheckIns] epCompanyId filter: ${beforeCount} -> ${checkIns.length}`);
   }
 
   if (filters?.ownerCompanyId) {
