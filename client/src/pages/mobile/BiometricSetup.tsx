@@ -170,8 +170,17 @@ export default function BiometricSetup() {
             size="lg"
           >
             <Fingerprint className="h-6 w-6 mr-2" />
-            {isRegistering || registerMutation.isPending ? "등록 중..." : "새 생체 인증 등록"}
+            {isRegistering || registerMutation.isPending 
+              ? "등록 중..." 
+              : credentials && credentials.length > 0
+                ? "추가 생체 인증 등록"
+                : "새 생체 인증 등록"}
           </Button>
+          {credentials && credentials.length > 0 && (
+            <p className="text-sm text-gray-600 mt-2 text-center">
+              ✓ {credentials.length}개의 생체 인증이 등록되어 있습니다
+            </p>
+          )}
         </CardContent>
       </Card>
 

@@ -453,44 +453,51 @@ export const webauthnRouter = router({
           credentialIds: credentials.map((c: any) => c.id),
         });
 
-        let credentialBuffers;
-        try {
-          credentialBuffers = credentials.map((c: any) => {
-            try {
-              const buffer = Buffer.from(c.id, 'base64url');
-              console.log('[WebAuthn] Credential ID converted:', {
-                original: c.id,
-                bufferLength: buffer.length,
-                bufferType: Buffer.isBuffer(buffer),
-              });
-              return {
-                id: buffer,
-                type: 'public-key' as const,
-                transports: ['internal'] as const,
-              };
-            } catch (err: any) {
-              console.error('[WebAuthn] Error converting credential ID:', {
-                credentialId: c.id,
-                error: err.message,
-              });
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message: `크레덴셜 ID 변환 실패: ${err.message}`,
-              });
+        // allowCredentials의 id는 Uint8Array 또는 base64url 문자열이어야 함
+        // DB에 저장된 c.id는 이미 base64url 문자열이므로 그대로 사용
+        const allowCredentials = credentials.map((c: any) => {
+          // c.id가 이미 base64url 문자열인지 확인
+          let credentialId: Uint8Array;
+          try {
+            // base64url 문자열을 Uint8Array로 변환
+            if (typeof c.id === 'string') {
+              // base64url 디코딩
+              credentialId = Buffer.from(c.id, 'base64url');
+            } else if (Buffer.isBuffer(c.id)) {
+              credentialId = new Uint8Array(c.id);
+            } else {
+              throw new Error(`Unexpected credential ID type: ${typeof c.id}`);
             }
-          });
-        } catch (err: any) {
-          if (err instanceof TRPCError) throw err;
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `크레덴셜 처리 실패: ${err.message}`,
-          });
-        }
+            
+            console.log('[WebAuthn] Credential ID prepared:', {
+              original: c.id,
+              originalType: typeof c.id,
+              credentialIdLength: credentialId.length,
+              credentialIdType: credentialId instanceof Uint8Array,
+            });
+          } catch (err: any) {
+            console.error('[WebAuthn] Error preparing credential ID:', {
+              credentialId: c.id,
+              credentialIdType: typeof c.id,
+              error: err.message,
+            });
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `크레덴셜 ID 처리 실패: ${err.message}`,
+            });
+          }
+
+          return {
+            id: credentialId, // Uint8Array로 전달
+            type: 'public-key' as const,
+            transports: ['internal'] as const,
+          };
+        });
 
         const options = await generateAuthenticationOptions({
           rpID: RP_ID,
           timeout: CHALLENGE_TIMEOUT,
-          allowCredentials: credentialBuffers,
+          allowCredentials,
           userVerification: 'required',
         });
 
