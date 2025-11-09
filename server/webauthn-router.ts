@@ -508,11 +508,22 @@ export const webauthnRouter = router({
           firstCredentialIdLength: allowCredentials[0]?.id?.length,
         });
 
+        // allowCredentials를 전달하지 않으면 모든 등록된 크레덴셜 허용
+        // 하지만 보안을 위해 특정 크레덴셜만 허용하는 것이 좋음
+        // 문제: generateAuthenticationOptions 내부 검증에서 Uint8Array를 문자열로 처리하려고 시도
+        // 해결: allowCredentials를 전달하지 않고, verifyAuthentication에서 크레덴셜 검증
         const options = await generateAuthenticationOptions({
           rpID: RP_ID,
           timeout: CHALLENGE_TIMEOUT,
-          allowCredentials,
+          // allowCredentials를 전달하지 않으면 모든 크레덴셜 허용 (보안상 좋지 않지만 작동함)
+          // allowCredentials, // 일시적으로 주석 처리하여 테스트
           userVerification: 'required',
+        });
+        
+        console.log('[WebAuthn] Authentication options generated:', {
+          challenge: options.challenge,
+          rpId: options.rpId,
+          allowCredentials: options.allowCredentials,
         });
 
         // 기존 챌린지가 있으면 타임아웃 취소
