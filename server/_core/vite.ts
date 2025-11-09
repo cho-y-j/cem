@@ -9,7 +9,9 @@ import viteConfig from "../../vite.config";
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server },
+    hmr: { 
+      server, // Express 서버와 같은 HTTP 서버 사용
+    },
     allowedHosts: true as const,
   };
 

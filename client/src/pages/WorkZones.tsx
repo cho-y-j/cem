@@ -27,8 +27,8 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 // 서울 시청 기본 위치
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
 
-// Circle 컴포넌트 (useMap 훅 사용)
-function Circle({
+// CircleZone 컴포넌트 (useMap 훅 사용)
+function CircleZone({
   center,
   radius,
   strokeColor = "#3B82F6",
@@ -811,7 +811,7 @@ export default function WorkZones() {
                                   title="중심점 (드래그 또는 지도 클릭으로 이동)"
                                 />
                                 {/* 작업 구역 원 */}
-                                <Circle
+                                <CircleZone
                                   center={{ lat: formData.centerLat, lng: formData.centerLng }}
                                   radius={formData.radiusMeters || 100}
                                   strokeColor="#3B82F6"
