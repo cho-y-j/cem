@@ -17,8 +17,11 @@ export default function BiometricSetup() {
   const [isRegistering, setIsRegistering] = useState(false);
   const utils = trpc.useUtils();
 
-  // 등록된 크레덴셜 목록 조회
-  const { data: credentials, isLoading, refetch } = trpc.webauthn.myCredentials.useQuery();
+  // 등록된 크레덴셜 목록 조회 (캐시 무효화를 위해 refetchInterval 추가)
+  const { data: credentials, isLoading, refetch } = trpc.webauthn.myCredentials.useQuery(undefined, {
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
   // 등록 뮤테이션
   const registerMutation = trpc.webauthn.registerCredential.useMutation({

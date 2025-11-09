@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import * as db from "./db";
+import { toCamelCaseArray } from "./db-utils";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -454,16 +455,21 @@ export const webauthnRouter = router({
         });
 
         // allowCredentials의 id는 Uint8Array여야 함
-        // DB에 저장된 c.id는 base64url 문자열이므로 Uint8Array로 변환
+        // SimpleWebAuthn은 내부적으로 id를 검증할 때 base64url 문자열을 기대하지만,
+        // 실제로는 Uint8Array를 받아서 처리함
+        // 하지만 generateAuthenticationOptions 내부의 isBase64URL 검증에서 문제가 발생하므로
+        // Uint8Array를 직접 전달하되, 올바른 형식으로 변환
         const allowCredentials = credentials.map((c: any) => {
           let credentialId: Uint8Array;
           try {
             if (typeof c.id === 'string') {
-              // base64url 문자열을 Buffer로 디코딩한 후 Uint8Array로 변환
+              // base64url 문자열을 디코딩하여 Uint8Array로 변환
+              // Buffer.from()은 base64url 인코딩을 올바르게 처리함
               const buffer = Buffer.from(c.id, 'base64url');
-              credentialId = new Uint8Array(buffer);
+              // Buffer를 Uint8Array로 변환 (Buffer는 Uint8Array의 서브클래스이지만 명시적 변환)
+              credentialId = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
             } else if (Buffer.isBuffer(c.id)) {
-              credentialId = new Uint8Array(c.id);
+              credentialId = new Uint8Array(c.id.buffer, c.id.byteOffset, c.id.byteLength);
             } else if (c.id instanceof Uint8Array) {
               credentialId = c.id;
             } else {
@@ -474,8 +480,8 @@ export const webauthnRouter = router({
               original: c.id,
               originalType: typeof c.id,
               credentialIdLength: credentialId.length,
-              credentialIdType: credentialId instanceof Uint8Array,
               isUint8Array: credentialId instanceof Uint8Array,
+              constructor: credentialId.constructor.name,
             });
           } catch (err: any) {
             console.error('[WebAuthn] Error preparing credential ID:', {
@@ -698,7 +704,7 @@ export const webauthnRouter = router({
           return [];
         }
 
-        const credentials = db.toCamelCaseArray(data || []);
+        const credentials = toCamelCaseArray(data || []);
         console.log('[WebAuthn] myCredentials result:', {
           userId: ctx.user.id,
           count: credentials.length,
