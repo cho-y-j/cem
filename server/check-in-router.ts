@@ -135,19 +135,21 @@ export const checkInRouter = router({
       let isWithinZone = false;
       let distanceFromZone: number | undefined;
 
-      // workZoneId가 없으면 가장 가까운 활성 작업 구역 찾기
+      // workZoneId가 없으면 deployment의 ep_company_id와 일치하는 활성 작업 구역 찾기
       if (!workZoneId) {
-        console.log("[CheckIn] Finding nearest active work zone");
+        console.log("[CheckIn] Finding work zone for deployment:", deploymentId);
+        console.log("[CheckIn] EP Company ID:", activeDeployment.ep_company_id);
         console.log("[CheckIn] Current GPS position:", input.lat, input.lng);
 
-        // 모든 활성 작업 구역 조회
+        // deployment의 ep_company_id와 일치하는 활성 작업 구역만 조회
         const { data: activeWorkZones } = await supabase
           .from("work_zones")
           .select("*")
           .eq("is_active", true)
+          .eq("company_id", activeDeployment.ep_company_id) // EP 회사 ID와 일치하는 구역만
           .is("deleted_at", null);
 
-        console.log("[CheckIn] Found active work zones:", activeWorkZones?.length || 0);
+        console.log("[CheckIn] Found active work zones for EP company:", activeWorkZones?.length || 0);
 
         if (activeWorkZones && activeWorkZones.length > 0) {
           // 각 작업 구역까지의 거리 계산
@@ -171,10 +173,21 @@ export const checkInRouter = router({
             console.log(`[CheckIn] Selected nearest work zone: "${nearestZone.name}" (${workZoneId}), distance=${distanceFromZone}m, within=${isWithinZone}`);
           }
         } else {
-          console.warn("[CheckIn] No active work zones found");
+          console.warn(`[CheckIn] No active work zones found for EP company: ${activeDeployment.ep_company_id}`);
         }
       } else {
         // workZoneId가 명시적으로 제공된 경우
+        // deployment의 ep_company_id와 일치하는지 확인
+        const { data: workZone } = await supabase
+          .from("work_zones")
+          .select("id, company_id")
+          .eq("id", workZoneId)
+          .maybeSingle();
+
+        if (workZone && workZone.company_id !== activeDeployment.ep_company_id) {
+          console.warn(`[CheckIn] Work zone ${workZoneId} does not match deployment EP company ${activeDeployment.ep_company_id}`);
+        }
+
         const result = await db.isWithinWorkZone(workZoneId, input.lat, input.lng);
         isWithinZone = result.isWithin;
         distanceFromZone = result.distance;
@@ -327,7 +340,7 @@ export const checkInRouter = router({
       endDate: tomorrow.toISOString(),
     });
 
-    // 출근 대상: 활성 deployment의 worker 수 조회
+    // 출근 대상: 활성 deployment의 worker 수 조회 (권한별 필터링 및 work_zone 연결)
     const supabase = db.getSupabase();
     if (!supabase) {
       console.error('[getTodayStats] Supabase client is null');
@@ -337,22 +350,68 @@ export const checkInRouter = router({
       });
     }
 
-    const { data: activeDeployments, error: deploymentsError } = await supabase
+    // 권한별 필터링
+    let deploymentQuery = supabase
       .from("deployments")
-      .select("worker_id")
+      .select("worker_id, ep_company_id")
       .eq("status", "active");
+
+    // EP인 경우 자신의 회사 deployment만
+    if (userRole === "ep" && ctx.user.companyId) {
+      deploymentQuery = deploymentQuery.eq("ep_company_id", ctx.user.companyId);
+    }
+    // BP인 경우 자신의 회사 deployment만
+    else if (userRole === "bp" && ctx.user.companyId) {
+      deploymentQuery = deploymentQuery.eq("bp_company_id", ctx.user.companyId);
+    }
+    // Owner인 경우 자신의 회사 deployment만 (equipment의 owner_company_id 확인 필요하지만 일단 deployment만)
+    // Admin은 전체 조회
+
+    const { data: activeDeployments, error: deploymentsError } = await deploymentQuery;
 
     console.log('[getTodayStats] Active deployments query result:', {
       count: activeDeployments?.length || 0,
       error: deploymentsError,
       userRole,
+      userCompanyId: ctx.user.companyId,
     });
 
     if (deploymentsError) {
       console.error('[getTodayStats] Deployment query error:', deploymentsError);
     }
 
-    const expectedWorkers = activeDeployments?.length || 0;
+    // work_zone이 있는 deployment만 출근 대상으로 계산
+    const expectedWorkers = await (async () => {
+      if (!activeDeployments || activeDeployments.length === 0) return 0;
+      
+      // 각 deployment의 ep_company_id에 해당하는 활성 work_zone이 있는지 확인
+      const epCompanyIds = [...new Set(activeDeployments.map((d: any) => d.ep_company_id).filter(Boolean))];
+      
+      if (epCompanyIds.length === 0) return 0;
+      
+      const { data: workZones } = await supabase
+        .from("work_zones")
+        .select("company_id")
+        .eq("is_active", true)
+        .in("company_id", epCompanyIds)
+        .is("deleted_at", null);
+
+      const validEpCompanyIds = new Set(workZones?.map((wz: any) => wz.company_id) || []);
+      
+      // work_zone이 있는 deployment만 출근 대상으로 계산
+      const validDeployments = activeDeployments.filter((d: any) => 
+        d.ep_company_id && validEpCompanyIds.has(d.ep_company_id)
+      );
+
+      console.log('[getTodayStats] Valid deployments (with work zones):', {
+        total: activeDeployments.length,
+        valid: validDeployments.length,
+        epCompanyIds: epCompanyIds.length,
+        workZones: workZones?.length || 0,
+      });
+
+      return validDeployments.length;
+    })();
 
     // 통계 계산
     const total = todayCheckIns.length;

@@ -3321,24 +3321,16 @@ export async function getCheckIns(filters?: {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  // 기본 쿼리 - 직접 조인 사용 (foreign key 이름이 정확하지 않을 수 있음)
+  // 기본 쿼리 - 단순 조인만 사용 (nested join은 Supabase PostgREST 제한으로 인해 별도 조회)
   let query = supabase.from('check_ins').select(`
     *,
     worker:workers!check_ins_worker_id_fkey(
       id,
       user_id,
       name,
-      worker_type_id,
-      worker_type:worker_types!workers_worker_type_id_fkey(id, name)
+      worker_type_id
     ),
-    work_zone:work_zones!check_ins_work_zone_id_fkey(id, name),
-    deployment:deployments!check_ins_deployment_id_fkey(
-      id,
-      bp_company_id,
-      ep_company_id,
-      bp_company:companies!deployments_bp_company_id_fkey(id, name),
-      ep_company:companies!deployments_ep_company_id_fkey(id, name)
-    )
+    work_zone:work_zones!check_ins_work_zone_id_fkey(id, name)
   `);
 
   if (filters?.workerId) {
@@ -3368,7 +3360,62 @@ export async function getCheckIns(filters?: {
 
   let checkIns = toCamelCaseArray(data || []);
 
-  // user 정보 별도 조회 (foreign key 관계 문제로 인해)
+  // deployment 정보 별도 조회 (nested join 제한으로 인해)
+  const deploymentIds = [...new Set(checkIns.map((ci: any) => ci.deploymentId).filter(Boolean))];
+  const deploymentMap = new Map();
+  
+  if (deploymentIds.length > 0) {
+    const { data: deployments } = await supabase
+      .from('deployments')
+      .select('id, bp_company_id, ep_company_id')
+      .in('id', deploymentIds);
+    
+    if (deployments) {
+      deployments.forEach((dep: any) => {
+        deploymentMap.set(dep.id, toCamelCase(dep));
+      });
+    }
+  }
+
+  // company 정보 별도 조회
+  const companyIds = new Set<string>();
+  deploymentMap.forEach((dep: any) => {
+    if (dep.bpCompanyId) companyIds.add(dep.bpCompanyId);
+    if (dep.epCompanyId) companyIds.add(dep.epCompanyId);
+  });
+  
+  const companyMap = new Map();
+  if (companyIds.size > 0) {
+    const { data: companies } = await supabase
+      .from('companies')
+      .select('id, name, company_type')
+      .in('id', Array.from(companyIds));
+    
+    if (companies) {
+      companies.forEach((comp: any) => {
+        companyMap.set(comp.id, toCamelCase(comp));
+      });
+    }
+  }
+
+  // worker_type 정보 별도 조회
+  const workerTypeIds = [...new Set(checkIns.map((ci: any) => ci.worker?.workerTypeId).filter(Boolean))];
+  const workerTypeMap = new Map();
+  
+  if (workerTypeIds.length > 0) {
+    const { data: workerTypes } = await supabase
+      .from('worker_types')
+      .select('id, name')
+      .in('id', workerTypeIds);
+    
+    if (workerTypes) {
+      workerTypes.forEach((wt: any) => {
+        workerTypeMap.set(wt.id, toCamelCase(wt));
+      });
+    }
+  }
+
+  // user 정보 별도 조회
   const userIds = [...new Set(checkIns.map((ci: any) => ci.userId).filter(Boolean))];
   const userMap = new Map();
   
@@ -3385,11 +3432,27 @@ export async function getCheckIns(filters?: {
     }
   }
 
-  // user 정보 추가
-  checkIns = checkIns.map((ci: any) => ({
-    ...ci,
-    user: userMap.get(ci.userId) || null,
-  }));
+  // 모든 정보 조합
+  checkIns = checkIns.map((ci: any) => {
+    const deployment = deploymentMap.get(ci.deploymentId);
+    const bpCompany = deployment?.bpCompanyId ? companyMap.get(deployment.bpCompanyId) : null;
+    const epCompany = deployment?.epCompanyId ? companyMap.get(deployment.epCompanyId) : null;
+    const workerType = ci.worker?.workerTypeId ? workerTypeMap.get(ci.worker.workerTypeId) : null;
+
+    return {
+      ...ci,
+      user: userMap.get(ci.userId) || null,
+      worker: ci.worker ? {
+        ...ci.worker,
+        workerType: workerType ? { id: workerType.id, name: workerType.name } : null,
+      } : null,
+      deployment: deployment ? {
+        ...deployment,
+        bpCompany: bpCompany ? { id: bpCompany.id, name: bpCompany.name } : null,
+        epCompany: epCompany ? { id: epCompany.id, name: epCompany.name } : null,
+      } : null,
+    };
+  });
 
   // 추가 필터링 (deployment 정보 기반)
   if (filters?.bpCompanyId) {

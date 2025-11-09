@@ -84,6 +84,18 @@ export const deploymentRouter = router({
         ownerId: ctx.user.id,
       });
 
+      // Entry Request에서 EP 회사 ID 가져오기
+      const entryRequest = await db.getEntryRequestById(input.entryRequestId);
+      if (!entryRequest) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "반입 요청을 찾을 수 없습니다.",
+        });
+      }
+
+      // epCompanyId가 없으면 entry_request에서 가져오기
+      const epCompanyId = input.epCompanyId || entryRequest.targetEpCompanyId || undefined;
+
       const id = nanoid();
 
       await db.createDeployment({
@@ -93,7 +105,7 @@ export const deploymentRouter = router({
         workerId: input.workerId,
         ownerId: ctx.user.id,
         bpCompanyId: input.bpCompanyId,
-        epCompanyId: input.epCompanyId,
+        epCompanyId: epCompanyId,
         startDate: input.startDate,
         plannedEndDate: input.plannedEndDate,
         status: "active",

@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { MapPin, Plus, Edit, Trash2, Save, X, MoreVertical, Circle, Shapes, MousePointer2, Hand } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -236,6 +238,10 @@ interface WorkZone {
 }
 
 export default function WorkZones() {
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === "admin";
+  const isEP = user?.role?.toLowerCase() === "ep";
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<WorkZone | null>(null);
 
@@ -248,7 +254,14 @@ export default function WorkZones() {
     centerLng: DEFAULT_CENTER.lng,
     radiusMeters: 100,
     polygonPoints: [] as Array<{ lat: number; lng: number }>, // 폴리곤 점들
+    epCompanyId: "" as string | undefined, // EP 회사 ID (Admin인 경우만 사용)
   });
+
+  // EP 회사 목록 조회 (Admin인 경우만)
+  const { data: epCompanies = [] } = trpc.companies.list.useQuery(
+    { companyType: "ep" },
+    { enabled: isAdmin }
+  );
 
   // 지도 중심 (폼과 별도로 관리)
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
@@ -343,6 +356,7 @@ export default function WorkZones() {
         centerLng: DEFAULT_CENTER.lng,
         radiusMeters: 100,
         polygonPoints: [],
+        epCompanyId: isAdmin ? undefined : undefined, // Admin인 경우 초기값 없음, EP인 경우 사용 안 함
       });
       setMapCenter(DEFAULT_CENTER);
     }
@@ -424,11 +438,22 @@ export default function WorkZones() {
       return;
     }
 
+    // Admin인 경우 EP 회사 선택 필수
+    if (isAdmin && !formData.epCompanyId) {
+      toast.error("EP 회사를 선택해주세요");
+      return;
+    }
+
     const data: any = {
       name: formData.name,
       description: formData.description || undefined,
       zoneType: formData.zoneType,
     };
+
+    // Admin인 경우 EP 회사 ID 추가
+    if (isAdmin) {
+      data.epCompanyId = formData.epCompanyId;
+    }
 
     if (formData.zoneType === "circle") {
       // 원형 모드: 중심점과 반경만 전송
@@ -677,6 +702,31 @@ export default function WorkZones() {
                   />
                 </div>
               </div>
+
+              {/* EP 회사 선택 (Admin인 경우만) */}
+              {isAdmin && !editingZone && (
+                <div className="space-y-2">
+                  <Label htmlFor="epCompany">EP 회사 *</Label>
+                  <Select
+                    value={formData.epCompanyId || ""}
+                    onValueChange={(value) => setFormData({ ...formData, epCompanyId: value })}
+                  >
+                    <SelectTrigger id="epCompany">
+                      <SelectValue placeholder="EP 회사를 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {epCompanies.map((company: any) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    이 작업 구역이 적용될 EP 회사를 선택하세요
+                  </p>
+                </div>
+              )}
 
               {/* Google Maps */}
               <div className="space-y-2">

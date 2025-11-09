@@ -23,7 +23,7 @@ export const workZoneRouter = router({
         centerLng: z.number().min(-180).max(180, "경도는 -180 ~ 180 사이여야 합니다").optional(),
         radiusMeters: z.number().min(10).max(10000, "반경은 10 ~ 10000m 사이여야 합니다").default(100),
         polygonCoordinates: z.string().optional(), // JSON 문자열
-        companyId: z.string().optional(),
+        epCompanyId: z.string().optional(), // EP 회사 ID (Admin인 경우 필수, EP인 경우 자동으로 자신의 회사 ID 사용)
       })
       .refine(
         (data) => {
@@ -48,6 +48,27 @@ export const workZoneRouter = router({
         });
       }
 
+      // EP 회사 ID 결정: Admin인 경우 입력값 필수, EP인 경우 자신의 회사 ID 사용
+      let epCompanyId: string | undefined;
+      if (userRole === "admin") {
+        if (!input.epCompanyId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Admin은 EP 회사를 선택해야 합니다.",
+          });
+        }
+        epCompanyId = input.epCompanyId;
+      } else if (userRole === "ep") {
+        // EP는 자신의 회사 ID 사용
+        epCompanyId = ctx.user.companyId || undefined;
+        if (!epCompanyId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "EP 회사 정보를 찾을 수 없습니다.",
+          });
+        }
+      }
+
       // 다각형 좌표 검증
       if (input.zoneType === "polygon" && (!input.polygonCoordinates || JSON.parse(input.polygonCoordinates).length < 3)) {
         throw new TRPCError({
@@ -66,12 +87,12 @@ export const workZoneRouter = router({
         centerLng: input.centerLng?.toString(),
         radiusMeters: input.radiusMeters,
         polygonCoordinates: input.polygonCoordinates,
-        companyId: input.companyId || ctx.user.companyId,
+        companyId: epCompanyId, // EP 회사 ID로 저장
         createdBy: ctx.user.id,
         isActive: true,
       });
 
-      console.log(`[WorkZone] Created: ${workZone.id} - ${workZone.name}`);
+      console.log(`[WorkZone] Created: ${workZone.id} - ${workZone.name} for EP company: ${epCompanyId}`);
       return workZone;
     }),
 
