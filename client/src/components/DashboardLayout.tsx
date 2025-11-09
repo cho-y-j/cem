@@ -65,10 +65,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // 클라이언트 사이드에서만 localStorage 읽기 (SSR hydration 에러 방지)
+  useEffect(() => {
+    setIsMounted(true);
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
-  });
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed)) {
+        setSidebarWidth(parsed);
+      }
+    }
+  }, []);
   const { loading, user } = useAuth();
 
   useEffect(() => {

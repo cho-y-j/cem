@@ -358,7 +358,10 @@ export function EntryRequestDetail({
         link.download = result.fileName || "반입요청서류.pdf";
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        // removeChild 전에 부모 노드 확인
+        if (link.parentNode === document.body) {
+          document.body.removeChild(link);
+        }
         URL.revokeObjectURL(url);
 
         toast.dismiss();

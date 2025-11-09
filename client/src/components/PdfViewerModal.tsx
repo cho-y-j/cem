@@ -75,7 +75,10 @@ export function PdfViewerModal({
     link.download = `${documentName}.pdf`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    // removeChild 전에 부모 노드 확인
+    if (link.parentNode === document.body) {
+      document.body.removeChild(link);
+    }
   };
 
   return (

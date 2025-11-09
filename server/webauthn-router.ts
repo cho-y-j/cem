@@ -318,11 +318,32 @@ export const webauthnRouter = router({
           });
         }
 
+        // credentialPublicKey도 대체 필드에서 찾기 시도
         if (!finalCredentialPublicKey) {
-          console.error('[WebAuthn] credentialPublicKey is undefined:', verification.registrationInfo);
+          console.warn('[WebAuthn] credentialPublicKey is undefined, trying to extract from registrationInfo');
+          const regInfo = verification.registrationInfo as any;
+          
+          // 다양한 가능한 필드명 확인
+          finalCredentialPublicKey = regInfo.credentialPublicKey || 
+                                    regInfo.publicKey || 
+                                    regInfo.public_key ||
+                                    regInfo.credential?.publicKey ||
+                                    regInfo.credential?.public_key;
+          
+          console.log('[WebAuthn] Attempted credentialPublicKey extraction:', {
+            found: !!finalCredentialPublicKey,
+            registrationInfoKeys: Object.keys(regInfo),
+          });
+        }
+
+        if (!finalCredentialPublicKey) {
+          console.error('[WebAuthn] credentialPublicKey is still undefined after extraction:', {
+            registrationInfo: verification.registrationInfo,
+            verificationKeys: Object.keys(verification),
+          });
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "공개키를 가져올 수 없습니다.",
+            message: "공개키를 가져올 수 없습니다. attestationType을 'direct'로 설정했는지 확인해주세요.",
           });
         }
 

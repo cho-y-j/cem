@@ -115,7 +115,10 @@ export default function CheckInMonitoring() {
       link.download = result.filename;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      // removeChild 전에 부모 노드 확인
+      if (link.parentNode === document.body) {
+        document.body.removeChild(link);
+      }
       window.URL.revokeObjectURL(url);
 
       toast.success("엑셀 파일이 다운로드되었습니다");
