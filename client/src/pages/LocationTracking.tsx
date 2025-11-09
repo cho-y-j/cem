@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker, Polyline, useMap } from "@vis.gl/react-google-maps";
 import { MapPin, Loader2, AlertCircle, Filter, X, Route, BarChart3, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 export default function LocationTracking() {
   const { user } = useAuth();
