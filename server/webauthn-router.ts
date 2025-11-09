@@ -455,21 +455,18 @@ export const webauthnRouter = router({
         });
 
         // allowCredentials의 id는 Uint8Array여야 함
-        // SimpleWebAuthn은 내부적으로 id를 검증할 때 base64url 문자열을 기대하지만,
-        // 실제로는 Uint8Array를 받아서 처리함
-        // 하지만 generateAuthenticationOptions 내부의 isBase64URL 검증에서 문제가 발생하므로
-        // Uint8Array를 직접 전달하되, 올바른 형식으로 변환
+        // 하지만 generateAuthenticationOptions 내부 검증에서 문제가 발생하므로
+        // Uint8Array.from()을 사용하여 순수한 Uint8Array 생성
         const allowCredentials = credentials.map((c: any) => {
           let credentialId: Uint8Array;
           try {
             if (typeof c.id === 'string') {
               // base64url 문자열을 디코딩하여 Uint8Array로 변환
-              // Buffer.from()은 base64url 인코딩을 올바르게 처리함
               const buffer = Buffer.from(c.id, 'base64url');
-              // Buffer를 Uint8Array로 변환 (Buffer는 Uint8Array의 서브클래스이지만 명시적 변환)
-              credentialId = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+              // Uint8Array.from()을 사용하여 순수한 Uint8Array 생성
+              credentialId = Uint8Array.from(buffer);
             } else if (Buffer.isBuffer(c.id)) {
-              credentialId = new Uint8Array(c.id.buffer, c.id.byteOffset, c.id.byteLength);
+              credentialId = Uint8Array.from(c.id);
             } else if (c.id instanceof Uint8Array) {
               credentialId = c.id;
             } else {
@@ -497,10 +494,18 @@ export const webauthnRouter = router({
           }
 
           return {
-            id: credentialId, // Uint8Array로 전달
+            id: credentialId,
             type: 'public-key' as const,
             transports: ['internal'] as const,
           };
+        });
+
+        console.log('[WebAuthn] Calling generateAuthenticationOptions with:', {
+          rpID: RP_ID,
+          timeout: CHALLENGE_TIMEOUT,
+          allowCredentialsCount: allowCredentials.length,
+          firstCredentialIdType: allowCredentials[0]?.id?.constructor?.name,
+          firstCredentialIdLength: allowCredentials[0]?.id?.length,
         });
 
         const options = await generateAuthenticationOptions({
