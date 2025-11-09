@@ -84,7 +84,11 @@ console.log('[WebAuthn] Configuration:', {
 });
 
 // 챌린지 임시 저장소 (프로덕션에서는 Redis/DB 사용)
-const challenges = new Map<string, string>();
+// Map<userId, { challenge: string, createdAt: Date, timeoutId: NodeJS.Timeout }>
+const challenges = new Map<string, { challenge: string; createdAt: Date; timeoutId: NodeJS.Timeout }>();
+
+// 챌린지 만료 시간 (밀리초) - PIN 입력 + 지문 등록 시간 고려하여 3분으로 설정
+const CHALLENGE_TIMEOUT = 3 * 60 * 1000; // 3분
 
 /**
  * WebAuthn 생체 인증 API
@@ -108,7 +112,7 @@ export const webauthnRouter = router({
           userDisplayName: user.name || user.email || "사용자",
           // Uint8Array로 변환
           userID: new TextEncoder().encode(user.id),
-          timeout: 60000,
+          timeout: CHALLENGE_TIMEOUT,
           attestationType: 'none',
           authenticatorSelection: {
             authenticatorAttachment: 'platform', // 기기 내장 생체 인식
@@ -119,11 +123,29 @@ export const webauthnRouter = router({
           supportedAlgorithmIDs: [-7, -257], // ES256, RS256
         });
 
-        // 챌린지 임시 저장 (60초 후 자동 삭제)
-        challenges.set(user.id, options.challenge);
-        setTimeout(() => challenges.delete(user.id), 60000);
+        // 기존 챌린지가 있으면 타임아웃 취소
+        const existingChallenge = challenges.get(user.id);
+        if (existingChallenge) {
+          clearTimeout(existingChallenge.timeoutId);
+        }
 
-        console.log(`[WebAuthn] Registration challenge generated for user ${user.id}`);
+        // 챌린지 임시 저장 (3분 후 자동 삭제)
+        const timeoutId = setTimeout(() => {
+          challenges.delete(user.id);
+          console.log(`[WebAuthn] Registration challenge expired for user ${user.id}`);
+        }, CHALLENGE_TIMEOUT);
+
+        challenges.set(user.id, {
+          challenge: options.challenge,
+          createdAt: new Date(),
+          timeoutId,
+        });
+
+        console.log(`[WebAuthn] Registration challenge generated for user ${user.id}`, {
+          challengeLength: options.challenge.length,
+          timeout: CHALLENGE_TIMEOUT / 1000 + '초',
+          createdAt: new Date().toISOString(),
+        });
 
         return options;
       } catch (error) {
@@ -146,14 +168,22 @@ export const webauthnRouter = router({
     .mutation(async ({ input, ctx }) => {
       try {
         const user = ctx.user;
-        const expectedChallenge = challenges.get(user.id);
+        const challengeData = challenges.get(user.id);
 
-        if (!expectedChallenge) {
+        if (!challengeData) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "챌린지가 만료되었거나 존재하지 않습니다. 다시 시도해주세요.",
           });
         }
+
+        const expectedChallenge = challengeData.challenge;
+        const elapsedTime = Date.now() - challengeData.createdAt.getTime();
+        
+        console.log(`[WebAuthn] Verifying registration for user ${user.id}`, {
+          elapsedTime: Math.round(elapsedTime / 1000) + '초',
+          challengeAge: Math.round(elapsedTime / 1000) + '초 전 생성',
+        });
 
         // 등록 응답 검증
         let verification: VerifiedRegistrationResponse;
@@ -226,7 +256,11 @@ export const webauthnRouter = router({
         }
 
         // 사용된 챌린지 삭제
-        challenges.delete(user.id);
+        const challengeData = challenges.get(user.id);
+        if (challengeData) {
+          clearTimeout(challengeData.timeoutId);
+          challenges.delete(user.id);
+        }
 
         console.log(`[WebAuthn] Credential registered successfully for user ${user.id}`);
 
@@ -277,7 +311,7 @@ export const webauthnRouter = router({
         // SimpleWebAuthn을 사용하여 인증 옵션 생성
         const options = await generateAuthenticationOptions({
           rpID: RP_ID,
-          timeout: 60000,
+          timeout: CHALLENGE_TIMEOUT,
           allowCredentials: credentials.map((c: any) => ({
             id: Buffer.from(c.id, 'base64url'),
             type: 'public-key',
@@ -286,11 +320,29 @@ export const webauthnRouter = router({
           userVerification: 'required',
         });
 
-        // 챌린지 임시 저장 (60초 후 자동 삭제)
-        challenges.set(user.id, options.challenge);
-        setTimeout(() => challenges.delete(user.id), 60000);
+        // 기존 챌린지가 있으면 타임아웃 취소
+        const existingChallenge = challenges.get(user.id);
+        if (existingChallenge) {
+          clearTimeout(existingChallenge.timeoutId);
+        }
 
-        console.log(`[WebAuthn] Authentication challenge generated for user ${user.id}`);
+        // 챌린지 임시 저장 (3분 후 자동 삭제)
+        const timeoutId = setTimeout(() => {
+          challenges.delete(user.id);
+          console.log(`[WebAuthn] Authentication challenge expired for user ${user.id}`);
+        }, CHALLENGE_TIMEOUT);
+
+        challenges.set(user.id, {
+          challenge: options.challenge,
+          createdAt: new Date(),
+          timeoutId,
+        });
+
+        console.log(`[WebAuthn] Authentication challenge generated for user ${user.id}`, {
+          challengeLength: options.challenge.length,
+          timeout: CHALLENGE_TIMEOUT / 1000 + '초',
+          createdAt: new Date().toISOString(),
+        });
 
         return options;
       } catch (error: any) {
@@ -314,14 +366,22 @@ export const webauthnRouter = router({
     .mutation(async ({ input, ctx }) => {
       try {
         const user = ctx.user;
-        const expectedChallenge = challenges.get(user.id);
+        const challengeData = challenges.get(user.id);
 
-        if (!expectedChallenge) {
+        if (!challengeData) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "챌린지가 만료되었거나 존재하지 않습니다. 다시 시도해주세요.",
           });
         }
+
+        const expectedChallenge = challengeData.challenge;
+        const elapsedTime = Date.now() - challengeData.createdAt.getTime();
+        
+        console.log(`[WebAuthn] Verifying authentication for user ${user.id}`, {
+          elapsedTime: Math.round(elapsedTime / 1000) + '초',
+          challengeAge: Math.round(elapsedTime / 1000) + '초 전 생성',
+        });
 
         const response = input.response as AuthenticationResponseJSON;
 
@@ -383,7 +443,11 @@ export const webauthnRouter = router({
           .eq('id', credentialIdBase64);
 
         // 사용된 챌린지 삭제
-        challenges.delete(user.id);
+        const challengeData = challenges.get(user.id);
+        if (challengeData) {
+          clearTimeout(challengeData.timeoutId);
+          challenges.delete(user.id);
+        }
 
         console.log(`[WebAuthn] Authentication verified successfully for user ${user.id}`);
 
