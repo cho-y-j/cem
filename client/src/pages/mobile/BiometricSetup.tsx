@@ -27,7 +27,10 @@ export default function BiometricSetup() {
   const registerMutation = trpc.webauthn.registerCredential.useMutation({
     onSuccess: () => {
       toast.success("생체 인증이 등록되었습니다!");
-      refetch();
+      // 즉시 refetch하여 UI 업데이트
+      setTimeout(() => {
+        refetch();
+      }, 500);
     },
     onError: (error) => {
       toast.error(`등록 실패: ${error.message}`);
