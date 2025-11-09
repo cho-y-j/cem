@@ -146,8 +146,7 @@ export const checkInRouter = router({
           .from("work_zones")
           .select("*")
           .eq("is_active", true)
-          .eq("company_id", activeDeployment.ep_company_id) // EP 회사 ID와 일치하는 구역만
-          .is("deleted_at", null);
+          .eq("company_id", activeDeployment.ep_company_id); // EP 회사 ID와 일치하는 구역만
 
         console.log("[CheckIn] Found active work zones for EP company:", activeWorkZones?.length || 0);
 
@@ -388,7 +387,7 @@ export const checkInRouter = router({
     // 권한별 필터링
     let deploymentQuery = supabase
       .from("deployments")
-      .select("worker_id, ep_company_id")
+      .select("worker_id, ep_company_id, bp_company_id, owner_id")
       .eq("status", "active");
 
     // EP인 경우 자신의 회사 deployment만
@@ -431,8 +430,7 @@ export const checkInRouter = router({
         .from("work_zones")
         .select("company_id")
         .eq("is_active", true)
-        .in("company_id", epCompanyIds)
-        .is("deleted_at", null);
+        .in("company_id", epCompanyIds);
 
       const validEpCompanyIds = new Set(workZones?.map((wz: any) => wz.company_id) || []);
       
