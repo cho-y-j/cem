@@ -3313,6 +3313,7 @@ export async function getCheckIns(filters?: {
   workZoneId?: string;
   bpCompanyId?: string;
   ownerCompanyId?: string;
+  epCompanyId?: string;
   workerTypeId?: string;
   workerName?: string;
   startDate?: string;
@@ -3458,6 +3459,12 @@ export async function getCheckIns(filters?: {
   if (filters?.bpCompanyId) {
     checkIns = checkIns.filter((ci: any) => 
       ci.deployment?.bpCompanyId === filters.bpCompanyId
+    );
+  }
+
+  if (filters?.epCompanyId) {
+    checkIns = checkIns.filter((ci: any) => 
+      ci.deployment?.epCompanyId === filters.epCompanyId
     );
   }
 

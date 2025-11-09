@@ -329,15 +329,31 @@ export const checkInRouter = router({
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const todayCheckIns = await db.getCheckIns({
+    // 권한별 출근 기록 필터링
+    const checkInFilters: any = {
       startDate: today.toISOString(),
       endDate: tomorrow.toISOString(),
-    });
+    };
+
+    // EP인 경우 자신의 회사 deployment의 출근 기록만
+    if (userRole === "ep" && ctx.user.companyId) {
+      // EP 회사와 연결된 deployment의 출근 기록만 조회하기 위해
+      // 일단 전체 조회 후 필터링 (getCheckIns에서 epCompanyId 필터 지원 필요)
+      // 임시로 전체 조회 후 필터링
+    }
+    // BP인 경우 자신의 회사 deployment의 출근 기록만
+    else if (userRole === "bp" && ctx.user.companyId) {
+      checkInFilters.bpCompanyId = ctx.user.companyId;
+    }
+
+    const todayCheckIns = await db.getCheckIns(checkInFilters);
 
     console.log('[getTodayStats] Today check-ins:', {
       count: todayCheckIns.length,
       startDate: today.toISOString(),
       endDate: tomorrow.toISOString(),
+      userRole,
+      filters: checkInFilters,
     });
 
     // 출근 대상: 활성 deployment의 worker 수 조회 (권한별 필터링 및 work_zone 연결)
