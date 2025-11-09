@@ -3368,7 +3368,7 @@ export async function getCheckIns(filters?: {
   if (deploymentIds.length > 0) {
     const { data: deployments } = await supabase
       .from('deployments')
-      .select('id, bp_company_id, ep_company_id')
+      .select('id, bp_company_id, ep_company_id, owner_id')
       .in('id', deploymentIds);
     
     if (deployments) {
@@ -3469,11 +3469,30 @@ export async function getCheckIns(filters?: {
   }
 
   if (filters?.ownerCompanyId) {
-    // ownerCompanyId는 equipment의 owner_company_id를 확인해야 함
-    // 일단 deployment의 ep_company_id로 필터링 (추후 수정 가능)
-    checkIns = checkIns.filter((ci: any) => 
-      ci.deployment?.epCompanyId === filters.ownerCompanyId
-    );
+    // Owner 필터링: deployment의 owner_id를 통해 owner의 company_id 확인
+    // 모든 deployment의 owner_id 수집
+    const ownerIds = [...new Set(checkIns.map((ci: any) => ci.deployment?.ownerId).filter(Boolean))];
+    
+    if (ownerIds.length > 0) {
+      // 한 번에 owner 정보 조회
+      const { data: owners } = await supabase
+        .from('users')
+        .select('id, company_id')
+        .in('id', ownerIds);
+      
+      // owner의 company_id가 필터와 일치하는 owner_id만 수집
+      const validOwnerIds = new Set(
+        owners?.filter((o: any) => o.company_id === filters.ownerCompanyId).map((o: any) => o.id) || []
+      );
+      
+      // 해당 owner_id를 가진 deployment의 check-in만 필터링
+      checkIns = checkIns.filter((ci: any) => 
+        ci.deployment?.ownerId && validOwnerIds.has(ci.deployment.ownerId)
+      );
+    } else {
+      // owner_id가 없으면 빈 결과
+      checkIns = [];
+    }
   }
 
   if (filters?.workerTypeId) {

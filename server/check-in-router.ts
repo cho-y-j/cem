@@ -295,17 +295,34 @@ export const checkInRouter = router({
         });
       }
 
-      // Admin/EP/Owner는 전체 조회
-      const checkIns = await db.getCheckIns({
+      // 권한별 필터링
+      const filters: any = {
         workerId: input?.workerId,
         workZoneId: input?.workZoneId,
-        bpCompanyId: input?.bpCompanyId,
-        ownerCompanyId: input?.ownerCompanyId,
         workerTypeId: input?.workerTypeId,
         workerName: input?.workerName,
         startDate: input?.startDate,
         endDate: input?.endDate,
-      });
+      };
+
+      // BP인 경우 자신의 회사 deployment의 출근 기록만
+      if (userRole === "bp" && ctx.user.companyId) {
+        filters.bpCompanyId = ctx.user.companyId;
+      }
+      // Owner인 경우 자신의 회사 deployment의 출근 기록만
+      else if (userRole === "owner" && ctx.user.companyId) {
+        filters.ownerCompanyId = ctx.user.companyId;
+      }
+      // EP인 경우 자신의 회사 deployment의 출근 기록만
+      else if (userRole === "ep" && ctx.user.companyId) {
+        filters.epCompanyId = ctx.user.companyId;
+      }
+      // Admin은 전체 조회 (필터 없음)
+      // 수동 필터는 그대로 전달
+      if (input?.bpCompanyId) filters.bpCompanyId = input.bpCompanyId;
+      if (input?.ownerCompanyId) filters.ownerCompanyId = input.ownerCompanyId;
+
+      const checkIns = await db.getCheckIns(filters);
 
       return checkIns.slice(0, input?.limit || 50);
     }),
@@ -337,13 +354,15 @@ export const checkInRouter = router({
 
     // EP인 경우 자신의 회사 deployment의 출근 기록만
     if (userRole === "ep" && ctx.user.companyId) {
-      // EP 회사와 연결된 deployment의 출근 기록만 조회하기 위해
-      // 일단 전체 조회 후 필터링 (getCheckIns에서 epCompanyId 필터 지원 필요)
-      // 임시로 전체 조회 후 필터링
+      checkInFilters.epCompanyId = ctx.user.companyId;
     }
     // BP인 경우 자신의 회사 deployment의 출근 기록만
     else if (userRole === "bp" && ctx.user.companyId) {
       checkInFilters.bpCompanyId = ctx.user.companyId;
+    }
+    // Owner인 경우 자신의 회사 deployment의 출근 기록만
+    else if (userRole === "owner" && ctx.user.companyId) {
+      checkInFilters.ownerCompanyId = ctx.user.companyId;
     }
 
     const todayCheckIns = await db.getCheckIns(checkInFilters);
@@ -380,7 +399,10 @@ export const checkInRouter = router({
     else if (userRole === "bp" && ctx.user.companyId) {
       deploymentQuery = deploymentQuery.eq("bp_company_id", ctx.user.companyId);
     }
-    // Owner인 경우 자신의 회사 deployment만 (equipment의 owner_company_id 확인 필요하지만 일단 deployment만)
+    // Owner인 경우 자신의 회사 deployment만 (deployment의 owner_id로 필터링)
+    else if (userRole === "owner" && ctx.user.id) {
+      deploymentQuery = deploymentQuery.eq("owner_id", ctx.user.id);
+    }
     // Admin은 전체 조회
 
     const { data: activeDeployments, error: deploymentsError } = await deploymentQuery;
