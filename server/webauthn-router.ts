@@ -113,7 +113,7 @@ export const webauthnRouter = router({
           // Uint8Array로 변환
           userID: new TextEncoder().encode(user.id),
           timeout: CHALLENGE_TIMEOUT,
-          attestationType: 'none',
+          attestationType: 'direct', // 'none'에서 'direct'로 변경하여 registrationInfo 확보
           authenticatorSelection: {
             authenticatorAttachment: 'platform', // 기기 내장 생체 인식
             requireResidentKey: false,
@@ -237,7 +237,7 @@ export const webauthnRouter = router({
           });
         }
 
-        if (!verification.verified || !verification.registrationInfo) {
+        if (!verification.verified) {
           console.error('[WebAuthn] Registration verification failed:', {
             verified: verification.verified,
             hasRegistrationInfo: !!verification.registrationInfo,
@@ -249,18 +249,76 @@ export const webauthnRouter = router({
           });
         }
 
-        const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
-
-        // 값 검증
-        if (!credentialID) {
-          console.error('[WebAuthn] credentialID is undefined:', verification.registrationInfo);
+        if (!verification.registrationInfo) {
+          console.error('[WebAuthn] registrationInfo is missing:', {
+            verified: verification.verified,
+            verificationKeys: Object.keys(verification),
+            verification,
+          });
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "크레덴셜 ID를 가져올 수 없습니다.",
+            message: "등록 정보를 가져올 수 없습니다. attestationType 설정을 확인해주세요.",
           });
         }
 
-        if (!credentialPublicKey) {
+        // registrationInfo 구조 확인
+        console.log('[WebAuthn] registrationInfo structure:', {
+          hasCredentialID: 'credentialID' in verification.registrationInfo,
+          hasCredentialPublicKey: 'credentialPublicKey' in verification.registrationInfo,
+          hasCounter: 'counter' in verification.registrationInfo,
+          registrationInfoKeys: Object.keys(verification.registrationInfo),
+          registrationInfo: JSON.stringify(verification.registrationInfo, (key, value) => {
+            if (value instanceof Uint8Array || Buffer.isBuffer(value)) {
+              return `[Uint8Array/Buffer: ${value.length} bytes]`;
+            }
+            return value;
+          }),
+        });
+
+        const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+
+        // 값 검증 - credentialID가 없으면 다른 필드에서 찾기 시도
+        let finalCredentialID = credentialID;
+        let finalCredentialPublicKey = credentialPublicKey;
+
+        // credentialID가 없으면 registrationInfo에서 직접 찾기
+        if (!finalCredentialID) {
+          console.warn('[WebAuthn] credentialID is undefined, trying to extract from registrationInfo');
+          const regInfo = verification.registrationInfo as any;
+          
+          // 다양한 가능한 필드명 확인
+          finalCredentialID = regInfo.credentialID || 
+                             regInfo.credentialId || 
+                             regInfo.id ||
+                             regInfo.credential?.id;
+          
+          console.log('[WebAuthn] Attempted credentialID extraction:', {
+            found: !!finalCredentialID,
+            registrationInfoKeys: Object.keys(regInfo),
+            registrationInfoValues: Object.keys(regInfo).reduce((acc, key) => {
+              const val = regInfo[key];
+              if (val instanceof Uint8Array || Buffer.isBuffer(val)) {
+                acc[key] = `[Uint8Array/Buffer: ${val.length} bytes]`;
+              } else {
+                acc[key] = typeof val;
+              }
+              return acc;
+            }, {} as Record<string, string>),
+          });
+        }
+
+        if (!finalCredentialID) {
+          console.error('[WebAuthn] credentialID is still undefined after extraction:', {
+            registrationInfo: verification.registrationInfo,
+            verificationKeys: Object.keys(verification),
+          });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "크레덴셜 ID를 가져올 수 없습니다. attestationType을 'direct'로 설정했는지 확인해주세요.",
+          });
+        }
+
+        if (!finalCredentialPublicKey) {
           console.error('[WebAuthn] credentialPublicKey is undefined:', verification.registrationInfo);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -269,28 +327,28 @@ export const webauthnRouter = router({
         }
 
         console.log('[WebAuthn] Registration info:', {
-          credentialIDType: typeof credentialID,
-          credentialIDIsBuffer: Buffer.isBuffer(credentialID),
-          credentialIDLength: credentialID?.length,
-          credentialPublicKeyType: typeof credentialPublicKey,
-          credentialPublicKeyIsBuffer: Buffer.isBuffer(credentialPublicKey),
-          credentialPublicKeyLength: credentialPublicKey?.length,
+          credentialIDType: typeof finalCredentialID,
+          credentialIDIsBuffer: Buffer.isBuffer(finalCredentialID),
+          credentialIDLength: finalCredentialID?.length,
+          credentialPublicKeyType: typeof finalCredentialPublicKey,
+          credentialPublicKeyIsBuffer: Buffer.isBuffer(finalCredentialPublicKey),
+          credentialPublicKeyLength: finalCredentialPublicKey?.length,
           counter,
         });
 
         // Base64URL 인코딩 (저장용)
         // credentialID는 Uint8Array이므로 Buffer.from()으로 변환
-        const credentialIdBuffer = credentialID instanceof Uint8Array 
-          ? Buffer.from(credentialID) 
-          : Buffer.isBuffer(credentialID) 
-            ? credentialID 
-            : Buffer.from(credentialID as any);
+        const credentialIdBuffer = finalCredentialID instanceof Uint8Array 
+          ? Buffer.from(finalCredentialID) 
+          : Buffer.isBuffer(finalCredentialID) 
+            ? finalCredentialID 
+            : Buffer.from(finalCredentialID as any);
         
-        const publicKeyBuffer = credentialPublicKey instanceof Uint8Array
-          ? Buffer.from(credentialPublicKey)
-          : Buffer.isBuffer(credentialPublicKey)
-            ? credentialPublicKey
-            : Buffer.from(credentialPublicKey as any);
+        const publicKeyBuffer = finalCredentialPublicKey instanceof Uint8Array
+          ? Buffer.from(finalCredentialPublicKey)
+          : Buffer.isBuffer(finalCredentialPublicKey)
+            ? finalCredentialPublicKey
+            : Buffer.from(finalCredentialPublicKey as any);
 
         const credentialIdBase64 = credentialIdBuffer.toString('base64url');
         const publicKeyBase64 = publicKeyBuffer.toString('base64');
