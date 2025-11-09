@@ -404,19 +404,25 @@ export const checkInRouter = router({
     }
     // Admin은 전체 조회
 
-    const { data: activeDeployments, error: deploymentsError } = await deploymentQuery;
+    const { data: activeDeploymentsRaw, error: deploymentsError } = await deploymentQuery;
 
     console.log('[getTodayStats] ===== Deployment 조회 결과 =====');
     console.log('[getTodayStats] User role:', userRole);
     console.log('[getTodayStats] User company ID:', ctx.user.companyId);
     console.log('[getTodayStats] User ID:', ctx.user.id);
-    console.log('[getTodayStats] Active deployments count:', activeDeployments?.length || 0);
-    console.log('[getTodayStats] Active deployments data:', JSON.stringify(activeDeployments, null, 2));
+    console.log('[getTodayStats] Active deployments count (raw):', activeDeploymentsRaw?.length || 0);
+    console.log('[getTodayStats] Active deployments data (raw):', JSON.stringify(activeDeploymentsRaw, null, 2));
     console.log('[getTodayStats] Deployment query error:', deploymentsError);
 
     if (deploymentsError) {
       console.error('[getTodayStats] ❌ Deployment query error:', deploymentsError);
     }
+
+    // Supabase는 snake_case를 반환하므로 camelCase로 변환
+    const { toCamelCaseArray } = await import('./db-utils');
+    const activeDeployments = activeDeploymentsRaw ? toCamelCaseArray(activeDeploymentsRaw) : [];
+    
+    console.log('[getTodayStats] Active deployments (converted):', JSON.stringify(activeDeployments, null, 2));
 
     // work_zone이 있는 deployment만 출근 대상으로 계산
     const expectedWorkers = await (async () => {
@@ -429,7 +435,10 @@ export const checkInRouter = router({
       }
       
       // 각 deployment의 ep_company_id에 해당하는 활성 work_zone이 있는지 확인
-      const epCompanyIds = [...new Set(activeDeployments.map((d: any) => d.ep_company_id).filter(Boolean))];
+      // camelCase 변환 후 epCompanyId 사용
+      const epCompanyIds = [...new Set(
+        activeDeployments.map((d: any) => d.epCompanyId || d.ep_company_id).filter(Boolean)
+      )];
       console.log('[getTodayStats] EP Company IDs:', epCompanyIds);
       
       if (epCompanyIds.length === 0) {
@@ -437,14 +446,14 @@ export const checkInRouter = router({
         return 0;
       }
       
-      const { data: workZones, error: workZonesError } = await supabase
+      const { data: workZonesRaw, error: workZonesError } = await supabase
         .from("work_zones")
         .select("company_id, id, name, is_active")
         .eq("is_active", true)
         .in("company_id", epCompanyIds);
 
-      console.log('[getTodayStats] Work zones query result:', {
-        workZones: workZones,
+      console.log('[getTodayStats] Work zones query result (raw):', {
+        workZones: workZonesRaw,
         error: workZonesError,
         epCompanyIds: epCompanyIds,
       });
@@ -453,13 +462,24 @@ export const checkInRouter = router({
         console.error('[getTodayStats] ❌ Work zones 조회 오류:', workZonesError);
       }
 
-      const validEpCompanyIds = new Set(workZones?.map((wz: any) => wz.company_id) || []);
+      // Supabase는 snake_case를 반환하므로 camelCase로 변환
+      const { toCamelCaseArray: toCamelCaseArray2 } = await import('./db-utils');
+      const workZones = workZonesRaw ? toCamelCaseArray2(workZonesRaw) : [];
+      
+      console.log('[getTodayStats] Work zones (converted):', JSON.stringify(workZones, null, 2));
+
+      // company_id는 snake_case이므로 그대로 사용 (또는 companyId로 변환된 경우 확인)
+      const validEpCompanyIds = new Set(
+        workZones.map((wz: any) => wz.companyId || wz.company_id).filter(Boolean)
+      );
       console.log('[getTodayStats] Valid EP Company IDs (work_zone이 있는):', Array.from(validEpCompanyIds));
       
       // work_zone이 있는 deployment만 출근 대상으로 계산
+      // ep_company_id는 snake_case이거나 camelCase일 수 있으므로 둘 다 확인
       const validDeployments = activeDeployments.filter((d: any) => {
-        const isValid = d.ep_company_id && validEpCompanyIds.has(d.ep_company_id);
-        console.log(`[getTodayStats] Deployment ${d.worker_id}: ep_company_id=${d.ep_company_id}, valid=${isValid}`);
+        const epCompanyId = d.epCompanyId || d.ep_company_id;
+        const isValid = epCompanyId && validEpCompanyIds.has(epCompanyId);
+        console.log(`[getTodayStats] Deployment ${d.workerId || d.worker_id}: epCompanyId=${epCompanyId}, valid=${isValid}`);
         return isValid;
       });
 
