@@ -53,6 +53,16 @@ export default function BiometricSetup() {
       toast.info("생체 인증을 진행해주세요 (지문 또는 얼굴 인식)");
       const registrationResponse = await startRegistration(options);
 
+      console.log('[BiometricSetup] Registration response:', {
+        id: registrationResponse.id,
+        rawId: registrationResponse.rawId,
+        response: registrationResponse.response,
+        type: registrationResponse.type,
+        hasId: !!registrationResponse.id,
+        hasRawId: !!registrationResponse.rawId,
+        hasResponse: !!registrationResponse.response,
+      });
+
       // 3. 서버로 크레덴셜 전송 및 검증
       const deviceName = navigator.userAgent.includes('iPhone') ? 'iPhone' :
                         navigator.userAgent.includes('Android') ? 'Android' :

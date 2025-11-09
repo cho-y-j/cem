@@ -186,6 +186,15 @@ export const webauthnRouter = router({
         });
 
         // 등록 응답 검증
+        console.log('[WebAuthn] Verifying registration response:', {
+          hasResponse: !!input.response,
+          responseId: input.response?.id,
+          responseType: input.response?.type,
+          hasRawId: !!input.response?.rawId,
+          hasResponseObject: !!input.response?.response,
+          responseKeys: input.response ? Object.keys(input.response) : [],
+        });
+
         let verification: VerifiedRegistrationResponse;
         try {
           verification = await verifyRegistrationResponse({
@@ -194,6 +203,12 @@ export const webauthnRouter = router({
             expectedOrigin: ORIGIN,
             expectedRPID: RP_ID,
             requireUserVerification: true,
+          });
+
+          console.log('[WebAuthn] Verification result:', {
+            verified: verification.verified,
+            hasRegistrationInfo: !!verification.registrationInfo,
+            registrationInfoKeys: verification.registrationInfo ? Object.keys(verification.registrationInfo) : [],
           });
         } catch (error: any) {
           console.error('[WebAuthn] Registration verification failed:', error);
@@ -223,6 +238,11 @@ export const webauthnRouter = router({
         }
 
         if (!verification.verified || !verification.registrationInfo) {
+          console.error('[WebAuthn] Registration verification failed:', {
+            verified: verification.verified,
+            hasRegistrationInfo: !!verification.registrationInfo,
+            verification,
+          });
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "등록 검증에 실패했습니다.",
@@ -231,9 +251,49 @@ export const webauthnRouter = router({
 
         const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
 
+        // 값 검증
+        if (!credentialID) {
+          console.error('[WebAuthn] credentialID is undefined:', verification.registrationInfo);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "크레덴셜 ID를 가져올 수 없습니다.",
+          });
+        }
+
+        if (!credentialPublicKey) {
+          console.error('[WebAuthn] credentialPublicKey is undefined:', verification.registrationInfo);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "공개키를 가져올 수 없습니다.",
+          });
+        }
+
+        console.log('[WebAuthn] Registration info:', {
+          credentialIDType: typeof credentialID,
+          credentialIDIsBuffer: Buffer.isBuffer(credentialID),
+          credentialIDLength: credentialID?.length,
+          credentialPublicKeyType: typeof credentialPublicKey,
+          credentialPublicKeyIsBuffer: Buffer.isBuffer(credentialPublicKey),
+          credentialPublicKeyLength: credentialPublicKey?.length,
+          counter,
+        });
+
         // Base64URL 인코딩 (저장용)
-        const credentialIdBase64 = Buffer.from(credentialID).toString('base64url');
-        const publicKeyBase64 = Buffer.from(credentialPublicKey).toString('base64');
+        // credentialID는 Uint8Array이므로 Buffer.from()으로 변환
+        const credentialIdBuffer = credentialID instanceof Uint8Array 
+          ? Buffer.from(credentialID) 
+          : Buffer.isBuffer(credentialID) 
+            ? credentialID 
+            : Buffer.from(credentialID as any);
+        
+        const publicKeyBuffer = credentialPublicKey instanceof Uint8Array
+          ? Buffer.from(credentialPublicKey)
+          : Buffer.isBuffer(credentialPublicKey)
+            ? credentialPublicKey
+            : Buffer.from(credentialPublicKey as any);
+
+        const credentialIdBase64 = credentialIdBuffer.toString('base64url');
+        const publicKeyBase64 = publicKeyBuffer.toString('base64');
 
         // DB에 크레덴셜 저장
         const supabase = db.getSupabase();
@@ -384,8 +444,28 @@ export const webauthnRouter = router({
 
         const response = input.response as AuthenticationResponseJSON;
 
+        // rawId 검증
+        if (!response.rawId) {
+          console.error('[WebAuthn] response.rawId is undefined:', response);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "인증 응답에 크레덴셜 ID가 없습니다.",
+          });
+        }
+
         // 크레덴셜 조회
-        const credentialIdBase64 = Buffer.from(response.rawId, 'base64url').toString('base64url');
+        // rawId는 base64url로 인코딩된 문자열이거나 ArrayBuffer일 수 있음
+        let credentialIdBase64: string;
+        if (typeof response.rawId === 'string') {
+          credentialIdBase64 = response.rawId;
+        } else if (response.rawId instanceof ArrayBuffer) {
+          credentialIdBase64 = Buffer.from(response.rawId).toString('base64url');
+        } else if (response.rawId instanceof Uint8Array) {
+          credentialIdBase64 = Buffer.from(response.rawId).toString('base64url');
+        } else {
+          // 이미 base64url 문자열로 가정
+          credentialIdBase64 = Buffer.from(response.rawId as any, 'base64url').toString('base64url');
+        }
         const supabase = db.getSupabase();
         const { data: credential, error: credError } = await supabase
           .from('webauthn_credentials')
