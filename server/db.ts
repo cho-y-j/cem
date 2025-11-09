@@ -3007,18 +3007,33 @@ export async function getAllActiveLocations(filters?: {
     } else if (role === 'ep') {
       // EP: 본인 회사에 투입된 장비만 (deployment에서 확인)
       if (filters.userCompanyId) {
+        console.log('[getAllActiveLocations] EP 필터링 시작 - userCompanyId:', filters.userCompanyId);
+        
         // 먼저 활성 deployment 조회
-        const { data: deployments } = await supabase
+        const { data: deployments, error: deploymentError } = await supabase
           .from('deployments')
           .select('equipment_id, worker_id')
           .eq('ep_company_id', filters.userCompanyId)
           .eq('status', 'active');
         
+        console.log('[getAllActiveLocations] EP deployment 조회 결과:', {
+          count: deployments?.length || 0,
+          error: deploymentError,
+          deployments: deployments?.slice(0, 5), // 처음 5개만 로그
+        });
+        
+        if (deploymentError) {
+          console.error('[getAllActiveLocations] EP deployment 조회 에러:', deploymentError);
+        }
+        
         if (deployments && deployments.length > 0) {
           const equipmentIds = deployments.map((d: any) => d.equipment_id).filter(Boolean);
           const workerIds = deployments.map((d: any) => d.worker_id).filter(Boolean);
           
+          console.log('[getAllActiveLocations] EP 필터링 - equipmentIds:', equipmentIds.length, 'workerIds:', workerIds.length);
+          
           if (equipmentIds.length > 0 || workerIds.length > 0) {
+            // Supabase PostgREST의 .or() 구문은 조건을 괄호로 묶어야 함
             const conditions: string[] = [];
             if (equipmentIds.length > 0) {
               conditions.push(`equipment_id.in.(${equipmentIds.join(',')})`);
@@ -3026,15 +3041,30 @@ export async function getAllActiveLocations(filters?: {
             if (workerIds.length > 0) {
               conditions.push(`worker_id.in.(${workerIds.join(',')})`);
             }
-            query = query.or(conditions.join(','));
+            
+            // .or() 대신 .in()을 각각 사용하거나, 조건을 합쳐서 사용
+            if (conditions.length === 1) {
+              query = query.filter(conditions[0].split('.')[0], 'in', conditions[0].split('(')[1].split(')')[0].split(','));
+            } else if (conditions.length === 2) {
+              // equipment_id와 worker_id 둘 다 있는 경우
+              // Supabase는 .or()를 지원하지만, 괄호로 묶어야 함
+              const orCondition = `(${conditions[0]},${conditions[1]})`;
+              query = query.or(orCondition);
+            }
+            
+            console.log('[getAllActiveLocations] EP 필터링 조건 적용 완료');
           } else {
             // 투입된 장비가 없으면 빈 결과 반환
+            console.log('[getAllActiveLocations] EP - 투입된 장비/인력이 없음');
             return [];
           }
         } else {
           // 활성 deployment가 없으면 빈 결과 반환
+          console.log('[getAllActiveLocations] EP - 활성 deployment가 없음');
           return [];
         }
+      } else {
+        console.log('[getAllActiveLocations] EP - userCompanyId가 없음');
       }
     }
     // BP와 Admin은 추가 필터 파라미터로 제어
@@ -3257,6 +3287,20 @@ export async function getAllActiveLocations(filters?: {
     }
   }
 
+  console.log('[getAllActiveLocations] ===== 최종 결과 =====');
+  console.log('[getAllActiveLocations] 최종 개수:', result.length);
+  if (result.length > 0) {
+    console.log('[getAllActiveLocations] 최종 샘플 (처음 3개):', result.slice(0, 3).map((loc: any) => ({
+      workerId: loc.workerId,
+      workerName: loc.workers?.name,
+      equipmentId: loc.equipmentId,
+      equipmentRegNum: loc.equipment?.regNum,
+      loggedAt: loc.loggedAt,
+      hasDeployment: !!loc.deployment,
+      deploymentEpCompanyId: loc.deployment?.epCompanyId,
+    })));
+  }
+  
   return toCamelCaseArray(result);
 }
 

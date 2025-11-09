@@ -147,6 +147,10 @@ export default function WorkerMain() {
     onSuccess: () => {
       toast.success("작업이 시작되었습니다.");
       refetchSession();
+      // GPS 위치 전송 시작
+      if (assignedEquipment) {
+        toast.info("GPS로 현위치가 전송됩니다.");
+      }
       startLocationTracking();
     },
     onError: (error) => {
