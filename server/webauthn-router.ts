@@ -680,19 +680,36 @@ export const webauthnRouter = router({
    */
   myCredentials: protectedProcedure
     .query(async ({ ctx }) => {
-      const supabase = db.getSupabase();
-      const { data, error } = await supabase
-        .from('webauthn_credentials')
-        .select('*')
-        .eq('user_id', ctx.user.id)
-        .order('created_at', { ascending: false });
+      try {
+        const supabase = db.getSupabase();
+        if (!supabase) {
+          console.error('[WebAuthn] Supabase not available');
+          return [];
+        }
 
-      if (error) {
-        console.error('[WebAuthn] myCredentials error:', error);
+        const { data, error } = await supabase
+          .from('webauthn_credentials')
+          .select('*')
+          .eq('user_id', ctx.user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('[WebAuthn] myCredentials error:', error);
+          return [];
+        }
+
+        const credentials = db.toCamelCaseArray(data || []);
+        console.log('[WebAuthn] myCredentials result:', {
+          userId: ctx.user.id,
+          count: credentials.length,
+          credentialIds: credentials.map((c: any) => c.id),
+        });
+
+        return credentials;
+      } catch (err: any) {
+        console.error('[WebAuthn] myCredentials exception:', err);
         return [];
       }
-
-      return db.toCamelCaseArray(data || []);
     }),
 
   /**
