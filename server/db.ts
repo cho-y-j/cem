@@ -3237,14 +3237,14 @@ export async function getAllActiveLocations(filters?: {
 
   // deployment 정보 추가 조회 (배치로 처리)
   const result = Array.from(latestByWorker.values());
-  const equipmentIds = result.map((loc: any) => loc.equipment_id).filter(Boolean);
+  const resultEquipmentIds = result.map((loc: any) => loc.equipment_id).filter(Boolean);
   
-  if (equipmentIds.length > 0) {
+  if (resultEquipmentIds.length > 0) {
     // 모든 활성 deployment 조회
     const { data: deployments } = await supabase
       .from('deployments')
       .select('id, equipment_id, bp_company_id, ep_company_id')
-      .in('equipment_id', equipmentIds)
+      .in('equipment_id', resultEquipmentIds)
       .eq('status', 'active');
 
     if (deployments && deployments.length > 0) {
