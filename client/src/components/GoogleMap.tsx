@@ -52,19 +52,15 @@ export default function GoogleMap({
       importLibrary("places"),
       importLibrary("marker"),
     ])
-      .then(([maps]) => {
+      .then(() => {
         if (!mapRef.current) return;
 
-        // importLibrary가 반환하는 객체를 사용
-        // maps 객체에는 Map, InfoWindow 등이 포함되어 있음
-        const Map = maps.Map || (globalThis as any).google?.maps?.Map;
-        const InfoWindow = maps.InfoWindow || (globalThis as any).google?.maps?.InfoWindow;
-
-        if (!Map || !InfoWindow) {
+        // importLibrary가 완료되면 전역 google.maps 객체가 사용 가능
+        if (typeof google === 'undefined' || !google.maps) {
           throw new Error("Google Maps API가 제대로 로드되지 않았습니다.");
         }
 
-        const newMap = new Map(mapRef.current, {
+        const newMap = new google.maps.Map(mapRef.current, {
           center,
           zoom,
           mapTypeControl: true,
@@ -73,7 +69,7 @@ export default function GoogleMap({
           zoomControl: true,
         });
 
-        const newInfoWindow = new InfoWindow();
+        const newInfoWindow = new google.maps.InfoWindow();
         
         setMap(newMap);
         setInfoWindow(newInfoWindow);
