@@ -406,45 +406,69 @@ export const checkInRouter = router({
 
     const { data: activeDeployments, error: deploymentsError } = await deploymentQuery;
 
-    console.log('[getTodayStats] Active deployments query result:', {
-      count: activeDeployments?.length || 0,
-      error: deploymentsError,
-      userRole,
-      userCompanyId: ctx.user.companyId,
-    });
+    console.log('[getTodayStats] ===== Deployment 조회 결과 =====');
+    console.log('[getTodayStats] User role:', userRole);
+    console.log('[getTodayStats] User company ID:', ctx.user.companyId);
+    console.log('[getTodayStats] User ID:', ctx.user.id);
+    console.log('[getTodayStats] Active deployments count:', activeDeployments?.length || 0);
+    console.log('[getTodayStats] Active deployments data:', JSON.stringify(activeDeployments, null, 2));
+    console.log('[getTodayStats] Deployment query error:', deploymentsError);
 
     if (deploymentsError) {
-      console.error('[getTodayStats] Deployment query error:', deploymentsError);
+      console.error('[getTodayStats] ❌ Deployment query error:', deploymentsError);
     }
 
     // work_zone이 있는 deployment만 출근 대상으로 계산
     const expectedWorkers = await (async () => {
-      if (!activeDeployments || activeDeployments.length === 0) return 0;
+      console.log('[getTodayStats] ===== 출근 대상 계산 시작 =====');
+      console.log('[getTodayStats] Active deployments:', JSON.stringify(activeDeployments, null, 2));
+      
+      if (!activeDeployments || activeDeployments.length === 0) {
+        console.log('[getTodayStats] ❌ 활성 deployment가 없음');
+        return 0;
+      }
       
       // 각 deployment의 ep_company_id에 해당하는 활성 work_zone이 있는지 확인
       const epCompanyIds = [...new Set(activeDeployments.map((d: any) => d.ep_company_id).filter(Boolean))];
+      console.log('[getTodayStats] EP Company IDs:', epCompanyIds);
       
-      if (epCompanyIds.length === 0) return 0;
+      if (epCompanyIds.length === 0) {
+        console.log('[getTodayStats] ❌ EP Company ID가 없음');
+        return 0;
+      }
       
-      const { data: workZones } = await supabase
+      const { data: workZones, error: workZonesError } = await supabase
         .from("work_zones")
-        .select("company_id")
+        .select("company_id, id, name, is_active")
         .eq("is_active", true)
         .in("company_id", epCompanyIds);
 
+      console.log('[getTodayStats] Work zones query result:', {
+        workZones: workZones,
+        error: workZonesError,
+        epCompanyIds: epCompanyIds,
+      });
+
+      if (workZonesError) {
+        console.error('[getTodayStats] ❌ Work zones 조회 오류:', workZonesError);
+      }
+
       const validEpCompanyIds = new Set(workZones?.map((wz: any) => wz.company_id) || []);
+      console.log('[getTodayStats] Valid EP Company IDs (work_zone이 있는):', Array.from(validEpCompanyIds));
       
       // work_zone이 있는 deployment만 출근 대상으로 계산
-      const validDeployments = activeDeployments.filter((d: any) => 
-        d.ep_company_id && validEpCompanyIds.has(d.ep_company_id)
-      );
-
-      console.log('[getTodayStats] Valid deployments (with work zones):', {
-        total: activeDeployments.length,
-        valid: validDeployments.length,
-        epCompanyIds: epCompanyIds.length,
-        workZones: workZones?.length || 0,
+      const validDeployments = activeDeployments.filter((d: any) => {
+        const isValid = d.ep_company_id && validEpCompanyIds.has(d.ep_company_id);
+        console.log(`[getTodayStats] Deployment ${d.worker_id}: ep_company_id=${d.ep_company_id}, valid=${isValid}`);
+        return isValid;
       });
+
+      console.log('[getTodayStats] ===== 출근 대상 계산 결과 =====');
+      console.log('[getTodayStats] Total deployments:', activeDeployments.length);
+      console.log('[getTodayStats] Valid deployments (with work zones):', validDeployments.length);
+      console.log('[getTodayStats] EP Company IDs found:', epCompanyIds.length);
+      console.log('[getTodayStats] Work zones found:', workZones?.length || 0);
+      console.log('[getTodayStats] Expected workers:', validDeployments.length);
 
       return validDeployments.length;
     })();
