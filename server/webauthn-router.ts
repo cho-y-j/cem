@@ -255,8 +255,7 @@ export const webauthnRouter = router({
           });
         }
 
-        // 사용된 챌린지 삭제
-        const challengeData = challenges.get(user.id);
+        // 사용된 챌린지 삭제 (이미 위에서 선언된 challengeData 사용)
         if (challengeData) {
           clearTimeout(challengeData.timeoutId);
           challenges.delete(user.id);
@@ -442,8 +441,7 @@ export const webauthnRouter = router({
           })
           .eq('id', credentialIdBase64);
 
-        // 사용된 챌린지 삭제
-        const challengeData = challenges.get(user.id);
+        // 사용된 챌린지 삭제 (이미 위에서 선언된 challengeData 사용)
         if (challengeData) {
           clearTimeout(challengeData.timeoutId);
           challenges.delete(user.id);
