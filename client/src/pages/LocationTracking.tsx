@@ -416,22 +416,41 @@ export default function LocationTracking() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            <GoogleMap
-              center={center}
-              zoom={markers.length === 1 ? 15 : 12}
-              markers={markers}
-              className="w-full h-[600px] rounded-lg"
-            />
-            {markers.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-lg">
-                <div className="text-center p-6">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">활성 위치가 없습니다</h3>
-                  <p className="text-muted-foreground">
-                    현재 작업 중인 장비 또는 인력이 없거나,<br />
-                    최근 10분 이내 위치 정보가 전송되지 않았습니다.
-                  </p>
+          <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
+            {GOOGLE_MAPS_API_KEY ? (
+              <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+                <Map
+                  defaultCenter={center}
+                  defaultZoom={markers.length === 1 ? 15 : 12}
+                  gestureHandling="greedy"
+                  disableDefaultUI={false}
+                  style={{ width: "100%", height: "100%" }}
+                >
+                  {markers.map((marker) => (
+                    <Marker
+                      key={marker.id}
+                      position={marker.position}
+                      title={marker.title}
+                    />
+                  ))}
+                </Map>
+                {markers.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+                    <div className="text-center p-6">
+                      <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">활성 위치가 없습니다</h3>
+                      <p className="text-muted-foreground">
+                        현재 작업 중인 장비 또는 인력이 없거나,<br />
+                        최근 10분 이내 위치 정보가 전송되지 않았습니다.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </APIProvider>
+            ) : (
+              <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+                <div className="text-center">
+                  <p className="text-red-600 font-medium">Google Maps API 키가 설정되지 않았습니다.</p>
                 </div>
               </div>
             )}
