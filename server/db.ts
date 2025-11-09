@@ -2969,6 +2969,12 @@ export async function getAllActiveLocations(filters?: {
 
   // 최근 10분 이내의 위치만 조회
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  console.log('[getAllActiveLocations] ===== 시작 =====');
+  console.log('[getAllActiveLocations] 조회 시간 범위:', {
+    now: new Date().toISOString(),
+    tenMinutesAgo: tenMinutesAgo.toISOString(),
+  });
+  console.log('[getAllActiveLocations] 필터:', JSON.stringify(filters, null, 2));
 
   // 각 worker별 최신 위치만 가져오기 위해 서브쿼리 사용
   let query = supabase
