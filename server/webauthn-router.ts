@@ -21,8 +21,67 @@ import type {
  * 프로덕션에서는 환경 변수로 관리
  */
 const RP_NAME = process.env.RP_NAME || "ERMS 건설장비관리";
-const RP_ID = process.env.RP_ID || "localhost";
-const ORIGIN = process.env.ORIGIN || "http://localhost:3000";
+
+// RP_ID: 도메인만 추출 (포트 제외)
+// 예: https://cem-21tp.onrender.com -> cem-21tp.onrender.com
+// 예: http://localhost:3000 -> localhost
+function getRPID(): string {
+  if (process.env.RP_ID) {
+    return process.env.RP_ID;
+  }
+  
+  // 환경 변수에서 URL 추출 시도
+  if (process.env.ORIGIN) {
+    try {
+      const url = new URL(process.env.ORIGIN);
+      return url.hostname;
+    } catch {
+      // URL 파싱 실패 시 그대로 사용
+    }
+  }
+  
+  // Render 환경 변수 확인
+  if (process.env.RENDER_EXTERNAL_URL) {
+    try {
+      const url = new URL(process.env.RENDER_EXTERNAL_URL);
+      return url.hostname;
+    } catch {
+      // URL 파싱 실패 시 그대로 사용
+    }
+  }
+  
+  // 기본값: localhost (개발 환경)
+  return "localhost";
+}
+
+// ORIGIN: 전체 URL (프로토콜 포함)
+// 예: https://cem-21tp.onrender.com
+// 예: http://localhost:3000
+function getOrigin(): string {
+  if (process.env.ORIGIN) {
+    return process.env.ORIGIN;
+  }
+  
+  // Render 환경 변수 확인
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL;
+  }
+  
+  // 기본값: localhost (개발 환경)
+  return "http://localhost:3000";
+}
+
+const RP_ID = getRPID();
+const ORIGIN = getOrigin();
+
+// 디버깅 로그
+console.log('[WebAuthn] Configuration:', {
+  RP_NAME,
+  RP_ID,
+  ORIGIN,
+  NODE_ENV: process.env.NODE_ENV,
+  RENDER_EXTERNAL_URL: process.env.RENDER_EXTERNAL_URL,
+});
 
 // 챌린지 임시 저장소 (프로덕션에서는 Redis/DB 사용)
 const challenges = new Map<string, string>();
@@ -108,9 +167,28 @@ export const webauthnRouter = router({
           });
         } catch (error: any) {
           console.error('[WebAuthn] Registration verification failed:', error);
+          console.error('[WebAuthn] Error details:', {
+            message: error.message,
+            name: error.name,
+            expectedOrigin: ORIGIN,
+            expectedRPID: RP_ID,
+            responseOrigin: input.response?.clientExtensionResults,
+          });
+          
+          // 더 명확한 에러 메시지
+          let errorMessage = `등록 검증 실패: ${error.message}`;
+          if (error.message?.includes('origin')) {
+            errorMessage += `\n현재 설정된 ORIGIN: ${ORIGIN}`;
+            errorMessage += `\n브라우저에서 요청한 ORIGIN과 일치하지 않습니다.`;
+          }
+          if (error.message?.includes('rpId') || error.message?.includes('RP ID')) {
+            errorMessage += `\n현재 설정된 RP_ID: ${RP_ID}`;
+            errorMessage += `\n브라우저에서 요청한 RP_ID와 일치하지 않습니다.`;
+          }
+          
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: `등록 검증 실패: ${error.message}`,
+            message: errorMessage,
           });
         }
 

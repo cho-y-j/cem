@@ -63,14 +63,24 @@ export default function BiometricSetup() {
         deviceName,
       });
     } catch (error: any) {
-      console.error('Registration error:', error);
+      console.error('[BiometricSetup] Registration error:', error);
+      console.error('[BiometricSetup] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
 
       if (error.name === 'NotAllowedError') {
         toast.error("생체 인증이 취소되었습니다.");
       } else if (error.name === 'NotSupportedError') {
         toast.error("이 기기는 생체 인증을 지원하지 않습니다.");
+      } else if (error.message?.includes('origin') || error.message?.includes('RP ID')) {
+        toast.error(
+          `등록 실패: 서버 설정 오류\n${error.message}\n\n관리자에게 문의하세요.`,
+          { duration: 5000 }
+        );
       } else {
-        toast.error(`등록 실패: ${error.message}`);
+        toast.error(`등록 실패: ${error.message || '알 수 없는 오류'}`);
       }
     } finally {
       setIsRegistering(false);
