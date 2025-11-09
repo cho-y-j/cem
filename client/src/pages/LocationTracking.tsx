@@ -143,7 +143,7 @@ export default function LocationTracking() {
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({
       ...prev,
-      [key]: value === "" ? undefined : value,
+      [key]: value === "" || value === "all" ? undefined : value,
     }));
   };
 
@@ -274,14 +274,14 @@ export default function LocationTracking() {
                 <div className="space-y-2">
                   <Label htmlFor="ownerCompanyFilter">오너사 (Owner)</Label>
                   <Select
-                    value={filters.ownerCompanyId || ""}
+                    value={filters.ownerCompanyId || "all"}
                     onValueChange={(value) => handleFilterChange("ownerCompanyId", value)}
                   >
                     <SelectTrigger id="ownerCompanyFilter">
                       <SelectValue placeholder="전체" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">전체</SelectItem>
+                      <SelectItem value="all">전체</SelectItem>
                       {ownerCompanies?.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -297,14 +297,14 @@ export default function LocationTracking() {
                 <div className="space-y-2">
                   <Label htmlFor="bpCompanyFilter">BP (협력사)</Label>
                   <Select
-                    value={filters.bpCompanyId || ""}
+                    value={filters.bpCompanyId || "all"}
                     onValueChange={(value) => handleFilterChange("bpCompanyId", value)}
                   >
                     <SelectTrigger id="bpCompanyFilter">
                       <SelectValue placeholder="전체" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">전체</SelectItem>
+                      <SelectItem value="all">전체</SelectItem>
                       {bpCompanies?.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -320,14 +320,14 @@ export default function LocationTracking() {
                 <div className="space-y-2">
                   <Label htmlFor="epCompanyFilter">EP (시행사)</Label>
                   <Select
-                    value={filters.epCompanyId || ""}
+                    value={filters.epCompanyId || "all"}
                     onValueChange={(value) => handleFilterChange("epCompanyId", value)}
                   >
                     <SelectTrigger id="epCompanyFilter">
                       <SelectValue placeholder="전체" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">전체</SelectItem>
+                      <SelectItem value="all">전체</SelectItem>
                       {epCompanies?.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -343,14 +343,14 @@ export default function LocationTracking() {
                 <div className="space-y-2">
                   <Label htmlFor="equipmentTypeFilter">차종</Label>
                   <Select
-                    value={filters.equipmentTypeId || ""}
+                    value={filters.equipmentTypeId || "all"}
                     onValueChange={(value) => handleFilterChange("equipmentTypeId", value)}
                   >
                     <SelectTrigger id="equipmentTypeFilter">
                       <SelectValue placeholder="전체" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">전체</SelectItem>
+                      <SelectItem value="all">전체</SelectItem>
                       {equipmentTypes?.map((type) => (
                         <SelectItem key={type.id} value={type.id}>
                           {type.name}
