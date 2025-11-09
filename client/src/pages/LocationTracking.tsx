@@ -602,13 +602,43 @@ export default function LocationTracking() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <GoogleMap
-                          center={analysisCenter}
-                          zoom={13}
-                          markers={analysisMarkers}
-                          path={analysisPath}
-                          className="w-full h-[600px] rounded-lg"
-                        />
+                        <div className="w-full h-[600px] rounded-lg overflow-hidden">
+                          {GOOGLE_MAPS_API_KEY ? (
+                            <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+                              <Map
+                                defaultCenter={analysisCenter}
+                                defaultZoom={13}
+                                gestureHandling="greedy"
+                                disableDefaultUI={false}
+                                style={{ width: "100%", height: "100%" }}
+                              >
+                                {/* 이동 경로 Polyline */}
+                                {analysisPath.length > 0 && (
+                                  <Polyline
+                                    path={analysisPath.map((p) => ({ lat: p.lat, lng: p.lng }))}
+                                    strokeColor="#FF0000"
+                                    strokeOpacity={0.8}
+                                    strokeWeight={3}
+                                  />
+                                )}
+                                {/* 마커들 */}
+                                {analysisMarkers.map((marker) => (
+                                  <Marker
+                                    key={marker.id}
+                                    position={marker.position}
+                                    title={marker.title}
+                                  />
+                                ))}
+                              </Map>
+                            </APIProvider>
+                          ) : (
+                            <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+                              <div className="text-center">
+                                <p className="text-red-600 font-medium">Google Maps API 키가 설정되지 않았습니다.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   )}
