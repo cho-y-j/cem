@@ -406,37 +406,36 @@ export default function LocationTracking() {
         </Card>
       )}
 
-      {markers.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">활성 위치가 없습니다</h3>
-              <p className="text-muted-foreground">
-                현재 작업 중인 장비 또는 인력이 없거나,<br />
-                최근 10분 이내 위치 정보가 전송되지 않았습니다.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>실시간 지도</CardTitle>
-            <CardDescription>
-              지도의 마커를 클릭하면 상세 정보를 확인할 수 있습니다. (10초마다 자동 새로고침)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle>실시간 지도</CardTitle>
+          <CardDescription>
+            지도의 마커를 클릭하면 상세 정보를 확인할 수 있습니다. (10초마다 자동 새로고침)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="relative">
             <GoogleMap
               center={center}
-              zoom={12}
+              zoom={markers.length === 1 ? 15 : 12}
               markers={markers}
               className="w-full h-[600px] rounded-lg"
             />
-          </CardContent>
-        </Card>
-      )}
+            {markers.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-lg">
+                <div className="text-center p-6">
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">활성 위치가 없습니다</h3>
+                  <p className="text-muted-foreground">
+                    현재 작업 중인 장비 또는 인력이 없거나,<br />
+                    최근 10분 이내 위치 정보가 전송되지 않았습니다.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 위치 목록 */}
       {markers.length > 0 && (
