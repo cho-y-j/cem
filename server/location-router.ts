@@ -153,10 +153,22 @@ export const locationRouter = router({
       const userRole = ctx.user?.role?.toLowerCase();
       const userCompanyId = ctx.user?.companyId ?? undefined;
 
-      return await db.getAllActiveLocations({
+      const locations = await db.getAllActiveLocations({
         ...input,
         userRole,
         userCompanyId,
       });
+
+      // 출근 대상 수 계산 (출근 현황과 동일한 로직)
+      const expectedWorkers = await db.getExpectedWorkersForLocationTracking({
+        userRole,
+        userCompanyId: userCompanyId || ctx.user?.id,
+        userId: ctx.user?.id,
+      });
+
+      return {
+        locations,
+        expectedWorkers,
+      };
     }),
 });

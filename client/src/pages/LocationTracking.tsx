@@ -80,7 +80,9 @@ export default function LocationTracking() {
   );
 
   // 모든 활성 위치 조회 (필터 포함)
-  const { data: locations, isLoading, refetch } = trpc.location.getAllActive.useQuery(filters);
+  const { data: locationData, isLoading, refetch } = trpc.location.getAllActive.useQuery(filters);
+  const locations = locationData?.locations || [];
+  const expectedWorkers = locationData?.expectedWorkers || 0;
 
   // 10초마다 자동 새로고침
   useEffect(() => {
@@ -233,11 +235,18 @@ export default function LocationTracking() {
             실시간 위치 추적 및 이동 동선 분석
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-primary" />
-          <Badge variant="outline" className="text-sm">
-            {markers.length}개 활성 위치
-          </Badge>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            <Badge variant="outline" className="text-sm">
+              {markers.length}개 활성 위치
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-sm">
+              대상: {expectedWorkers}명
+            </Badge>
+          </div>
         </div>
       </div>
 

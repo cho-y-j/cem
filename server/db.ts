@@ -3039,7 +3039,8 @@ export async function getAllActiveLocations(filters?: {
           console.log('[getAllActiveLocations] EP 필터링 - equipmentIds:', equipmentIds.length, 'workerIds:', workerIds.length);
           
           if (equipmentIds.length > 0 || workerIds.length > 0) {
-            // Supabase PostgREST의 .or() 구문은 조건을 괄호로 묶어야 함
+            // Supabase PostgREST의 .or() 구문 사용
+            // 형식: "column1.in.(value1,value2),column2.in.(value3,value4)"
             const conditions: string[] = [];
             if (equipmentIds.length > 0) {
               conditions.push(`equipment_id.in.(${equipmentIds.join(',')})`);
@@ -3048,17 +3049,12 @@ export async function getAllActiveLocations(filters?: {
               conditions.push(`worker_id.in.(${workerIds.join(',')})`);
             }
             
-            // .or() 대신 .in()을 각각 사용하거나, 조건을 합쳐서 사용
-            if (conditions.length === 1) {
-              query = query.filter(conditions[0].split('.')[0], 'in', conditions[0].split('(')[1].split(')')[0].split(','));
-            } else if (conditions.length === 2) {
-              // equipment_id와 worker_id 둘 다 있는 경우
-              // Supabase는 .or()를 지원하지만, 괄호로 묶어야 함
-              const orCondition = `(${conditions[0]},${conditions[1]})`;
-              query = query.or(orCondition);
+            // .or() 사용 (PostgREST 구문: 조건을 쉼표로 구분)
+            if (conditions.length > 0) {
+              query = query.or(conditions.join(','));
             }
             
-            console.log('[getAllActiveLocations] EP 필터링 조건 적용 완료');
+            console.log('[getAllActiveLocations] EP 필터링 조건 적용:', conditions);
           } else {
             // 투입된 장비가 없으면 빈 결과 반환
             console.log('[getAllActiveLocations] EP - 투입된 장비/인력이 없음');
@@ -3308,6 +3304,109 @@ export async function getAllActiveLocations(filters?: {
   }
   
   return toCamelCaseArray(result);
+}
+
+/**
+ * 위치 추적용 출근 대상 수 계산 (출근 현황과 동일한 로직)
+ */
+export async function getExpectedWorkersForLocationTracking(filters?: {
+  userRole?: string;
+  userCompanyId?: string;
+  userId?: string;
+}): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+
+  const userRole = filters?.userRole?.toLowerCase();
+  
+  // 권한별 필터링
+  let deploymentQuery = supabase
+    .from("deployments")
+    .select("worker_id, ep_company_id, bp_company_id, owner_id")
+    .eq("status", "active");
+
+  // EP인 경우 자신의 회사 deployment만
+  if (userRole === "ep" && filters?.userCompanyId) {
+    deploymentQuery = deploymentQuery.eq("ep_company_id", filters.userCompanyId);
+  }
+  // BP인 경우 자신의 회사 deployment만
+  else if (userRole === "bp" && filters?.userCompanyId) {
+    deploymentQuery = deploymentQuery.eq("bp_company_id", filters.userCompanyId);
+  }
+  // Owner인 경우 자신의 회사 deployment만 (deployment의 owner_id로 필터링)
+  else if (userRole === "owner" && filters?.userId) {
+    deploymentQuery = deploymentQuery.eq("owner_id", filters.userId);
+  }
+  // Admin은 전체 조회
+
+  const { data: activeDeploymentsRaw, error: deploymentsError } = await deploymentQuery;
+
+  console.log('[getExpectedWorkersForLocationTracking] ===== Deployment 조회 =====');
+  console.log('[getExpectedWorkersForLocationTracking] User role:', userRole);
+  console.log('[getExpectedWorkersForLocationTracking] User company ID:', filters?.userCompanyId);
+  console.log('[getExpectedWorkersForLocationTracking] User ID:', filters?.userId);
+  console.log('[getExpectedWorkersForLocationTracking] Active deployments count:', activeDeploymentsRaw?.length || 0);
+
+  if (deploymentsError) {
+    console.error('[getExpectedWorkersForLocationTracking] ❌ Deployment query error:', deploymentsError);
+    return 0;
+  }
+
+  if (!activeDeploymentsRaw || activeDeploymentsRaw.length === 0) {
+    console.log('[getExpectedWorkersForLocationTracking] ❌ 활성 deployment가 없음');
+    return 0;
+  }
+
+  // Supabase는 snake_case를 반환하므로 camelCase로 변환
+  const activeDeployments = toCamelCaseArray(activeDeploymentsRaw);
+  
+  // 각 deployment의 ep_company_id에 해당하는 활성 work_zone이 있는지 확인
+  const epCompanyIds = [...new Set(
+    activeDeployments.map((d: any) => d.epCompanyId || d.ep_company_id).filter(Boolean)
+  )];
+  
+  console.log('[getExpectedWorkersForLocationTracking] EP Company IDs:', epCompanyIds);
+  
+  if (epCompanyIds.length === 0) {
+    console.log('[getExpectedWorkersForLocationTracking] ❌ EP Company ID가 없음');
+    return 0;
+  }
+  
+  const { data: workZonesRaw, error: workZonesError } = await supabase
+    .from("work_zones")
+    .select("company_id, id, name, is_active")
+    .eq("is_active", true)
+    .in("company_id", epCompanyIds);
+
+  console.log('[getExpectedWorkersForLocationTracking] Work zones query result:', {
+    workZones: workZonesRaw?.length || 0,
+    error: workZonesError,
+  });
+
+  if (workZonesError) {
+    console.error('[getExpectedWorkersForLocationTracking] ❌ Work zones 조회 오류:', workZonesError);
+  }
+
+  const workZones = workZonesRaw ? toCamelCaseArray(workZonesRaw) : [];
+  
+  const validEpCompanyIds = new Set(
+    workZones.map((wz: any) => wz.companyId || wz.company_id).filter(Boolean)
+  );
+  
+  console.log('[getExpectedWorkersForLocationTracking] Valid EP Company IDs (work_zone이 있는):', Array.from(validEpCompanyIds));
+  
+  // work_zone이 있는 deployment만 출근 대상으로 계산
+  const validDeployments = activeDeployments.filter((d: any) => {
+    const epCompanyId = d.epCompanyId || d.ep_company_id;
+    return epCompanyId && validEpCompanyIds.has(epCompanyId);
+  });
+
+  console.log('[getExpectedWorkersForLocationTracking] ===== 최종 결과 =====');
+  console.log('[getExpectedWorkersForLocationTracking] Total deployments:', activeDeployments.length);
+  console.log('[getExpectedWorkersForLocationTracking] Valid deployments (with work zones):', validDeployments.length);
+  console.log('[getExpectedWorkersForLocationTracking] Expected workers:', validDeployments.length);
+
+  return validDeployments.length;
 }
 
 // ============================================================
