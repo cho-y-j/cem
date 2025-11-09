@@ -15,6 +15,7 @@ import { startRegistration } from '@simplewebauthn/browser';
 export default function BiometricSetup() {
   const [, setLocation] = useLocation();
   const [isRegistering, setIsRegistering] = useState(false);
+  const utils = trpc.useUtils();
 
   // 등록된 크레덴셜 목록 조회
   const { data: credentials, isLoading, refetch } = trpc.webauthn.myCredentials.useQuery();
@@ -46,7 +47,7 @@ export default function BiometricSetup() {
     setIsRegistering(true);
     try {
       // 1. 서버에서 등록 옵션 가져오기
-      const options = await trpc.webauthn.generateRegistrationChallenge.query();
+      const options = await utils.webauthn.generateRegistrationChallenge.fetch();
 
       // 2. 브라우저 WebAuthn API 호출 (생체 인식 스캔)
       toast.info("생체 인증을 진행해주세요 (지문 또는 얼굴 인식)");

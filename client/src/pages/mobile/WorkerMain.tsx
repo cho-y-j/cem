@@ -34,6 +34,7 @@ import { startAuthentication } from '@simplewebauthn/browser';
 export default function WorkerMain() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
 
   // 로그인 체크
   useEffect(() => {
@@ -408,7 +409,7 @@ export default function WorkerMain() {
             const { latitude, longitude } = position.coords;
 
             // 2. 인증 챌린지 가져오기
-            const authOptions = await trpc.webauthn.generateAuthenticationChallenge.query();
+            const authOptions = await utils.webauthn.generateAuthenticationChallenge.fetch();
 
             // 3. 생체 인증 (지문/얼굴 스캔)
             toast.info("생체 인증을 진행해주세요...");
