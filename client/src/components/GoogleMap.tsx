@@ -41,18 +41,30 @@ export default function GoogleMap({
       return;
     }
 
-    const loader = new Loader({
+    // 새로운 함수형 API 사용
+    setOptions({
       apiKey,
       version: "weekly",
-      libraries: ["places", "marker"],
     });
 
-    loader
-      .load()
-      .then(() => {
+    Promise.all([
+      importLibrary("maps"),
+      importLibrary("places"),
+      importLibrary("marker"),
+    ])
+      .then(([maps]) => {
         if (!mapRef.current) return;
 
-        const newMap = new google.maps.Map(mapRef.current, {
+        // importLibrary가 반환하는 객체를 사용
+        // maps 객체에는 Map, InfoWindow 등이 포함되어 있음
+        const Map = maps.Map || (globalThis as any).google?.maps?.Map;
+        const InfoWindow = maps.InfoWindow || (globalThis as any).google?.maps?.InfoWindow;
+
+        if (!Map || !InfoWindow) {
+          throw new Error("Google Maps API가 제대로 로드되지 않았습니다.");
+        }
+
+        const newMap = new Map(mapRef.current, {
           center,
           zoom,
           mapTypeControl: true,
@@ -61,7 +73,7 @@ export default function GoogleMap({
           zoomControl: true,
         });
 
-        const newInfoWindow = new google.maps.InfoWindow();
+        const newInfoWindow = new InfoWindow();
         
         setMap(newMap);
         setInfoWindow(newInfoWindow);
@@ -82,6 +94,11 @@ export default function GoogleMap({
   useEffect(() => {
     if (!map || !infoWindow) return;
 
+    // google.maps가 로드되었는지 확인
+    if (typeof google === 'undefined' || !google.maps) {
+      return;
+    }
+
     // 기존 마커 제거
     mapMarkers.forEach((marker) => marker.setMap(null));
 
@@ -99,7 +116,7 @@ export default function GoogleMap({
         const content = `
           <div style="padding: 8px;">
             <h3 style="font-weight: bold; margin-bottom: 4px;">${markerData.title}</h3>
-            ${markerData.info ? `<p style="font-size: 14px; color: #666;">${markerData.info}</p>` : ""}
+            ${markerData.info ? `<div style="font-size: 14px; color: #666;">${markerData.info}</div>` : ""}
           </div>
         `;
         infoWindow.setContent(content);
