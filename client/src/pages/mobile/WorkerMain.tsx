@@ -55,13 +55,30 @@ export default function WorkerMain() {
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== 'undefined') {
-      const isAvailable =
-        'PublicKeyCredential' in window &&
-        (window.location.protocol === 'https:' || window.location.hostname === 'localhost');
+      // WebAuthn 지원 체크 (더 유연하게)
+      const hasWebAuthn = 'PublicKeyCredential' in window;
+      const isSecureContext = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+      const isAvailable = hasWebAuthn && isSecureContext;
+
       setIsBiometricAvailable(isAvailable);
-      console.log('[WorkerMain] Biometric available:', isAvailable);
+
+      console.log('[WorkerMain] ===== WebAuthn 지원 체크 =====');
+      console.log('[WorkerMain] URL:', window.location.href);
       console.log('[WorkerMain] Protocol:', window.location.protocol);
-      console.log('[WorkerMain] PublicKeyCredential:', 'PublicKeyCredential' in window);
+      console.log('[WorkerMain] Hostname:', window.location.hostname);
+      console.log('[WorkerMain] PublicKeyCredential supported:', hasWebAuthn);
+      console.log('[WorkerMain] Secure context (HTTPS/localhost):', isSecureContext);
+      console.log('[WorkerMain] Biometric available:', isAvailable);
+      console.log('[WorkerMain] User agent:', navigator.userAgent);
+
+      // 추가 디버깅: WebAuthn 메서드 확인
+      if (hasWebAuthn) {
+        console.log('[WorkerMain] WebAuthn methods available:');
+        console.log('- createCredential:', typeof window.PublicKeyCredential.createCredential);
+        console.log('- getClientCapabilities:', typeof window.PublicKeyCredential.getClientCapabilities);
+        console.log('- isConditionalMediationAvailable:', typeof window.PublicKeyCredential.isConditionalMediationAvailable);
+        console.log('- isUserVerifyingPlatformAuthenticatorAvailable:', typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable);
+      }
     }
   }, []);
 
@@ -508,8 +525,11 @@ export default function WorkerMain() {
                   생체 인증으로 출근
                 </Button>
               ) : (
-                <div className="text-xs opacity-60 text-center">
-                  💡 생체 인증은 HTTPS에서만 사용 가능합니다
+                <div className="text-xs opacity-60 text-center space-y-1">
+                  <div>💡 생체 인증은 HTTPS 환경에서만 사용 가능합니다</div>
+                  <div className="text-xs text-yellow-200">
+                    현재: {window.location.protocol} | WebAuthn: {'PublicKeyCredential' in window ? '지원' : '미지원'}
+                  </div>
                 </div>
               )}
 
@@ -518,17 +538,15 @@ export default function WorkerMain() {
               </div>
 
               {/* 생체 인증 설정 링크 */}
-              {isBiometricAvailable && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white/80 hover:text-white hover:bg-white/10"
-                  onClick={() => setLocation("/mobile/biometric-setup")}
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  생체 인증 설정
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white/80 hover:text-white hover:bg-white/10"
+                onClick={() => setLocation("/mobile/biometric-setup")}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                생체 인증 설정
+              </Button>
             </div>
           </div>
         ) : (
@@ -739,20 +757,21 @@ export default function WorkerMain() {
           </Button>
 
           {/* 생체 인증 설정 */}
-          {isBiometricAvailable && (
-            <Button
-              size="lg"
-              variant="outline"
-              className="w-full h-16 text-base font-bold border-2 border-purple-400 hover:bg-purple-50 active:scale-95 transition-transform"
-              onClick={() => setLocation("/mobile/biometric-setup")}
-            >
-              <Fingerprint className="mr-2 h-6 w-6 text-purple-600" />
-              <div className="text-left flex-1">
-                <div>생체 인증 설정</div>
-                <div className="text-xs text-gray-500 font-normal">지문/얼굴 인식 등록</div>
+          <Button
+            size="lg"
+            variant="outline"
+            className="w-full h-16 text-base font-bold border-2 border-purple-400 hover:bg-purple-50 active:scale-95 transition-transform"
+            onClick={() => setLocation("/mobile/biometric-setup")}
+          >
+            <Fingerprint className="mr-2 h-6 w-6 text-purple-600" />
+            <div className="text-left flex-1">
+              <div>생체 인증 설정</div>
+              <div className="text-xs text-gray-500 font-normal">
+                지문/얼굴 인식 등록
+                {!isBiometricAvailable && ' (브라우저 미지원)'}
               </div>
-            </Button>
-          )}
+            </div>
+          </Button>
         </div>
 
         {/* 긴급 상황 버튼 */}
