@@ -2977,27 +2977,10 @@ export async function getAllActiveLocations(filters?: {
   console.log('[getAllActiveLocations] 필터:', JSON.stringify(filters, null, 2));
 
   // 각 worker별 최신 위치만 가져오기 위해 서브쿼리 사용
+  // Supabase 관계 에러 방지를 위해 join 없이 단순 조회
   let query = supabase
     .from('location_logs')
-    .select(`
-      *,
-      workers (
-        id,
-        name,
-        phone,
-        owner_company_id
-      ),
-      equipment (
-        id,
-        reg_num,
-        equip_type_id,
-        owner_company_id,
-        equip_types (
-          id,
-          name
-        )
-      )
-    `)
+    .select('*')
     .gte('logged_at', tenMinutesAgo.toISOString())
     .order('logged_at', { ascending: false });
 
@@ -3145,14 +3128,79 @@ export async function getAllActiveLocations(filters?: {
     return [];
   }
 
-  console.log('[getAllActiveLocations] 조회 결과:', {
-    totalCount: data?.length || 0,
-    sample: data?.[0] ? {
-      workerId: data[0].worker_id,
-      equipmentId: data[0].equipment_id,
-      loggedAt: data[0].logged_at,
-    } : null,
-  });
+  console.log('[getAllActiveLocations] ===== 위치 로그 조회 결과 =====');
+  console.log('[getAllActiveLocations] 총 개수:', data?.length || 0);
+  if (data && data.length > 0) {
+    console.log('[getAllActiveLocations] 샘플 데이터 (처음 3개):', data.slice(0, 3).map((loc: any) => ({
+      workerId: loc.worker_id,
+      equipmentId: loc.equipment_id,
+      loggedAt: loc.logged_at,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+    })));
+  } else {
+    console.log('[getAllActiveLocations] ⚠️ 위치 로그가 없습니다.');
+  }
+
+  if (!data || data.length === 0) {
+    console.log('[getAllActiveLocations] 위치 로그가 없어 빈 배열 반환');
+    return [];
+  }
+
+  // worker 정보 별도 조회 (Supabase 관계 에러 방지)
+  const workerIds = [...new Set(data.map((loc: any) => loc.worker_id).filter(Boolean))];
+  const workerMap = new Map();
+  
+  if (workerIds.length > 0) {
+    const { data: workers } = await supabase
+      .from('workers')
+      .select('id, name, phone, owner_company_id')
+      .in('id', workerIds);
+    
+    if (workers) {
+      workers.forEach((w: any) => {
+        workerMap.set(w.id, toCamelCase(w));
+      });
+    }
+  }
+
+  // equipment 정보 별도 조회
+  const equipmentIds = [...new Set(data.map((loc: any) => loc.equipment_id).filter(Boolean))];
+  const equipmentMap = new Map();
+  
+  if (equipmentIds.length > 0) {
+    const { data: equipment } = await supabase
+      .from('equipment')
+      .select('id, reg_num, equip_type_id, owner_company_id')
+      .in('id', equipmentIds);
+    
+    if (equipment) {
+      // equip_types 정보 별도 조회
+      const equipTypeIds = [...new Set(equipment.map((e: any) => e.equip_type_id).filter(Boolean))];
+      const equipTypeMap = new Map();
+      
+      if (equipTypeIds.length > 0) {
+        const { data: equipTypes } = await supabase
+          .from('equip_types')
+          .select('id, name')
+          .in('id', equipTypeIds);
+        
+        if (equipTypes) {
+          equipTypes.forEach((et: any) => {
+            equipTypeMap.set(et.id, toCamelCase(et));
+          });
+        }
+      }
+      
+      equipment.forEach((e: any) => {
+        const equipData = toCamelCase(e);
+        if (e.equip_type_id && equipTypeMap.has(e.equip_type_id)) {
+          equipData.equipTypes = equipTypeMap.get(e.equip_type_id);
+        }
+        equipmentMap.set(e.id, equipData);
+      });
+    }
+  }
 
   // 클라이언트 사이드 필터링 (차량번호, 차종, 운전자)
   let filteredData = data || [];
