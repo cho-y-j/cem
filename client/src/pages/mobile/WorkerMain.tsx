@@ -409,7 +409,14 @@ export default function WorkerMain() {
             const { latitude, longitude } = position.coords;
 
             // 2. 인증 챌린지 가져오기
-            const authOptions = await utils.webauthn.generateAuthenticationChallenge.fetch();
+            let authOptions;
+            try {
+              authOptions = await utils.webauthn.generateAuthenticationChallenge.fetch();
+            } catch (error: any) {
+              console.error('[BiometricCheckIn] Challenge generation error:', error);
+              toast.error(`인증 챌린지 생성 실패: ${error.message || '알 수 없는 오류'}`);
+              return; // 에러 발생 시 출근 기록 생성하지 않음
+            }
 
             // 3. 생체 인증 (지문/얼굴 스캔)
             toast.info("생체 인증을 진행해주세요...");

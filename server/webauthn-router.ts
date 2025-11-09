@@ -447,14 +447,50 @@ export const webauthnRouter = router({
         }
 
         // SimpleWebAuthn을 사용하여 인증 옵션 생성
+        console.log('[WebAuthn] Generating authentication options:', {
+          rpID: RP_ID,
+          credentialsCount: credentials.length,
+          credentialIds: credentials.map((c: any) => c.id),
+        });
+
+        let credentialBuffers;
+        try {
+          credentialBuffers = credentials.map((c: any) => {
+            try {
+              const buffer = Buffer.from(c.id, 'base64url');
+              console.log('[WebAuthn] Credential ID converted:', {
+                original: c.id,
+                bufferLength: buffer.length,
+                bufferType: Buffer.isBuffer(buffer),
+              });
+              return {
+                id: buffer,
+                type: 'public-key' as const,
+                transports: ['internal'] as const,
+              };
+            } catch (err: any) {
+              console.error('[WebAuthn] Error converting credential ID:', {
+                credentialId: c.id,
+                error: err.message,
+              });
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: `크레덴셜 ID 변환 실패: ${err.message}`,
+              });
+            }
+          });
+        } catch (err: any) {
+          if (err instanceof TRPCError) throw err;
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `크레덴셜 처리 실패: ${err.message}`,
+          });
+        }
+
         const options = await generateAuthenticationOptions({
           rpID: RP_ID,
           timeout: CHALLENGE_TIMEOUT,
-          allowCredentials: credentials.map((c: any) => ({
-            id: Buffer.from(c.id, 'base64url'),
-            type: 'public-key',
-            transports: ['internal'],
-          })),
+          allowCredentials: credentialBuffers,
           userVerification: 'required',
         });
 
@@ -486,10 +522,16 @@ export const webauthnRouter = router({
       } catch (error: any) {
         if (error instanceof TRPCError) throw error;
 
-        console.error('[WebAuthn] Error generating authentication challenge:', error);
+        console.error('[WebAuthn] Error generating authentication challenge:', {
+          error: error.message,
+          stack: error.stack,
+          name: error.name,
+          rpID: RP_ID,
+          ORIGIN: ORIGIN,
+        });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "인증 챌린지 생성에 실패했습니다.",
+          message: `인증 챌린지 생성에 실패했습니다: ${error.message || '알 수 없는 오류'}`,
         });
       }
     }),

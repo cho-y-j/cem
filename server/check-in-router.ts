@@ -237,6 +237,9 @@ export const checkInRouter = router({
         userId: ctx.user.id,
         deploymentId,
         workZoneId: workZoneId || undefined,
+        // 출근 시간 저장 (서버 시간 사용, DB에서 타임존 처리)
+        // 참고: PostgreSQL/Supabase는 타임존을 자동으로 처리하므로 new Date()를 그대로 사용
+        // 단, 표시 시에는 클라이언트에서 한국 시간으로 변환
         checkInTime: new Date(),
         checkInLat: input.lat.toString(),
         checkInLng: input.lng.toString(),
