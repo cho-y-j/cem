@@ -254,7 +254,7 @@ export default function WorkerMain() {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
-            await sendLocationMutation.mutateAsync({
+            const result = await sendLocationMutation.mutateAsync({
               equipmentId: assignedEquipment.id,
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
@@ -264,6 +264,8 @@ export default function WorkerMain() {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
               accuracy: position.coords.accuracy,
+              result,
+              timestamp: new Date().toISOString(),
             });
           } catch (error: any) {
             console.error('[GPS] 위치 전송 실패:', error);
@@ -320,17 +322,21 @@ export default function WorkerMain() {
       return;
     }
 
+    console.log('[GPS] 위치 추적 시작 - 장비 ID:', assignedEquipment.id, '간격:', gpsIntervalMinutes, '분');
+
     // 즉시 위치 전송
+    console.log('[GPS] 즉시 위치 전송 시작...');
     sendLocationWithRetry();
 
     // 설정된 간격으로 위치 전송 (기본값: 5분)
     const intervalMs = gpsIntervalMinutes * 60 * 1000;
     const interval = setInterval(() => {
+      console.log('[GPS] 주기적 위치 전송 실행 (간격:', gpsIntervalMinutes, '분)');
       sendLocationWithRetry();
     }, intervalMs);
 
     setLocationInterval(interval);
-    console.log(`[GPS] 위치 추적 시작 (간격: ${gpsIntervalMinutes}분)`);
+    console.log(`[GPS] 위치 추적 시작 완료 (간격: ${gpsIntervalMinutes}분, interval ID: ${interval})`);
   };
 
   // 위치 추적 중지

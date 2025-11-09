@@ -3113,6 +3113,15 @@ export async function getAllActiveLocations(filters?: {
     return [];
   }
 
+  console.log('[getAllActiveLocations] 조회 결과:', {
+    totalCount: data?.length || 0,
+    sample: data?.[0] ? {
+      workerId: data[0].worker_id,
+      equipmentId: data[0].equipment_id,
+      loggedAt: data[0].logged_at,
+    } : null,
+  });
+
   // 클라이언트 사이드 필터링 (차량번호, 차종, 운전자)
   let filteredData = data || [];
   
