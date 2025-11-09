@@ -48,7 +48,7 @@ export const workZoneRouter = router({
         });
       }
 
-      // EP 회사 ID 결정: Admin인 경우 입력값 필수, EP인 경우 자신의 회사 ID 사용
+변리      // EP 회사 ID 결정: Admin인 경우 입력값 필수, EP인 경우 자신의 회사 ID 사용
       let epCompanyId: string | undefined;
       if (userRole === "admin") {
         if (!input.epCompanyId) {

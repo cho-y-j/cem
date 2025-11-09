@@ -513,26 +513,31 @@ export default function WorkerMain() {
                 )}
               </Button>
 
-              {/* 생체 인증 출근 버튼 */}
-              {isBiometricAvailable ? (
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="w-full h-14 text-lg font-semibold bg-white/10 text-white border-white/30 hover:bg-white/20 shadow-lg active:scale-95 transition-transform"
-                  onClick={handleBiometricCheckIn}
-                  disabled={checkInMutation.isPending}
-                >
-                  <Fingerprint className="mr-2 h-5 w-5" />
-                  생체 인증으로 출근
-                </Button>
-              ) : (
-                <div className="text-xs opacity-60 text-center space-y-1">
-                  <div>💡 생체 인증은 HTTPS 환경에서만 사용 가능합니다</div>
-                  <div className="text-xs text-yellow-200">
-                    현재: {window.location.protocol} | WebAuthn: {'PublicKeyCredential' in window ? '지원' : '미지원'}
-                  </div>
-                </div>
-              )}
+              {/* 생체 인증 출근 버튼 - 항상 표시 (프로토타입용) */}
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full h-14 text-lg font-semibold bg-white/10 text-white border-white/30 hover:bg-white/20 shadow-lg active:scale-95 transition-transform"
+                onClick={() => {
+                  if (!isBiometricAvailable) {
+                    toast.info(
+                      "생체 인증은 HTTPS 환경에서만 사용 가능합니다.\n" +
+                      "현재 환경: " + window.location.protocol + "\n" +
+                      "WebAuthn 지원: " + ('PublicKeyCredential' in window ? '지원' : '미지원'),
+                      { duration: 5000 }
+                    );
+                    return;
+                  }
+                  handleBiometricCheckIn();
+                }}
+                disabled={checkInMutation.isPending}
+              >
+                <Fingerprint className="mr-2 h-5 w-5" />
+                생체 인증으로 출근
+                {!isBiometricAvailable && (
+                  <span className="ml-2 text-xs opacity-60">(HTTPS 필요)</span>
+                )}
+              </Button>
 
               <div className="text-xs opacity-80">
                 📍 현재 위치가 자동으로 기록됩니다

@@ -811,4 +811,69 @@ export const checkInRouter = router({
         filename: `출근기록_${new Date().toISOString().split('T')[0]}.xlsx`,
       };
     }),
+
+  /**
+   * 출근 기록 삭제 (테스트용)
+   */
+  delete: protectedProcedure
+    .input(
+      z.object({
+        checkInId: z.string().optional(), // 특정 기록 삭제
+        userId: z.string().optional(), // 특정 사용자의 오늘 출근 기록 삭제
+        deleteToday: z.boolean().default(false), // 오늘 출근 기록만 삭제
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const supabase = db.getSupabase();
+      if (!supabase) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "데이터베이스 연결 실패",
+        });
+      }
+
+      let query = supabase.from('check_ins').delete();
+
+      // Worker는 본인 것만 삭제 가능
+      if (ctx.user.role?.toLowerCase() === "worker") {
+        query = query.eq('user_id', ctx.user.id);
+      } else if (input.userId) {
+        // Admin/EP/BP/Owner는 지정된 사용자의 기록 삭제 가능
+        query = query.eq('user_id', input.userId);
+      } else if (input.checkInId) {
+        // 특정 기록 삭제
+        query = query.eq('id', input.checkInId);
+      } else {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "삭제할 기록을 지정해주세요.",
+        });
+      }
+
+      // 오늘 출근 기록만 삭제
+      if (input.deleteToday) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString();
+        
+        query = query
+          .gte('check_in_time', todayStr)
+          .lt('check_in_time', tomorrowStr);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        console.error('[CheckIn] Delete error:', error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `출근 기록 삭제 실패: ${error.message}`,
+        });
+      }
+
+      return { success: true };
+    }),
 });
