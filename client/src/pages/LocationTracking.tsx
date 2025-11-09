@@ -683,7 +683,7 @@ export default function LocationTracking() {
                               >
                                 {/* 이동 경로 Polyline */}
                                 {analysisPath.length > 0 && (
-                                  <Polyline
+                                  <PolylineComponent
                                     path={analysisPath.map((p) => ({ lat: p.lat, lng: p.lng }))}
                                     strokeColor="#FF0000"
                                     strokeOpacity={0.8}
