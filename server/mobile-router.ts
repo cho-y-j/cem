@@ -470,20 +470,60 @@ export const mobileRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const workerId = await getWorkerIdFromContext(ctx);
-        const id = nanoid();
+        try {
+          const workerId = await getWorkerIdFromContext(ctx);
+          
+          // 좌표 유효성 검사
+          if (
+            isNaN(input.latitude) ||
+            isNaN(input.longitude) ||
+            input.latitude < -90 ||
+            input.latitude > 90 ||
+            input.longitude < -180 ||
+            input.longitude > 180
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "유효하지 않은 GPS 좌표입니다.",
+            });
+          }
 
-        await db.createLocationLog({
-          id,
-          equipmentId: input.equipmentId,
-          workerId,
-          latitude: input.latitude.toString(),
-          longitude: input.longitude.toString(),
-          accuracy: input.accuracy?.toString(),
-          loggedAt: new Date(),
-        });
+          const id = nanoid();
 
-        return { success: true };
+          await db.createLocationLog({
+            id,
+            equipmentId: input.equipmentId,
+            workerId,
+            latitude: input.latitude.toString(),
+            longitude: input.longitude.toString(),
+            accuracy: input.accuracy?.toString(),
+            loggedAt: new Date(),
+          });
+
+          console.log(`[Location] 위치 기록 성공: Worker ${workerId} at (${input.latitude}, ${input.longitude})`);
+          return { success: true };
+        } catch (error: any) {
+          console.error('[Location] 위치 기록 실패:', error);
+          
+          // 데이터베이스 오류인 경우
+          if (error.code === 'PGRST116' || error.message?.includes('database')) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "데이터베이스 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+            });
+          }
+          
+          // 이미 TRPCError인 경우 그대로 throw
+          if (error instanceof TRPCError) {
+            throw error;
+          }
+          
+          // 기타 오류
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error.message || "위치 기록에 실패했습니다.",
+          });
+        }
       }),
 
     /**

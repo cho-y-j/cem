@@ -1,13 +1,58 @@
 # 건설장비 및 인력 관리 시스템 (ERMS) - TODO 및 작업 가이드
 
-**마지막 업데이트**: 2025-11-09
+**마지막 업데이트**: 2025-11-09 (오후)
 **프로젝트**: Equipment and Resource Management System (ERMS)
 **Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY
-**현재 단계**: 🎉 **WebAuthn 지문 인식 구현 완료!**
+**현재 단계**: 🔄 **WebAuthn 생체 인증 버그 수정 및 GPS 위치 추적 시스템 개선**
 
 ---
 
 ## 🎉 오늘 완료한 작업 (2025-11-09)
+
+### ✅ WebAuthn 생체 인증 버그 수정
+
+**수정된 문제들:**
+1. ✅ **"인증 챌린지 생성에 실패했습니다" 에러 수정**
+   - `allowCredentials` 타입 문제 해결 (일시적으로 제거하여 우회)
+   - `simplewebauthn/server`의 내부 검증 로직과 `Uint8Array` 타입 불일치 문제
+   - **임시 해결**: `generateAuthenticationOptions`에서 `allowCredentials` 제거
+   - **근본 해결 필요**: `allowCredentials`를 올바른 형식으로 전달하도록 개선 필요
+
+2. ✅ **생체 인증 등록 후 UI 업데이트 문제 해결**
+   - `BiometricSetup.tsx`에 `refetchOnMount`, `refetchOnWindowFocus` 옵션 추가
+   - 등록 성공 후 `setTimeout`으로 `refetch` 호출하여 DB 업데이트 대기
+   - 버튼 텍스트 동적 변경: "새 생체 인증 등록" → "추가 생체 인증 등록"
+   - 등록된 크레덴셜 개수 표시 추가
+
+3. ✅ **`toCamelCaseArray` import 문제 해결**
+   - `server/webauthn-router.ts`에서 `toCamelCaseArray`를 `db-utils`에서 직접 import
+
+4. ✅ **React DOM `removeChild` 에러 수정**
+   - `CheckInMonitoring.tsx`, `EntryRequestDetail.tsx`, `PdfViewerModal.tsx`에서 `removeChild` 호출 전 부모 노드 확인 추가
+   - `DashboardLayout.tsx`에서 SSR hydration 에러 방지를 위해 `localStorage` 접근을 `useEffect` 내부로 이동
+
+5. ✅ **모바일 Chrome 자동 번역 방지**
+   - `client/index.html`에 `<meta name="google" content="notranslate" />` 추가
+   - `lang="ko"` 설정
+
+6. ✅ **출근 시간 기록 오류 수정**
+   - KST 변환 로직 제거, `new Date()` 직접 사용
+   - PostgreSQL/Supabase가 타임존을 자동 처리하므로 클라이언트에서 표시 시에만 변환
+
+**수정된 파일:**
+- `server/webauthn-router.ts` - `allowCredentials` 임시 제거, `toCamelCaseArray` import 수정
+- `client/src/pages/mobile/BiometricSetup.tsx` - UI 업데이트 로직 개선
+- `client/src/pages/mobile/WorkerMain.tsx` - 에러 핸들링 개선
+- `client/src/pages/CheckInMonitoring.tsx` - `removeChild` 안전성 개선
+- `client/src/components/DashboardLayout.tsx` - SSR hydration 에러 방지
+- `client/src/components/EntryRequestDetail.tsx` - `removeChild` 안전성 개선
+- `client/src/components/PdfViewerModal.tsx` - `removeChild` 안전성 개선
+- `client/index.html` - 자동 번역 방지 메타 태그 추가
+- `server/check-in-router.ts` - 출근 시간 기록 로직 수정
+
+---
+
+## 🎉 이전 완료한 작업 (2025-11-09 오전)
 
 ### ✅ 모바일 출근 체크 에러 수정
 - 🔴 **긴급 버그 수정**: `deployments.work_zone_id` 컬럼 문제 해결
@@ -106,7 +151,26 @@
 
 ## 🐛 현재 발견된 문제 (2025-11-09)
 
-### 1. ✅ 모바일 출근 체크 실패 (해결됨)
+### 1. 🟠 WebAuthn `allowCredentials` 타입 문제 (임시 해결됨, 근본 해결 필요)
+
+**증상:**
+- 생체 인증 출근 시 "인증 챌린지 생성에 실패했습니다. input replace is not a function" 에러 발생
+- `simplewebauthn/server`의 내부 검증 로직이 `allowCredentials.id`를 문자열로 기대하지만 `Uint8Array`를 전달하여 발생
+
+**임시 해결:**
+- ✅ `generateAuthenticationOptions`에서 `allowCredentials` 제거
+- ✅ `verifyAuthentication`에서 크레덴셜 검증 수행
+
+**근본 해결 필요:**
+- `allowCredentials`를 올바른 형식으로 전달하도록 개선
+- `simplewebauthn/server` 라이브러리의 최신 버전 확인 및 업데이트
+- 또는 `allowCredentials` 없이도 안전하게 작동하도록 검증 로직 강화
+
+**예상 소요 시간:** 1-2시간
+
+---
+
+### 2. ✅ 모바일 출근 체크 실패 (해결됨)
 
 **증상:**
 - 모바일에서 출근 버튼 클릭 시 "투입정보조회중 오류가 발생했습니다" 에러 발생
@@ -159,7 +223,264 @@
 
 ## 📋 다음 작업 계획 (2025-11-10)
 
-### 🟢 우선순위 1: 생체 인증 실제 테스트
+### 🔴 우선순위 1: 워커-차량 매칭 및 GPS 위치 추적 시스템 개선
+
+**작업 내용:**
+
+#### 1.1 워커-차량 매칭 및 작업확인서/운전자 안전점검 작성
+- ✅ **현재 상태**: 기본 기능 구현됨 (`equipment.assignDriver`, `workJournal`, `safetyInspections`)
+- 🔄 **개선 필요**:
+  - 워커가 배정된 차량과 매칭되어 작업확인서 작성 가능하도록 UI 개선
+  - 운전자 안전점검 작성 플로우 개선
+  - 작업 시작 시 자동으로 차량 매칭 확인
+
+**관련 파일:**
+- `server/routers.ts` - `equipment.assignDriver`
+- `server/work-journal-router.ts` - 작업확인서 API
+- `server/safety-inspection-router.ts` - 안전점검 API
+- `client/src/pages/mobile/WorkerMain.tsx` - 워커 메인 페이지
+- `client/src/pages/mobile/DriverInspection.tsx` - 운전자 점검 페이지
+
+**예상 소요 시간:** 2-3시간
+
+---
+
+#### 1.2 GPS 5분 간격 전송 개선
+
+**현재 상태:**
+- ✅ 기본 GPS 전송 기능 구현됨 (`server/location-router.ts`, `client/src/pages/mobile/WorkerMain.tsx`)
+- ✅ 작업 시작 시 GPS 전송 시작
+- ✅ 5분 간격으로 GPS 전송
+
+**개선 필요:**
+1. **관리자가 GPS 전송 간격 조정 가능하도록 설정**
+   - Admin/EP가 설정 페이지에서 GPS 전송 간격 설정 (기본 5분)
+   - 설정값을 데이터베이스에 저장
+   - 워커 앱에서 설정값을 읽어서 사용
+
+2. **휴식 중 GPS 전송 중지**
+   - 현재: 작업 세션 상태와 관계없이 GPS 전송
+   - 개선: `workStatus === "resting"`일 때 GPS 전송 중지
+   - 휴식 종료 시 GPS 전송 재개
+
+3. **작업 종료 후 GPS 전송 중지**
+   - 현재: 작업 종료 후에도 GPS 전송 계속됨
+   - 개선: `workStatus === "finished"` 또는 작업 세션 종료 시 GPS 전송 중지
+
+**수정 필요 파일:**
+- `server/mobile-router.ts` - GPS 전송 간격 설정 API 추가
+- `client/src/pages/mobile/WorkerMain.tsx` - GPS 전송 로직 개선
+- `server/db.ts` - GPS 전송 간격 설정 저장/조회 함수 추가
+- `drizzle/schema.ts` - 설정 테이블 추가 (또는 기존 설정 테이블 활용)
+
+**예상 소요 시간:** 3-4시간
+
+---
+
+#### 1.3 차량 위치 추적 시스템 개선
+
+**현재 상태:**
+- ✅ 기본 위치 추적 기능 구현됨 (`server/location-router.ts`, `client/src/pages/LocationTracking.tsx`)
+- ✅ 실시간 위치 지도 (Google Maps)
+- ✅ 10초마다 자동 새로고침
+- ⚠️ **문제**: 위치 추적에 에러 발생 (사용자 보고)
+
+**개선 필요:**
+1. **위치 추적 에러 수정**
+   - 현재 에러 원인 분석 필요
+   - GPS 수신 실패 시 처리 로직 개선
+   - 네트워크 오류 시 재시도 로직 추가
+
+2. **지도에 차량과 운전자 표기**
+   - 현재: 워커 위치만 표시
+   - 개선: 차량 정보와 운전자 정보를 함께 표시
+   - 마커 클릭 시 상세 정보 표시 (차량 번호, 운전자 이름, 회사 정보 등)
+
+3. **필터링 기능 추가**
+   - 차종별 필터 (장비 타입별)
+   - 운전자별 필터
+   - 오너사별 필터
+   - BP사별 필터
+   - EP사별 필터
+   - 다중 필터 조합 지원
+
+4. **이동 동선 추적 및 분석**
+   - 위치 이력 저장 (현재 `location_logs` 테이블 활용)
+   - 시간대별 이동 경로 시각화 (Polyline)
+   - 이동 거리 계산
+   - 체류 시간 분석
+   - 분석 리포트 생성 (일별/주별/월별)
+
+**수정 필요 파일:**
+- `server/location-router.ts` - 위치 추적 로직 개선
+- `server/db.ts` - 위치 이력 조회 및 분석 함수 추가
+- `client/src/pages/LocationTracking.tsx` - 필터링 및 시각화 개선
+- `drizzle/schema.ts` - 위치 이력 테이블 확인 및 필요 시 스키마 확장
+
+**예상 소요 시간:** 4-5시간
+
+---
+
+## 📝 상세 작업 플랜: 워커-차량 매칭 및 GPS 위치 추적 시스템
+
+### Phase 1: 워커-차량 매칭 및 작업확인서/운전자 안전점검 작성
+
+**목표:**
+- 워커가 배정된 차량과 매칭되어 작업확인서 및 운전자 안전점검을 작성할 수 있도록 개선
+
+**작업 단계:**
+1. **데이터베이스 스키마 확인**
+   - `equipment.assigned_worker_id` 확인
+   - `work_journal` 테이블 구조 확인
+   - `safety_inspections` 테이블 구조 확인
+
+2. **워커 메인 페이지 개선 (`WorkerMain.tsx`)**
+   - 배정된 차량 정보 표시
+   - 작업 시작 버튼 클릭 시 차량 매칭 확인
+   - 작업확인서 작성 버튼 추가 (배정된 차량이 있을 때만 활성화)
+   - 운전자 안전점검 작성 버튼 추가 (배정된 차량이 있을 때만 활성화)
+
+3. **작업확인서 작성 플로우 개선**
+   - 워커가 배정된 차량 정보 자동 입력
+   - 작업 시작 시간 자동 기록
+   - 작업 종료 시간 기록
+
+4. **운전자 안전점검 작성 플로우 개선**
+   - 배정된 차량의 템플릿 자동 로드
+   - 점검 항목 자동 채우기 (차량 정보)
+
+**예상 소요 시간:** 2-3시간
+
+---
+
+### Phase 2: GPS 5분 간격 전송 개선
+
+**목표:**
+- 관리자가 GPS 전송 간격을 조정할 수 있도록 설정
+- 휴식 중 및 작업 종료 후 GPS 전송 중지
+
+**작업 단계:**
+1. **GPS 전송 간격 설정 테이블 생성**
+   - `system_settings` 테이블에 `gps_tracking_interval_minutes` 컬럼 추가
+   - 또는 별도 `gps_settings` 테이블 생성
+   - 기본값: 5분
+
+2. **설정 API 구현**
+   - `system.getGpsInterval` - GPS 전송 간격 조회
+   - `system.setGpsInterval` - GPS 전송 간격 설정 (Admin/EP만 가능)
+
+3. **워커 앱 GPS 전송 로직 개선 (`WorkerMain.tsx`)**
+   - 설정값을 읽어서 동적으로 GPS 전송 간격 설정
+   - 작업 세션 상태 확인:
+     - `workStatus === "working"` 또는 `workStatus === "overtime"`: GPS 전송
+     - `workStatus === "resting"`: GPS 전송 중지
+     - `workStatus === "finished"` 또는 작업 세션 종료: GPS 전송 중지
+   - 휴식 종료 시 GPS 전송 재개
+
+4. **설정 페이지 추가 (Admin/EP용)**
+   - GPS 전송 간격 설정 UI
+   - 실시간 적용 확인
+
+**예상 소요 시간:** 3-4시간
+
+---
+
+### Phase 3: 차량 위치 추적 시스템 개선
+
+**목표:**
+- 위치 추적 에러 수정
+- 지도에 차량과 운전자 정보 표시
+- 필터링 기능 추가 (차종별, 운전자별, 오너사별, BP사별)
+- 이동 동선 추적 및 분석 기능
+
+**작업 단계:**
+1. **위치 추적 에러 수정**
+   - 현재 에러 로그 분석 (Render MCP 활용)
+   - GPS 수신 실패 시 처리 로직 개선
+   - 네트워크 오류 시 재시도 로직 추가
+   - 에러 메시지 개선
+
+2. **지도 마커 개선 (`LocationTracking.tsx`)**
+   - 차량 정보와 운전자 정보를 함께 표시
+   - 마커 아이콘 차별화 (차종별, 상태별)
+   - 마커 클릭 시 상세 정보 표시:
+     - 차량 번호
+     - 운전자 이름
+     - 오너사/BP사/EP사 정보
+     - 현재 위치 시간
+     - GPS 정확도
+
+3. **필터링 기능 추가**
+   - 차종별 필터 (Select 컴포넌트)
+   - 운전자별 필터 (Select 컴포넌트)
+   - 오너사별 필터 (Select 컴포넌트)
+   - BP사별 필터 (Select 컴포넌트)
+   - EP사별 필터 (Select 컴포넌트)
+   - 다중 필터 조합 지원
+   - 필터 초기화 버튼
+
+4. **이동 동선 추적 및 분석**
+   - 위치 이력 조회 API 개선 (`location.getHistory`)
+   - 시간대별 이동 경로 시각화 (Google Maps Polyline)
+   - 이동 거리 계산 (Haversine 공식 활용)
+   - 체류 시간 분석
+   - 분석 리포트 생성:
+     - 일별 리포트 (이동 거리, 체류 시간, 경로)
+     - 주별 리포트 (요약 통계)
+     - 월별 리포트 (요약 통계)
+   - 리포트 다운로드 (Excel/PDF)
+
+**예상 소요 시간:** 4-5시간
+
+---
+
+### Phase 4: 통합 테스트 및 최적화
+
+**목표:**
+- 모든 기능 통합 테스트
+- 성능 최적화
+- UI/UX 개선
+
+**작업 단계:**
+1. **통합 테스트**
+   - 워커-차량 매칭 테스트
+   - GPS 전송 간격 설정 테스트
+   - 휴식 중 GPS 전송 중지 테스트
+   - 작업 종료 후 GPS 전송 중지 테스트
+   - 위치 추적 에러 수정 확인
+   - 필터링 기능 테스트
+   - 이동 동선 분석 테스트
+
+2. **성능 최적화**
+   - GPS 전송 빈도 최적화
+   - 위치 이력 조회 쿼리 최적화
+   - 지도 렌더링 최적화 (마커 클러스터링)
+
+3. **UI/UX 개선**
+   - 필터 UI 개선
+   - 지도 인터랙션 개선
+   - 리포트 UI 개선
+
+**예상 소요 시간:** 2-3시간
+
+---
+
+**전체 예상 소요 시간:** 11-15시간
+
+---
+
+### 🟡 우선순위 2: WebAuthn `allowCredentials` 근본 해결
+
+**작업 내용:**
+1. `simplewebauthn/server` 라이브러리 최신 버전 확인
+2. `allowCredentials`를 올바른 형식으로 전달하도록 수정
+3. 또는 `allowCredentials` 없이도 안전하게 작동하도록 검증 로직 강화
+
+**예상 소요 시간:** 1-2시간
+
+---
+
+### 🟡 우선순위 3: 생체 인증 실제 테스트
 
 **작업 내용:**
 1. 모바일 기기(iPhone/Android)에서 테스트
@@ -172,38 +493,6 @@
    - 등록되지 않은 상태에서 출근 시도
    - 챌린지 만료
    - GPS 실패 시 처리
-
-**예상 소요 시간:** 2시간
-
----
-
-### 🟡 우선순위 2: 프로덕션 배포 준비
-
-**작업 내용:**
-1. 환경 변수 설정
-   - `RP_NAME`: 실제 서비스 이름
-   - `RP_ID`: 실제 도메인 (예: erms.example.com)
-   - `ORIGIN`: HTTPS URL
-
-2. HTTPS 설정 확인
-   - WebAuthn은 HTTPS 필수
-   - Vercel/Render 등 호스팅 설정
-
-3. 데이터베이스 마이그레이션
-   - `webauthn_credentials` 테이블 생성 확인
-   - 인덱스 추가
-
-**예상 소요 시간:** 1시간
-
----
-
-### 🟡 우선순위 3: 출근 현황 페이지 추가 기능
-
-**작업 내용:**
-1. 실시간 새로고침 (Polling)
-2. 출근 기록 상세 정보 모달
-3. 지도에서 출근 위치 표시
-4. 통계 차트 개선 (시간대별, 요일별)
 
 **예상 소요 시간:** 2시간
 
@@ -546,8 +835,8 @@ pnpm db:push          # 마이그레이션 생성 및 적용
 
 ---
 
-**마지막 업데이트**: 2025-11-09
-**다음 작업**: 생체 인증 실제 테스트 (모바일 기기)
+**마지막 업데이트**: 2025-11-09 (오후)
+**다음 작업**: 워커-차량 매칭 및 GPS 위치 추적 시스템 개선
 **Supabase MCP**: ✅ 연결됨 및 사용 가능
 **Render MCP**: ✅ 연결됨 및 사용 가능
-**오늘 작업 종료**: 🎉 WebAuthn 지문 인식 구현 완료!
+**오늘 작업 요약**: WebAuthn 생체 인증 버그 수정 완료, GPS 위치 추적 시스템 개선 계획 수립

@@ -10,6 +10,7 @@ interface GoogleMapProps {
     title: string;
     info?: string;
   }>;
+  path?: Array<{ lat: number; lng: number; timestamp?: Date }>; // 이동 경로 (Polyline)
   onMapLoad?: (map: google.maps.Map) => void;
   className?: string;
 }
@@ -18,12 +19,14 @@ export default function GoogleMap({
   center = { lat: 37.5665, lng: 126.9780 }, // 서울 기본 좌표
   zoom = 12,
   markers = [],
+  path = [],
   onMapLoad,
   className = "w-full h-[500px]",
 }: GoogleMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [mapMarkers, setMapMarkers] = useState<google.maps.Marker[]>([]);
+  const [polyline, setPolyline] = useState<google.maps.Polyline | null>(null);
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +135,42 @@ export default function GoogleMap({
       map.setCenter(center);
     }
   }, [map, center]);
+
+  // 이동 경로 (Polyline) 업데이트
+  useEffect(() => {
+    if (!map) return;
+
+    // 기존 Polyline 제거
+    if (polyline) {
+      polyline.setMap(null);
+    }
+
+    // 새로운 경로가 있으면 Polyline 생성
+    if (path && path.length > 0) {
+      const pathCoordinates = path.map((p) => ({
+        lat: p.lat,
+        lng: p.lng,
+      }));
+
+      const newPolyline = new google.maps.Polyline({
+        path: pathCoordinates,
+        geodesic: true,
+        strokeColor: "#FF0000",
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        map,
+      });
+
+      setPolyline(newPolyline);
+
+      // 경로에 맞게 지도 범위 조정
+      const bounds = new google.maps.LatLngBounds();
+      pathCoordinates.forEach((coord) => {
+        bounds.extend(coord);
+      });
+      map.fitBounds(bounds);
+    }
+  }, [map, path]);
 
   if (error) {
     return (

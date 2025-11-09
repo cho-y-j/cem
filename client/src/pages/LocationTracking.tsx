@@ -3,12 +3,13 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import GoogleMap from "@/components/GoogleMap";
-import { MapPin, Loader2, AlertCircle, Filter, X } from "lucide-react";
+import { MapPin, Loader2, AlertCircle, Filter, X, Route, BarChart3, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function LocationTracking() {
   const { user } = useAuth();
@@ -20,6 +21,8 @@ export default function LocationTracking() {
     bpCompanyId?: string;
     epCompanyId?: string;
     vehicleNumber?: string;
+    equipmentTypeId?: string;
+    workerId?: string;
   }>({});
 
   const userRole = user?.role?.toLowerCase() || "";
@@ -44,6 +47,38 @@ export default function LocationTracking() {
     { enabled: (isBp || isAdmin) && (filters.epCompanyId === undefined || filters.epCompanyId !== "") }
   );
 
+  // 장비 타입 목록 조회 (차종별 필터용)
+  const { data: equipmentTypes } = trpc.equipTypes.list.useQuery(undefined, {
+    enabled: filters.equipmentTypeId !== undefined || isAdmin || isBp || isEp,
+  });
+
+  // 운전자 목록 조회 (운전자별 필터용)
+  const { data: workers } = trpc.workers.list.useQuery(undefined, {
+    enabled: filters.workerId !== undefined || isAdmin || isBp || isEp,
+  });
+
+  // 이동 동선 분석 상태
+  const [activeTab, setActiveTab] = useState<"realtime" | "analysis">("realtime");
+  const [analysisWorkerId, setAnalysisWorkerId] = useState<string>("");
+  const [analysisStartDate, setAnalysisStartDate] = useState<string>(
+    new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [analysisEndDate, setAnalysisEndDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+
+  // 이동 동선 분석 조회
+  const { data: analysisData, isLoading: isAnalyzing } = trpc.location.analyzeHistory.useQuery(
+    {
+      workerId: analysisWorkerId,
+      startDate: new Date(analysisStartDate),
+      endDate: new Date(analysisEndDate + "T23:59:59"),
+    },
+    {
+      enabled: !!analysisWorkerId && analysisStartDate && analysisEndDate,
+    }
+  );
+
   // 모든 활성 위치 조회 (필터 포함)
   const { data: locations, isLoading, refetch } = trpc.location.getAllActive.useQuery(filters);
 
@@ -66,6 +101,9 @@ export default function LocationTracking() {
     const ownerCompanyName = deployment?.equipment?.ownerCompanies?.name || "";
     const bpCompanyName = deployment?.bpCompanies?.name || "";
     const epCompanyName = deployment?.epCompanies?.name || "";
+    const equipmentTypeName = loc.equipment?.equip_types?.name || "미지정";
+    const workerName = loc.workers?.name || "Unknown";
+    const vehicleNumber = loc.equipment?.reg_num || "미배정";
     
     return {
       id: loc.id,
@@ -73,15 +111,25 @@ export default function LocationTracking() {
         lat: parseFloat(loc.latitude),
         lng: parseFloat(loc.longitude),
       },
-      title: loc.workers?.name || `Worker ${loc.worker_id}`,
+      title: `${workerName} - ${vehicleNumber}`,
+      workerName,
+      vehicleNumber,
+      equipmentTypeName,
+      equipmentTypeId: loc.equipment?.equip_type_id,
+      workerId: loc.worker_id,
       info: `
-        <strong>${loc.workers?.name || "Unknown"}</strong><br/>
-        장비: ${loc.equipment?.reg_num || "미배정"}<br/>
-        ${ownerCompanyName ? `오너사: ${ownerCompanyName}<br/>` : ""}
-        ${bpCompanyName ? `BP: ${bpCompanyName}<br/>` : ""}
-        ${epCompanyName ? `EP: ${epCompanyName}<br/>` : ""}
-        시간: ${new Date(loc.logged_at).toLocaleString("ko-KR")}<br/>
-        정확도: ${loc.accuracy ? `${Math.round(parseFloat(loc.accuracy))}m` : "N/A"}
+        <div style="min-width: 200px;">
+          <h3 style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">${workerName}</h3>
+          <div style="font-size: 14px; line-height: 1.6;">
+            <p><strong>차량번호:</strong> ${vehicleNumber}</p>
+            <p><strong>차종:</strong> ${equipmentTypeName}</p>
+            ${ownerCompanyName ? `<p><strong>오너사:</strong> ${ownerCompanyName}</p>` : ""}
+            ${bpCompanyName ? `<p><strong>BP:</strong> ${bpCompanyName}</p>` : ""}
+            ${epCompanyName ? `<p><strong>EP:</strong> ${epCompanyName}</p>` : ""}
+            <p><strong>시간:</strong> ${new Date(loc.logged_at).toLocaleString("ko-KR")}</p>
+            <p><strong>정확도:</strong> ${loc.accuracy ? `${Math.round(parseFloat(loc.accuracy))}m` : "N/A"}</p>
+          </div>
+        </div>
       `,
     };
   }) || [];
@@ -118,13 +166,71 @@ export default function LocationTracking() {
     );
   }
 
+  // 분석용 경로 데이터
+  const analysisPath = analysisData?.path.map((p) => ({
+    lat: p.lat,
+    lng: p.lng,
+    timestamp: p.timestamp,
+  })) || [];
+
+  // 분석용 마커 (시작점, 종료점, 체류 지점)
+  const analysisMarkers: Array<{
+    id: string;
+    position: { lat: number; lng: number };
+    title: string;
+    info?: string;
+  }> = [];
+
+  if (analysisData && analysisData.path.length > 0) {
+    const startPoint = analysisData.path[0];
+    analysisMarkers.push({
+      id: "start",
+      position: { lat: startPoint.lat, lng: startPoint.lng },
+      title: "시작점",
+      info: `시작 시간: ${startPoint.timestamp.toLocaleString("ko-KR")}`,
+    });
+
+    const endPoint = analysisData.path[analysisData.path.length - 1];
+    analysisMarkers.push({
+      id: "end",
+      position: { lat: endPoint.lat, lng: endPoint.lng },
+      title: "종료점",
+      info: `종료 시간: ${endPoint.timestamp.toLocaleString("ko-KR")}`,
+    });
+
+    analysisData.stayPoints.forEach((stay, index) => {
+      analysisMarkers.push({
+        id: `stay-${index}`,
+        position: { lat: stay.lat, lng: stay.lng },
+        title: `체류 지점 ${index + 1}`,
+        info: `
+          <div style="min-width: 200px;">
+            <h3 style="font-weight: bold; margin-bottom: 8px;">체류 지점 ${index + 1}</h3>
+            <div style="font-size: 14px; line-height: 1.6;">
+              <p><strong>시작:</strong> ${stay.startTime.toLocaleString("ko-KR")}</p>
+              <p><strong>종료:</strong> ${stay.endTime.toLocaleString("ko-KR")}</p>
+              <p><strong>체류 시간:</strong> ${Math.floor(stay.duration / 60)}분 ${stay.duration % 60}초</p>
+            </div>
+          </div>
+        `,
+      });
+    });
+  }
+
+  const analysisCenter = analysisPath.length > 0
+    ? {
+        lat: analysisPath.reduce((sum, p) => sum + p.lat, 0) / analysisPath.length,
+        lng: analysisPath.reduce((sum, p) => sum + p.lng, 0) / analysisPath.length,
+      }
+    : center;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">실시간 위치 추적</h1>
+          <h1 className="text-3xl font-bold">위치 추적</h1>
           <p className="text-muted-foreground mt-1">
-            작업 중인 장비 및 인력의 실시간 위치를 확인합니다.
+            실시간 위치 추적 및 이동 동선 분석
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -134,6 +240,20 @@ export default function LocationTracking() {
           </Badge>
         </div>
       </div>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "realtime" | "analysis")}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="realtime">
+            <MapPin className="h-4 w-4 mr-2" />
+            실시간 위치
+          </TabsTrigger>
+          <TabsTrigger value="analysis">
+            <Route className="h-4 w-4 mr-2" />
+            이동 동선 분석
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="realtime" className="space-y-6">
 
       {/* 필터 섹션 */}
       {(isAdmin || isBp || isEp || (!isOwner && Object.keys(filters).length > 0)) && (
@@ -211,6 +331,29 @@ export default function LocationTracking() {
                       {epCompanies?.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* 차종별 필터 */}
+              {(isAdmin || isBp || isEp) && (
+                <div className="space-y-2">
+                  <Label htmlFor="equipmentTypeFilter">차종</Label>
+                  <Select
+                    value={filters.equipmentTypeId || ""}
+                    onValueChange={(value) => handleFilterChange("equipmentTypeId", value)}
+                  >
+                    <SelectTrigger id="equipmentTypeFilter">
+                      <SelectValue placeholder="전체" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">전체</SelectItem>
+                      {equipmentTypes?.map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -338,6 +481,190 @@ export default function LocationTracking() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="analysis" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                이동 동선 분석
+              </CardTitle>
+              <CardDescription>
+                특정 운전자의 이동 경로를 분석하고 시각화합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="analysisWorker">운전자 선택</Label>
+                  <Select value={analysisWorkerId} onValueChange={setAnalysisWorkerId}>
+                    <SelectTrigger id="analysisWorker">
+                      <SelectValue placeholder="운전자 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workers?.map((worker) => (
+                        <SelectItem key={worker.id} value={worker.id}>
+                          {worker.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="analysisStartDate">시작 날짜</Label>
+                  <Input
+                    id="analysisStartDate"
+                    type="date"
+                    value={analysisStartDate}
+                    onChange={(e) => setAnalysisStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="analysisEndDate">종료 날짜</Label>
+                  <Input
+                    id="analysisEndDate"
+                    type="date"
+                    value={analysisEndDate}
+                    onChange={(e) => setAnalysisEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {isAnalyzing && (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2">분석 중...</span>
+                </div>
+              )}
+
+              {analysisData && analysisWorkerId && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">총 이동 거리</p>
+                          <p className="text-2xl font-bold mt-2">
+                            {(analysisData.totalDistance / 1000).toFixed(2)} km
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">평균 속도</p>
+                          <p className="text-2xl font-bold mt-2">
+                            {analysisData.averageSpeed.toFixed(1)} km/h
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">최대 속도</p>
+                          <p className="text-2xl font-bold mt-2">
+                            {analysisData.maxSpeed.toFixed(1)} km/h
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">총 시간</p>
+                          <p className="text-2xl font-bold mt-2">
+                            {Math.floor(analysisData.totalTime / 3600)}시간 {Math.floor((analysisData.totalTime % 3600) / 60)}분
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {analysisPath.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>이동 경로</CardTitle>
+                        <CardDescription>
+                          빨간 선은 이동 경로를, 마커는 시작점/종료점/체류 지점을 표시합니다.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <GoogleMap
+                          center={analysisCenter}
+                          zoom={13}
+                          markers={analysisMarkers}
+                          path={analysisPath}
+                          className="w-full h-[600px] rounded-lg"
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {analysisData.stayPoints.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>체류 지점</CardTitle>
+                        <CardDescription>일정 시간 이상 머문 위치 목록</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {analysisData.stayPoints.map((stay, index) => (
+                            <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                              <div>
+                                <p className="font-medium">체류 지점 {index + 1}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {stay.startTime.toLocaleString("ko-KR")} ~ {stay.endTime.toLocaleString("ko-KR")}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  좌표: {stay.lat.toFixed(6)}, {stay.lng.toFixed(6)}
+                                </p>
+                              </div>
+                              <Badge variant="outline">
+                                {Math.floor(stay.duration / 60)}분 {stay.duration % 60}초
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {analysisPath.length === 0 && (
+                    <Card>
+                      <CardContent className="py-12">
+                        <div className="text-center">
+                          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">위치 이력이 없습니다</h3>
+                          <p className="text-muted-foreground">
+                            선택한 기간 동안 위치 정보가 기록되지 않았습니다.
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              {!analysisWorkerId && (
+                <Card>
+                  <CardContent className="py-12">
+                    <div className="text-center">
+                      <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">운전자를 선택해주세요</h3>
+                      <p className="text-muted-foreground">
+                        분석할 운전자와 기간을 선택하면 이동 동선을 확인할 수 있습니다.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

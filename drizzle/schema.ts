@@ -761,6 +761,27 @@ export const workZones = pgTable("work_zones", {
 });
 
 export type WorkZone = typeof workZones.$inferSelect;
+
+// ============================================================
+// 시스템 설정 (System Settings)
+// ============================================================
+
+/**
+ * 시스템 설정
+ * GPS 전송 간격 등 시스템 전역 설정 저장
+ */
+export const systemSettings = pgTable("system_settings", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedBy: varchar("updated_by", { length: 64 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = typeof systemSettings.$inferInsert;
 export type InsertWorkZone = typeof workZones.$inferInsert;
 
 /**

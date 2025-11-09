@@ -45,6 +45,7 @@ export default function WorkerMain() {
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const [locationInterval, setLocationInterval] = useState<NodeJS.Timeout | null>(null);
+  const [gpsIntervalMinutes, setGpsIntervalMinutes] = useState<number>(5); // 기본값: 5분
   const [emergencyDialogOpen, setEmergencyDialogOpen] = useState(false);
   const [emergencyType, setEmergencyType] = useState<string>("");
   const [emergencyDescription, setEmergencyDescription] = useState<string>("");
@@ -85,6 +86,19 @@ export default function WorkerMain() {
 
   // 배정된 장비 조회
   const { data: assignedEquipment, isLoading: isLoadingEquipment } = trpc.mobile.worker.getMyAssignedEquipment.useQuery();
+
+  // GPS 전송 간격 조회
+  const { data: gpsIntervalData } = trpc.system.getGpsInterval.useQuery(undefined, {
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+
+  // GPS 전송 간격 설정
+  useEffect(() => {
+    if (gpsIntervalData?.intervalMinutes) {
+      setGpsIntervalMinutes(gpsIntervalData.intervalMinutes);
+    }
+  }, [gpsIntervalData]);
 
   // 현재 투입 정보 조회 (BP사 정보 포함)
   const { data: currentDeployment } = trpc.mobile.worker.getCurrentDeployment.useQuery();
@@ -157,6 +171,7 @@ export default function WorkerMain() {
     onSuccess: () => {
       toast.success("휴식이 시작되었습니다.");
       refetchSession();
+      stopLocationTracking(); // 휴식 중 GPS 전송 중지
     },
     onError: (error) => {
       toast.error("휴식 시작 실패: " + error.message);
@@ -168,6 +183,10 @@ export default function WorkerMain() {
     onSuccess: () => {
       toast.success("작업을 재개합니다.");
       refetchSession();
+      // 휴식 종료 시 GPS 전송 재개 (작업 세션이 활성 상태인 경우에만)
+      if (currentSession && (currentSession.status === 'working' || currentSession.status === 'overtime')) {
+        startLocationTracking();
+      }
     },
     onError: (error) => {
       toast.error("휴식 종료 실패: " + error.message);
@@ -197,7 +216,13 @@ export default function WorkerMain() {
   });
 
   // 위치 전송
-  const sendLocationMutation = trpc.mobile.worker.sendLocation.useMutation();
+  const sendLocationMutation = trpc.mobile.worker.sendLocation.useMutation({
+    onError: (error) => {
+      console.error('[GPS] 위치 전송 실패:', error);
+      // 사용자에게는 조용히 실패 (백그라운드 작업이므로)
+      // 재시도는 자동으로 다음 간격에 시도됨
+    },
+  });
 
   // 긴급 알림
   const sendEmergencyMutation = trpc.mobile.worker.sendEmergencyAlert.useMutation({
@@ -209,47 +234,103 @@ export default function WorkerMain() {
     },
   });
 
-  // 위치 추적 시작
-  const startLocationTracking = () => {
+  // 위치 전송 함수 (재시도 로직 포함)
+  const sendLocationWithRetry = async (retryCount = 0, maxRetries = 3) => {
     if (!assignedEquipment) return;
 
-    // 즉시 위치 전송
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          sendLocationMutation.mutate({
-            equipmentId: assignedEquipment.id,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          });
-        },
-        (error) => {
-          console.error("위치 정보 가져오기 실패:", error);
-        }
-      );
-    }
+    try {
+      if (!("geolocation" in navigator)) {
+        console.warn('[GPS] Geolocation API를 사용할 수 없습니다.');
+        return;
+      }
 
-    // 5분 간격으로 위치 전송
-    const interval = setInterval(() => {
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            sendLocationMutation.mutate({
+      // GPS 옵션 설정
+      const options: PositionOptions = {
+        enableHighAccuracy: true,
+        timeout: 10000, // 10초 타임아웃
+        maximumAge: 0, // 캐시 사용 안 함
+      };
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            await sendLocationMutation.mutateAsync({
               equipmentId: assignedEquipment.id,
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
               accuracy: position.coords.accuracy,
             });
-          },
-          (error) => {
-            console.error("위치 정보 가져오기 실패:", error);
+            console.log('[GPS] 위치 전송 성공:', {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+            });
+          } catch (error: any) {
+            console.error('[GPS] 위치 전송 실패:', error);
+            
+            // 네트워크 오류인 경우 재시도
+            if (retryCount < maxRetries && (
+              error.message?.includes('network') ||
+              error.message?.includes('Network') ||
+              error.message?.includes('fetch') ||
+              error.code === 'NETWORK_ERROR'
+            )) {
+              console.log(`[GPS] 네트워크 오류로 재시도 중... (${retryCount + 1}/${maxRetries})`);
+              setTimeout(() => {
+                sendLocationWithRetry(retryCount + 1, maxRetries);
+              }, 5000); // 5초 후 재시도
+            }
           }
-        );
+        },
+        (error) => {
+          console.error('[GPS] 위치 정보 가져오기 실패:', {
+            code: error.code,
+            message: error.message,
+            retryCount,
+          });
+
+          // GPS 수신 실패 시 재시도 (PERMISSION_DENIED 제외)
+          if (retryCount < maxRetries && error.code !== error.PERMISSION_DENIED) {
+            console.log(`[GPS] 위치 수신 실패로 재시도 중... (${retryCount + 1}/${maxRetries})`);
+            setTimeout(() => {
+              sendLocationWithRetry(retryCount + 1, maxRetries);
+            }, 10000); // 10초 후 재시도
+          } else if (error.code === error.PERMISSION_DENIED) {
+            console.warn('[GPS] 위치 권한이 거부되었습니다.');
+          }
+        },
+        options
+      );
+    } catch (error: any) {
+      console.error('[GPS] 위치 전송 중 예외 발생:', error);
+      
+      // 예외 발생 시 재시도
+      if (retryCount < maxRetries) {
+        setTimeout(() => {
+          sendLocationWithRetry(retryCount + 1, maxRetries);
+        }, 5000);
       }
-    }, 5 * 60 * 1000); // 5분 간격
+    }
+  };
+
+  // 위치 추적 시작
+  const startLocationTracking = () => {
+    if (!assignedEquipment) {
+      console.warn('[GPS] 배정된 장비가 없어 위치 추적을 시작할 수 없습니다.');
+      return;
+    }
+
+    // 즉시 위치 전송
+    sendLocationWithRetry();
+
+    // 설정된 간격으로 위치 전송 (기본값: 5분)
+    const intervalMs = gpsIntervalMinutes * 60 * 1000;
+    const interval = setInterval(() => {
+      sendLocationWithRetry();
+    }, intervalMs);
 
     setLocationInterval(interval);
+    console.log(`[GPS] 위치 추적 시작 (간격: ${gpsIntervalMinutes}분)`);
   };
 
   // 위치 추적 중지
@@ -257,8 +338,32 @@ export default function WorkerMain() {
     if (locationInterval) {
       clearInterval(locationInterval);
       setLocationInterval(null);
+      console.log('[GPS] 위치 추적 중지');
     }
   };
+
+  // 작업 세션 상태 변경 시 GPS 전송 상태 업데이트
+  useEffect(() => {
+    if (!currentSession) {
+      // 작업 세션이 없으면 GPS 전송 중지
+      stopLocationTracking();
+      return;
+    }
+
+    const status = currentSession.status;
+    if (status === 'working' || status === 'overtime') {
+      // 작업 중이면 GPS 전송 시작 (이미 시작되어 있으면 재시작하지 않음)
+      if (!locationInterval) {
+        startLocationTracking();
+      }
+    } else if (status === 'break') {
+      // 휴식 중이면 GPS 전송 중지
+      stopLocationTracking();
+    } else if (status === 'completed') {
+      // 작업 종료면 GPS 전송 중지
+      stopLocationTracking();
+    }
+  }, [currentSession?.status, locationInterval]);
 
   // 경과 시간 계산
   useEffect(() => {

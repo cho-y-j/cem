@@ -37,6 +37,8 @@ import {
   InsertCheckIn,
   WebauthnCredential,
   InsertWebauthnCredential,
+  SystemSetting,
+  InsertSystemSetting,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1671,20 +1673,28 @@ export async function createLocationLog(log: any): Promise<void> {
     throw new Error("Supabase not available");
   }
 
-  const { error } = await supabase
-    .from('location_logs')
-    .insert({
-      id: log.id,
-      worker_id: log.workerId,
-      equipment_id: log.equipmentId,
-      latitude: log.latitude,
-      longitude: log.longitude,
-      accuracy: log.accuracy,
-      logged_at: log.loggedAt || new Date(),
-      created_at: new Date()
-    });
+  try {
+    const { error } = await supabase
+      .from('location_logs')
+      .insert({
+        id: log.id,
+        worker_id: log.workerId,
+        equipment_id: log.equipmentId,
+        latitude: log.latitude,
+        longitude: log.longitude,
+        accuracy: log.accuracy,
+        logged_at: log.loggedAt || new Date(),
+        created_at: new Date()
+      });
 
-  if (error) throw error;
+    if (error) {
+      console.error('[DB] createLocationLog error:', error);
+      throw new Error(`위치 기록 실패: ${error.message}`);
+    }
+  } catch (error: any) {
+    console.error('[DB] createLocationLog exception:', error);
+    throw error;
+  }
 }
 
 export async function getLatestLocationByWorker(workerId: string): Promise<any | undefined> {
@@ -1729,10 +1739,168 @@ export async function getLocationHistory(workerId: string, startDate: Date, endD
     .eq('worker_id', workerId)
     .gte('logged_at', startDate.toISOString())
     .lte('logged_at', endDate.toISOString())
-    .order('logged_at', { ascending: false });
+    .order('logged_at', { ascending: true }); // 시간순 정렬 (오래된 것부터)
 
-  if (error) return [];
+  if (error) {
+    console.error('[DB] getLocationHistory error:', error);
+    return [];
+  }
   return toCamelCaseArray(data || []);
+}
+
+/**
+ * 위치 이력 분석 (이동 거리, 체류 시간 등)
+ */
+export async function analyzeLocationHistory(
+  workerId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<{
+  totalDistance: number; // 총 이동 거리 (미터)
+  averageSpeed: number; // 평균 속도 (km/h)
+  maxSpeed: number; // 최대 속도 (km/h)
+  totalTime: number; // 총 시간 (초)
+  stayPoints: Array<{
+    lat: number;
+    lng: number;
+    startTime: Date;
+    endTime: Date;
+    duration: number; // 체류 시간 (초)
+    location: string; // 위치 정보 (선택사항)
+  }>;
+  path: Array<{
+    lat: number;
+    lng: number;
+    timestamp: Date;
+    accuracy?: number;
+  }>;
+}> {
+  const history = await getLocationHistory(workerId, startDate, endDate);
+  
+  if (history.length === 0) {
+    return {
+      totalDistance: 0,
+      averageSpeed: 0,
+      maxSpeed: 0,
+      totalTime: 0,
+      stayPoints: [],
+      path: [],
+    };
+  }
+
+  // 경로 데이터 생성
+  const path = history.map((loc: any) => ({
+    lat: parseFloat(loc.latitude),
+    lng: parseFloat(loc.longitude),
+    timestamp: new Date(loc.loggedAt),
+    accuracy: loc.accuracy ? parseFloat(loc.accuracy) : undefined,
+  }));
+
+  // 총 이동 거리 계산
+  let totalDistance = 0;
+  const speeds: number[] = [];
+  
+  for (let i = 1; i < path.length; i++) {
+    const prev = path[i - 1];
+    const curr = path[i];
+    
+    const distance = calculateDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+    totalDistance += distance;
+    
+    // 속도 계산 (m/s)
+    const timeDiff = (curr.timestamp.getTime() - prev.timestamp.getTime()) / 1000; // 초
+    if (timeDiff > 0) {
+      const speedMs = distance / timeDiff; // m/s
+      const speedKmh = speedMs * 3.6; // km/h
+      speeds.push(speedKmh);
+    }
+  }
+
+  // 체류 지점 분석 (같은 위치에 일정 시간 이상 머문 곳)
+  const stayPoints: Array<{
+    lat: number;
+    lng: number;
+    startTime: Date;
+    endTime: Date;
+    duration: number;
+    location: string;
+  }> = [];
+  
+  const STAY_THRESHOLD = 50; // 50미터 이내면 같은 위치로 간주
+  const MIN_STAY_DURATION = 5 * 60; // 최소 5분 이상 머물러야 체류 지점으로 인정
+  
+  let currentStayStart: { lat: number; lng: number; time: Date } | null = null;
+  
+  for (let i = 0; i < path.length; i++) {
+    const point = path[i];
+    
+    if (!currentStayStart) {
+      currentStayStart = { lat: point.lat, lng: point.lng, time: point.timestamp };
+    } else {
+      const distance = calculateDistance(
+        currentStayStart.lat,
+        currentStayStart.lng,
+        point.lat,
+        point.lng
+      );
+      
+      if (distance > STAY_THRESHOLD) {
+        // 체류 지점 종료
+        const duration = (point.timestamp.getTime() - currentStayStart.time.getTime()) / 1000;
+        if (duration >= MIN_STAY_DURATION) {
+          stayPoints.push({
+            lat: currentStayStart.lat,
+            lng: currentStayStart.lng,
+            startTime: currentStayStart.time,
+            endTime: point.timestamp,
+            duration: Math.round(duration),
+            location: '', // 나중에 역지오코딩으로 추가 가능
+          });
+        }
+        currentStayStart = { lat: point.lat, lng: point.lng, time: point.timestamp };
+      }
+    }
+  }
+  
+  // 마지막 체류 지점 처리
+  if (currentStayStart && path.length > 0) {
+    const lastPoint = path[path.length - 1];
+    const duration = (lastPoint.timestamp.getTime() - currentStayStart.time.getTime()) / 1000;
+    if (duration >= MIN_STAY_DURATION) {
+      stayPoints.push({
+        lat: currentStayStart.lat,
+        lng: currentStayStart.lng,
+        startTime: currentStayStart.time,
+        endTime: lastPoint.timestamp,
+        duration: Math.round(duration),
+        location: '',
+      });
+    }
+  }
+
+  // 총 시간 계산
+  const totalTime = path.length > 1
+    ? (path[path.length - 1].timestamp.getTime() - path[0].timestamp.getTime()) / 1000
+    : 0;
+
+  // 평균 속도 계산
+  const averageSpeed = speeds.length > 0
+    ? speeds.reduce((sum, s) => sum + s, 0) / speeds.length
+    : 0;
+
+  // 최대 속도 계산
+  const maxSpeed = speeds.length > 0
+    ? Math.max(...speeds)
+    : 0;
+
+  return {
+    totalDistance: Math.round(totalDistance),
+    averageSpeed: Math.round(averageSpeed * 10) / 10,
+    maxSpeed: Math.round(maxSpeed * 10) / 10,
+    totalTime: Math.round(totalTime),
+    stayPoints,
+    path,
+  };
 }
 
 // ============================================================
@@ -2945,12 +3113,25 @@ export async function getAllActiveLocations(filters?: {
     return [];
   }
 
-  // 차량번호 필터링 (장비명 부분 매칭)
+  // 클라이언트 사이드 필터링 (차량번호, 차종, 운전자)
   let filteredData = data || [];
+  
   if (filters?.vehicleNumber) {
     filteredData = filteredData.filter((loc: any) => {
       const regNum = loc.equipment?.reg_num || '';
       return regNum.toLowerCase().includes(filters.vehicleNumber!.toLowerCase());
+    });
+  }
+
+  if (filters?.equipmentTypeId) {
+    filteredData = filteredData.filter((loc: any) => {
+      return loc.equipment?.equip_type_id === filters.equipmentTypeId;
+    });
+  }
+
+  if (filters?.workerId) {
+    filteredData = filteredData.filter((loc: any) => {
+      return loc.worker_id === filters.workerId;
     });
   }
 
@@ -3633,5 +3814,100 @@ export async function getTodayCheckIn(userId: string): Promise<CheckIn | null> {
   }
 
   return data ? toCamelCase(data) : null;
+}
+
+// ============================================================
+// System Settings (시스템 설정)
+// ============================================================
+
+/**
+ * 시스템 설정 조회
+ */
+export async function getSystemSetting(key: string): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[DB] getSystemSetting error:', error);
+    return null;
+  }
+
+  return data?.value || null;
+}
+
+/**
+ * 시스템 설정 저장/업데이트
+ */
+export async function setSystemSetting(
+  key: string,
+  value: string,
+  description?: string,
+  updatedBy?: string
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("Supabase not available");
+  }
+
+  const id = `setting-${nanoid()}`;
+  const now = new Date();
+
+  // 기존 설정 확인
+  const { data: existing } = await supabase
+    .from('system_settings')
+    .select('id')
+    .eq('key', key)
+    .maybeSingle();
+
+  if (existing) {
+    // 업데이트
+    const { error } = await supabase
+      .from('system_settings')
+      .update({
+        value,
+        description: description || null,
+        updated_by: updatedBy || null,
+        updated_at: now,
+      })
+      .eq('key', key);
+
+    if (error) throw error;
+  } else {
+    // 새로 생성
+    const { error } = await supabase
+      .from('system_settings')
+      .insert({
+        id,
+        key,
+        value,
+        description: description || null,
+        updated_by: updatedBy || null,
+        updated_at: now,
+        created_at: now,
+      });
+
+    if (error) throw error;
+  }
+}
+
+/**
+ * GPS 전송 간격 조회 (기본값: 5분)
+ */
+export async function getGpsTrackingInterval(): Promise<number> {
+  const value = await getSystemSetting('gps_tracking_interval_minutes');
+  if (value) {
+    const interval = parseInt(value, 10);
+    if (!isNaN(interval) && interval > 0) {
+      return interval;
+    }
+  }
+  // 기본값: 5분
+  return 5;
 }
 
