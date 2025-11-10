@@ -595,11 +595,33 @@ export default function WorkerMain() {
 
             // 3. 생체 인증 (지문/얼굴 스캔)
             toast.info("생체 인증을 진행해주세요...");
+            
+            console.log('[BiometricCheckIn] Starting authentication with options:', {
+              challenge: authOptions.challenge?.substring(0, 20) + '...',
+              rpId: authOptions.rpId,
+              allowCredentials: authOptions.allowCredentials?.length || 0,
+              userVerification: authOptions.userVerification,
+            });
+            
             const authResponse = await startAuthentication(authOptions);
+            
+            console.log('[BiometricCheckIn] Authentication response received:', {
+              hasRawId: !!authResponse.rawId,
+              rawIdType: typeof authResponse.rawId,
+              hasId: !!authResponse.id,
+              hasResponse: !!authResponse.response,
+              type: authResponse.type,
+            });
 
             // 4. 서버 검증
+            console.log('[BiometricCheckIn] Sending to server for verification...');
             const authResult = await trpc.webauthn.verifyAuthentication.mutate({
               response: authResponse,
+            });
+            
+            console.log('[BiometricCheckIn] Verification result:', {
+              verified: authResult.verified,
+              credentialId: authResult.credentialId?.substring(0, 20) + '...',
             });
 
             if (authResult.verified) {
