@@ -1150,19 +1150,6 @@ export default function WorkerMain() {
           </DialogContent>
         </Dialog>
 
-        {/* 위치 전송 상태 */}
-        {currentSession && locationInterval && (
-          <div className="px-4 mt-4">
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2 text-sm text-blue-700">
-                  <MapPin className="h-4 w-4 animate-pulse" />
-                  <span>위치 정보 전송 중 (5분 간격)</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
 
       <MobileBottomNav items={workerNavItems} />
