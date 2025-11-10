@@ -781,16 +781,11 @@ export const webauthnRouter = router({
             counter: credential.counter,
           });
           
-          // credential.id는 이미 base64url 문자열로 저장되어 있음
-          // verifyAuthenticationResponse는 Uint8Array를 기대하므로 변환 필요
-          const credentialIDBuffer = Buffer.from(credential.id, 'base64url');
-          const credentialPublicKeyBuffer = Buffer.from(credential.public_key, 'base64');
-          
-          console.log('[WebAuthn] Credential buffers prepared:', {
-            credentialIDBufferLength: credentialIDBuffer.length,
-            credentialPublicKeyBufferLength: credentialPublicKeyBuffer.length,
-            credentialIDBufferType: credentialIDBuffer.constructor.name,
-            credentialPublicKeyBufferType: credentialPublicKeyBuffer.constructor.name,
+          // 라이브러리 v13.2.2 타입 정의는 문자열(Base64URL/Base64)을 기대
+          // DB에는 id(base64url), public_key(base64)로 저장되어 있으므로 그대로 전달
+          console.log('[WebAuthn] Credential strings prepared (using raw DB values):', {
+            credentialIdPreview: credential.id.substring(0, 20) + '...',
+            credentialPublicKeyPreview: credential.public_key.substring(0, 20) + '...',
           });
           
           verification = await verifyAuthenticationResponse({
@@ -799,8 +794,8 @@ export const webauthnRouter = router({
             expectedOrigin: ORIGIN,
             expectedRPID: RP_ID,
             credential: {
-              id: credentialIDBuffer,
-              publicKey: credentialPublicKeyBuffer,
+              id: credential.id,                // base64url string
+              publicKey: credential.public_key, // base64 string
               counter: credential.counter,
             },
             requireUserVerification: true,
