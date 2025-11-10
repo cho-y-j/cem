@@ -273,20 +273,21 @@ export default function LocationTracking() {
     };
   }) || [];
 
-  // 마커 아이콘 캐싱 (workStatus와 equipmentTypeId 조합별로)
-  const iconCache = useMemo(() => {
-    const cache = new Map<string, any>();
+  // 마커 아이콘 캐싱 (간단한 객체 캐시 사용)
+  const iconCacheRef = useRef<Map<string, any>>(new Map());
+  
+  // 마커가 변경될 때 캐시 업데이트
+  useEffect(() => {
     if (typeof google === 'undefined' || !google.maps) {
-      return cache;
+      return;
     }
     markers.forEach((marker) => {
-      if (!cache.has(marker.iconKey)) {
+      if (!iconCacheRef.current.has(marker.iconKey)) {
         const icon = createMarkerIcon(marker.workStatus, marker.equipmentTypeId);
-        cache.set(marker.iconKey, icon);
+        iconCacheRef.current.set(marker.iconKey, icon);
       }
     });
-    return cache;
-  }, [markers.length, markers.map(m => m.iconKey).join(',')]);
+  }, [markers]);
 
   // 필터 초기화
   const clearFilters = () => {
@@ -616,8 +617,12 @@ export default function LocationTracking() {
                   style={{ width: "100%", height: "100%" }}
                 >
                   {markers.map((marker) => {
-                    // 캐시된 아이콘 사용
-                    const icon = iconCache.get(marker.iconKey);
+                    // 캐시된 아이콘 사용 (없으면 생성)
+                    let icon = iconCacheRef.current.get(marker.iconKey);
+                    if (!icon && typeof google !== 'undefined' && google.maps) {
+                      icon = createMarkerIcon(marker.workStatus, marker.equipmentTypeId);
+                      iconCacheRef.current.set(marker.iconKey, icon);
+                    }
                     
                     return (
                       <Marker
