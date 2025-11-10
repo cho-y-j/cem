@@ -484,6 +484,7 @@ export const webauthnRouter = router({
         // v13에서 allowCredentials.id는 Base64URLString (string) 허용
         const allowCredentials = credentials.map((c: any) => ({
           id: c.id as string, // DB 저장된 base64url
+          type: 'public-key',
         }));
 
         console.log('[WebAuthn] Calling generateAuthenticationOptions with:', {
