@@ -1,9 +1,9 @@
 # 건설장비 및 인력 관리 시스템 (ERMS) - TODO 및 작업 가이드
 
-**마지막 업데이트**: 2025-11-09 (오후)
+**마지막 업데이트**: 2025-11-10
 **프로젝트**: Equipment and Resource Management System (ERMS)
 **Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY
-**현재 단계**: 🔄 **WebAuthn 생체 인증 버그 수정 및 GPS 위치 추적 시스템 개선**
+**현재 단계**: 🔄 **Worker 지문 출근 문제 해결**
 
 ---
 
@@ -149,7 +149,53 @@
 
 ---
 
-## 🐛 현재 발견된 문제 (2025-11-09)
+## 🐛 현재 발견된 문제 (2025-11-10)
+
+### 1. 🟠 DashboardLayout 반응형 개선 필요
+
+**증상:**
+- 좌측 네비게이션 바와 우측 공간이 항상 표시됨
+- 모바일에서도 사이드바가 기본적으로 표시되어 공간을 차지함
+- 화면 축소 시 콘텐츠가 잘릴 수 있음
+
+**현재 상태:**
+- `DashboardLayout`은 `SidebarProvider`와 `SidebarInset`을 사용
+- `isMobile`을 사용하여 모바일에서 상단 바만 표시하지만, 사이드바 자체는 항상 표시됨
+- shadcn/ui의 Sidebar 컴포넌트는 기본적으로 항상 표시되고, 모바일에서는 오버레이로 작동해야 함
+
+**개선 필요:**
+- 모바일에서 사이드바가 기본적으로 숨겨지고, 햄버거 메뉴로만 열리도록 개선
+- 화면 크기에 따라 사이드바 동작 최적화
+- WorkZones 페이지의 중앙 정렬 및 반응형 개선 (부분 완료)
+
+**예상 소요 시간:** 2-3시간
+
+---
+
+### 2. 🔴 Worker 지문 출근 문제 해결 (진행 중)
+
+**현재 상태:**
+- ✅ WebAuthn 생체 인증 시스템 구현 완료
+- ✅ `handleBiometricCheckIn` 함수 구현됨
+- ✅ GPS + 생체 인증 통합 플로우 구현됨
+
+**확인 필요 사항:**
+1. 생체 인증 등록 여부 확인
+2. 챌린지 생성 성공 여부
+3. 인증 검증 성공 여부
+4. 출근 체크 API 호출 성공 여부
+5. 에러 메시지 및 로그 확인
+
+**관련 파일:**
+- `client/src/pages/mobile/WorkerMain.tsx` - `handleBiometricCheckIn` 함수
+- `server/webauthn-router.ts` - `generateAuthenticationChallenge`, `verifyAuthentication`
+- `server/check-in-router.ts` - 출근 체크 API
+
+**예상 소요 시간:** 1-2시간
+
+---
+
+## 🐛 이전 발견된 문제 (2025-11-09)
 
 ### 1. 🟠 WebAuthn `allowCredentials` 타입 문제 (임시 해결됨, 근본 해결 필요)
 
