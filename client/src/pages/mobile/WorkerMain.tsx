@@ -636,6 +636,8 @@ export default function WorkerMain() {
             });
 
             // 4. 서버 검증
+            // @simplewebauthn/browser의 startAuthentication은 이미 JSON 형식으로 변환된 객체를 반환
+            // BiometricSetup.tsx와 동일하게 그대로 전달
             console.log('[BiometricCheckIn] Sending to server for verification...');
             let authResult;
             try {

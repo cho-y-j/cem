@@ -598,7 +598,23 @@ export const webauthnRouter = router({
           ORIGIN,
         });
 
-        const response = input.response as AuthenticationResponseJSON;
+        // response 객체 검증 및 정규화
+        const rawResponse = input.response;
+        
+        // AuthenticationResponseJSON 형식으로 변환
+        const response: AuthenticationResponseJSON = {
+          id: rawResponse.id,
+          rawId: rawResponse.rawId || rawResponse.id,
+          type: rawResponse.type || 'public-key',
+          response: {
+            clientDataJSON: rawResponse.response?.clientDataJSON || rawResponse.response?.clientDataJSON,
+            authenticatorData: rawResponse.response?.authenticatorData || rawResponse.response?.authenticatorData,
+            signature: rawResponse.response?.signature || rawResponse.response?.signature,
+            userHandle: rawResponse.response?.userHandle || rawResponse.response?.userHandle || null,
+          },
+          clientExtensionResults: rawResponse.clientExtensionResults || {},
+          authenticatorAttachment: rawResponse.authenticatorAttachment || undefined,
+        };
         
         console.log('[WebAuthn] Authentication response received:', {
           hasRawId: !!response.rawId,
@@ -607,6 +623,7 @@ export const webauthnRouter = router({
           hasResponse: !!response.response,
           hasClientExtensionResults: !!response.clientExtensionResults,
           type: response.type,
+          responseKeys: Object.keys(response.response || {}),
         });
 
         // rawId 검증
