@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -251,6 +251,8 @@ export default function LocationTracking() {
       workStatus,
       statusLabel,
       workerId: loc.worker_id || loc.workerId,
+      // 아이콘 키 생성 (캐싱용)
+      iconKey: `${workStatus || 'none'}-${equipmentTypeId || 'none'}`,
       info: `
         <div style="min-width: 200px;">
           <h3 style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">${workerName}</h3>
@@ -270,6 +272,20 @@ export default function LocationTracking() {
       `,
     };
   }) || [];
+
+  // 마커 아이콘 캐싱 (workStatus와 equipmentTypeId 조합별로)
+  const iconCache = useMemo(() => {
+    const cache = new Map<string, google.maps.Icon | undefined>();
+    markers.forEach((marker) => {
+      if (!cache.has(marker.iconKey)) {
+        const icon = typeof google !== 'undefined' && google.maps
+          ? createMarkerIcon(marker.workStatus, marker.equipmentTypeId)
+          : undefined;
+        cache.set(marker.iconKey, icon);
+      }
+    });
+    return cache;
+  }, [markers.map(m => `${m.workStatus || 'none'}-${m.equipmentTypeId || 'none'}`).join(',')]);
 
   // 필터 초기화
   const clearFilters = () => {
@@ -599,10 +615,8 @@ export default function LocationTracking() {
                   style={{ width: "100%", height: "100%" }}
                 >
                   {markers.map((marker) => {
-                    // 작업 상태별 색상 + 차종별 모양 아이콘 생성
-                    const icon = typeof google !== 'undefined' && google.maps
-                      ? createMarkerIcon(marker.workStatus, marker.equipmentTypeId)
-                      : undefined;
+                    // 캐시된 아이콘 사용
+                    const icon = iconCache.get(marker.iconKey);
                     
                     return (
                       <Marker

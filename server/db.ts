@@ -3254,27 +3254,9 @@ export async function getAllActiveLocations(filters?: {
     return mappedLoc;
   });
   
-  // Owner 권한 필터링 (equipment 정보가 매핑된 후)
-  if (filters?.userRole?.toLowerCase() === 'owner' && filters.userCompanyId) {
-    result = result.filter((loc: any) => {
-      const equipment = loc.equipment;
-      if (equipment) {
-        const ownerCompanyId = equipment.owner_company_id || equipment.ownerCompanyId;
-        const matches = ownerCompanyId === filters.userCompanyId;
-        if (!matches) {
-          console.log('[getAllActiveLocations] Owner 필터링 - 불일치:', {
-            equipmentId: loc.equipment_id,
-            equipmentOwnerCompanyId: ownerCompanyId,
-            userCompanyId: filters.userCompanyId,
-          });
-        }
-        return matches;
-      }
-      console.log('[getAllActiveLocations] Owner 필터링 - equipment 정보 없음:', loc.equipment_id);
-      return false;
-    });
-    console.log('[getAllActiveLocations] Owner 필터링 후 개수:', result.length);
-  }
+  // Owner 권한 필터링은 deployment 정보가 매핑된 후에 수행 (출근 현황과 동일한 로직)
+  // 여기서는 일단 deployment 정보를 가져온 후 필터링하도록 주석 처리
+  // 실제 필터링은 deployment 매핑 후에 수행
   
   const resultEquipmentIds = result.map((loc: any) => loc.equipment_id).filter(Boolean);
   const resultWorkerIds = result.map((loc: any) => loc.worker_id).filter(Boolean);
@@ -3307,10 +3289,10 @@ export async function getAllActiveLocations(filters?: {
   });
   
   if (resultEquipmentIds.length > 0) {
-    // 모든 활성 deployment 조회 (worker_id도 함께 조회)
+    // 모든 활성 deployment 조회 (worker_id, owner_id도 함께 조회)
     const { data: deployments } = await supabase
       .from('deployments')
-      .select('id, equipment_id, worker_id, bp_company_id, ep_company_id')
+      .select('id, equipment_id, worker_id, bp_company_id, ep_company_id, owner_id')
       .in('equipment_id', resultEquipmentIds)
       .eq('status', 'active');
 
@@ -3410,6 +3392,45 @@ export async function getAllActiveLocations(filters?: {
           loc.deployment = toCamelCase(dep);
         }
       });
+      
+      // Owner 권한 필터링 (deployment 정보가 매핑된 후, 출근 현황과 동일한 로직)
+      if (filters?.userRole?.toLowerCase() === 'owner' && filters.userCompanyId) {
+        // 모든 deployment의 owner_id 수집
+        const ownerIds = [...new Set(result.map((loc: any) => loc.deployment?.ownerId || loc.deployment?.owner_id).filter(Boolean))];
+        
+        if (ownerIds.length > 0) {
+          // 한 번에 owner 정보 조회
+          const { data: owners } = await supabase
+            .from('users')
+            .select('id, company_id')
+            .in('id', ownerIds);
+          
+          // owner의 company_id가 필터와 일치하는 owner_id만 수집
+          const validOwnerIds = new Set(
+            owners?.filter((o: any) => o.company_id === filters.userCompanyId).map((o: any) => o.id) || []
+          );
+          
+          // 해당 owner_id를 가진 deployment의 location만 필터링
+          result = result.filter((loc: any) => {
+            const ownerId = loc.deployment?.ownerId || loc.deployment?.owner_id;
+            const matches = ownerId && validOwnerIds.has(ownerId);
+            if (!matches && ownerId) {
+              console.log('[getAllActiveLocations] Owner 필터링 - 불일치:', {
+                locationId: loc.id,
+                deploymentOwnerId: ownerId,
+                userCompanyId: filters.userCompanyId,
+              });
+            }
+            return matches;
+          });
+          
+          console.log('[getAllActiveLocations] Owner 필터링 후 개수:', result.length);
+        } else {
+          // owner_id가 없으면 빈 결과
+          console.log('[getAllActiveLocations] Owner 필터링 - owner_id 없음');
+          result = [];
+        }
+      }
     }
   }
 
