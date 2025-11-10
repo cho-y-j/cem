@@ -638,35 +638,64 @@ export const webauthnRouter = router({
         // response 객체 검증 및 정규화
         const rawResponse = input.response;
         
-        // rawResponse가 이미 올바른 형식인지 확인
+        console.log('[WebAuthn] Raw response received:', {
+          hasRawId: !!rawResponse?.rawId,
+          rawIdType: typeof rawResponse?.rawId,
+          hasId: !!rawResponse?.id,
+          hasResponse: !!rawResponse?.response,
+          responseKeys: rawResponse?.response ? Object.keys(rawResponse.response) : [],
+          type: rawResponse?.type,
+        });
+        
         // @simplewebauthn/browser는 이미 JSON 직렬화 가능한 객체를 반환
+        // 하지만 tRPC를 통해 전송될 때 ArrayBuffer/Uint8Array가 문자열로 변환될 수 있음
+        // AuthenticationResponseJSON 형식으로 명시적으로 변환
         let response: AuthenticationResponseJSON;
         
         try {
-          // 이미 올바른 형식인 경우 그대로 사용
-          if (rawResponse && typeof rawResponse === 'object' && rawResponse.id && rawResponse.response) {
-            response = rawResponse as AuthenticationResponseJSON;
-          } else {
-            // 형식이 맞지 않는 경우 재구성
-            response = {
-              id: rawResponse.id,
-              rawId: rawResponse.rawId || rawResponse.id,
-              type: rawResponse.type || 'public-key',
-              response: {
-                clientDataJSON: rawResponse.response?.clientDataJSON,
-                authenticatorData: rawResponse.response?.authenticatorData,
-                signature: rawResponse.response?.signature,
-                userHandle: rawResponse.response?.userHandle || null,
-              },
-              clientExtensionResults: rawResponse.clientExtensionResults || {},
-              authenticatorAttachment: rawResponse.authenticatorAttachment || undefined,
-            };
+          // response 객체를 명시적으로 정규화
+          // 모든 필드가 올바른 형식인지 확인
+          response = {
+            id: rawResponse.id,
+            rawId: rawResponse.rawId || rawResponse.id,
+            type: rawResponse.type || 'public-key',
+            response: {
+              clientDataJSON: rawResponse.response?.clientDataJSON,
+              authenticatorData: rawResponse.response?.authenticatorData,
+              signature: rawResponse.response?.signature,
+              userHandle: rawResponse.response?.userHandle || null,
+            },
+            clientExtensionResults: rawResponse.clientExtensionResults || {},
+            authenticatorAttachment: rawResponse.authenticatorAttachment || undefined,
+          };
+          
+          // 필수 필드 검증
+          if (!response.id && !response.rawId) {
+            throw new Error('response.id or response.rawId is required');
+          }
+          if (!response.response) {
+            throw new Error('response.response is required');
+          }
+          if (!response.response.clientDataJSON) {
+            throw new Error('response.response.clientDataJSON is required');
+          }
+          if (!response.response.authenticatorData) {
+            throw new Error('response.response.authenticatorData is required');
+          }
+          if (!response.response.signature) {
+            throw new Error('response.response.signature is required');
           }
         } catch (error: any) {
           console.error('[WebAuthn] Response normalization error:', {
             error: error.message,
             rawResponseKeys: Object.keys(rawResponse || {}),
             rawResponseType: typeof rawResponse,
+            rawResponseString: JSON.stringify(rawResponse, (key, value) => {
+              if (value instanceof ArrayBuffer || value instanceof Uint8Array) {
+                return `[${value.constructor.name}: ${value.byteLength || value.length} bytes]`;
+              }
+              return value;
+            }, 2),
           });
           throw new TRPCError({
             code: "BAD_REQUEST",

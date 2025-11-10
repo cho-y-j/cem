@@ -650,19 +650,51 @@ export default function WorkerMain() {
             console.log('[BiometricCheckIn] Authentication response received:', {
               hasRawId: !!authResponse.rawId,
               rawIdType: typeof authResponse.rawId,
+              rawIdIsArrayBuffer: authResponse.rawId instanceof ArrayBuffer,
+              rawIdIsUint8Array: authResponse.rawId instanceof Uint8Array,
               hasId: !!authResponse.id,
               hasResponse: !!authResponse.response,
+              responseClientDataJSONType: typeof authResponse.response?.clientDataJSON,
+              responseClientDataJSONIsArrayBuffer: authResponse.response?.clientDataJSON instanceof ArrayBuffer,
+              responseClientDataJSONIsUint8Array: authResponse.response?.clientDataJSON instanceof Uint8Array,
               type: authResponse.type,
             });
 
             // 4. 서버 검증
-            // @simplewebauthn/browser의 startAuthentication은 이미 JSON 형식으로 변환된 객체를 반환
-            // BiometricSetup.tsx와 동일하게 그대로 전달
+            // @simplewebauthn/browser의 startAuthentication은 이미 JSON 직렬화 가능한 객체를 반환하지만,
+            // ArrayBuffer/Uint8Array가 포함되어 있을 수 있으므로 명시적으로 변환
+            // BiometricSetup.tsx와 동일한 패턴 사용
+            console.log('[BiometricCheckIn] Preparing response for server...');
+            
+            // response 객체를 명시적으로 정규화
+            // @simplewebauthn/browser는 이미 base64url 문자열로 변환하지만, 안전성을 위해 재확인
+            const normalizedResponse = {
+              id: authResponse.id,
+              rawId: authResponse.rawId,
+              type: authResponse.type || 'public-key',
+              response: {
+                clientDataJSON: authResponse.response?.clientDataJSON,
+                authenticatorData: authResponse.response?.authenticatorData,
+                signature: authResponse.response?.signature,
+                userHandle: authResponse.response?.userHandle || null,
+              },
+              clientExtensionResults: authResponse.clientExtensionResults || {},
+              authenticatorAttachment: authResponse.authenticatorAttachment || undefined,
+            };
+            
+            console.log('[BiometricCheckIn] Normalized response:', {
+              hasId: !!normalizedResponse.id,
+              hasRawId: !!normalizedResponse.rawId,
+              rawIdType: typeof normalizedResponse.rawId,
+              hasResponse: !!normalizedResponse.response,
+              responseKeys: Object.keys(normalizedResponse.response || {}),
+            });
+            
             console.log('[BiometricCheckIn] Sending to server for verification...');
             let authResult;
             try {
               authResult = await trpc.webauthn.verifyAuthentication.mutate({
-                response: authResponse,
+                response: normalizedResponse,
               });
             } catch (error: any) {
               console.error('[BiometricCheckIn] verifyAuthentication error:', {
