@@ -197,3 +197,4 @@ CREATE POLICY "Users can manage driver record items" ON driver_inspection_record
 
 
 
+

@@ -3235,15 +3235,31 @@ export async function getAllActiveLocations(filters?: {
     }
   });
 
-  // deployment 정보 추가 조회 (배치로 처리)
-  const result = Array.from(latestByWorker.values());
+  // worker와 equipment 정보를 location 객체에 매핑
+  const result = Array.from(latestByWorker.values()).map((loc: any) => {
+    const mappedLoc = { ...loc };
+    
+    // worker 정보 매핑
+    if (loc.worker_id && workerMap.has(loc.worker_id)) {
+      mappedLoc.workers = workerMap.get(loc.worker_id);
+    }
+    
+    // equipment 정보 매핑
+    if (loc.equipment_id && equipmentMap.has(loc.equipment_id)) {
+      mappedLoc.equipment = equipmentMap.get(loc.equipment_id);
+    }
+    
+    return mappedLoc;
+  });
+  
   const resultEquipmentIds = result.map((loc: any) => loc.equipment_id).filter(Boolean);
+  const resultWorkerIds = result.map((loc: any) => loc.worker_id).filter(Boolean);
   
   if (resultEquipmentIds.length > 0) {
-    // 모든 활성 deployment 조회
+    // 모든 활성 deployment 조회 (worker_id도 함께 조회)
     const { data: deployments } = await supabase
       .from('deployments')
-      .select('id, equipment_id, bp_company_id, ep_company_id')
+      .select('id, equipment_id, worker_id, bp_company_id, ep_company_id')
       .in('equipment_id', resultEquipmentIds)
       .eq('status', 'active');
 
