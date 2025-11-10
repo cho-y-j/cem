@@ -593,13 +593,33 @@ export const webauthnRouter = router({
         console.log(`[WebAuthn] Verifying authentication for user ${user.id}`, {
           elapsedTime: Math.round(elapsedTime / 1000) + '초',
           challengeAge: Math.round(elapsedTime / 1000) + '초 전 생성',
+          expectedChallenge: expectedChallenge.substring(0, 20) + '...',
+          RP_ID,
+          ORIGIN,
         });
 
         const response = input.response as AuthenticationResponseJSON;
+        
+        console.log('[WebAuthn] Authentication response received:', {
+          hasRawId: !!response.rawId,
+          rawIdType: typeof response.rawId,
+          hasId: !!response.id,
+          hasResponse: !!response.response,
+          hasClientExtensionResults: !!response.clientExtensionResults,
+          type: response.type,
+        });
 
         // rawId 검증
-        if (!response.rawId) {
-          console.error('[WebAuthn] response.rawId is undefined:', response);
+        if (!response.rawId && !response.id) {
+          console.error('[WebAuthn] response.rawId and response.id are both undefined:', {
+            responseKeys: Object.keys(response),
+            response: JSON.stringify(response, (key, value) => {
+              if (value instanceof ArrayBuffer || value instanceof Uint8Array) {
+                return `[${value.constructor.name}: ${value.byteLength || value.length} bytes]`;
+              }
+              return value;
+            }),
+          });
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "인증 응답에 크레덴셜 ID가 없습니다.",
@@ -607,18 +627,27 @@ export const webauthnRouter = router({
         }
 
         // 크레덴셜 조회
-        // rawId는 base64url로 인코딩된 문자열이거나 ArrayBuffer일 수 있음
+        // rawId 또는 id를 사용 (브라우저에 따라 다를 수 있음)
+        const rawIdSource = response.rawId || response.id;
+        
         let credentialIdBase64: string;
-        if (typeof response.rawId === 'string') {
-          credentialIdBase64 = response.rawId;
-        } else if (response.rawId instanceof ArrayBuffer) {
-          credentialIdBase64 = Buffer.from(response.rawId).toString('base64url');
-        } else if (response.rawId instanceof Uint8Array) {
-          credentialIdBase64 = Buffer.from(response.rawId).toString('base64url');
+        if (typeof rawIdSource === 'string') {
+          credentialIdBase64 = rawIdSource;
+        } else if (rawIdSource instanceof ArrayBuffer) {
+          credentialIdBase64 = Buffer.from(rawIdSource).toString('base64url');
+        } else if (rawIdSource instanceof Uint8Array) {
+          credentialIdBase64 = Buffer.from(rawIdSource).toString('base64url');
         } else {
           // 이미 base64url 문자열로 가정
-          credentialIdBase64 = Buffer.from(response.rawId as any, 'base64url').toString('base64url');
+          credentialIdBase64 = Buffer.from(rawIdSource as any, 'base64url').toString('base64url');
         }
+        
+        console.log('[WebAuthn] Credential ID extracted:', {
+          rawIdType: typeof response.rawId,
+          idType: typeof response.id,
+          credentialIdBase64Length: credentialIdBase64.length,
+          credentialIdBase64Preview: credentialIdBase64.substring(0, 20) + '...',
+        });
         const supabase = db.getSupabase();
         const { data: credential, error: credError } = await supabase
           .from('webauthn_credentials')
@@ -637,6 +666,16 @@ export const webauthnRouter = router({
         // 인증 응답 검증
         let verification: VerifiedAuthenticationResponse;
         try {
+          console.log('[WebAuthn] Starting verification with:', {
+            expectedChallengeLength: expectedChallenge.length,
+            expectedChallengePreview: expectedChallenge.substring(0, 20) + '...',
+            expectedOrigin: ORIGIN,
+            expectedRPID: RP_ID,
+            credentialIdLength: credential.id.length,
+            credentialPublicKeyLength: credential.public_key.length,
+            counter: credential.counter,
+          });
+          
           verification = await verifyAuthenticationResponse({
             response,
             expectedChallenge,
@@ -649,11 +688,40 @@ export const webauthnRouter = router({
             },
             requireUserVerification: true,
           });
+          
+          console.log('[WebAuthn] Verification result:', {
+            verified: verification.verified,
+            hasAuthenticationInfo: !!verification.authenticationInfo,
+            newCounter: verification.authenticationInfo?.newCounter,
+          });
         } catch (error: any) {
-          console.error('[WebAuthn] Authentication verification failed:', error);
+          console.error('[WebAuthn] Authentication verification failed:', {
+            errorMessage: error.message,
+            errorName: error.name,
+            errorStack: error.stack,
+            expectedOrigin: ORIGIN,
+            expectedRPID: RP_ID,
+            responseOrigin: (response as any).clientExtensionResults,
+            responseType: response.type,
+          });
+          
+          // 더 구체적인 에러 메시지 제공
+          let errorMessage = `인증 검증 실패: ${error.message}`;
+          if (error.message?.includes('origin') || error.message?.includes('Origin')) {
+            errorMessage += `\n현재 설정된 ORIGIN: ${ORIGIN}`;
+            errorMessage += `\n브라우저에서 요청한 ORIGIN과 일치하지 않습니다.`;
+          }
+          if (error.message?.includes('rpId') || error.message?.includes('RP ID') || error.message?.includes('rpId')) {
+            errorMessage += `\n현재 설정된 RP_ID: ${RP_ID}`;
+            errorMessage += `\n브라우저에서 요청한 RP_ID와 일치하지 않습니다.`;
+          }
+          if (error.message?.includes('challenge') || error.message?.includes('Challenge')) {
+            errorMessage += `\n챌린지가 일치하지 않습니다. 시간이 지나 만료되었을 수 있습니다.`;
+          }
+          
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: `인증 검증 실패: ${error.message}`,
+            message: errorMessage,
           });
         }
 
