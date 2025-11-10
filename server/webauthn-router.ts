@@ -601,20 +601,41 @@ export const webauthnRouter = router({
         // response 객체 검증 및 정규화
         const rawResponse = input.response;
         
-        // AuthenticationResponseJSON 형식으로 변환
-        const response: AuthenticationResponseJSON = {
-          id: rawResponse.id,
-          rawId: rawResponse.rawId || rawResponse.id,
-          type: rawResponse.type || 'public-key',
-          response: {
-            clientDataJSON: rawResponse.response?.clientDataJSON || rawResponse.response?.clientDataJSON,
-            authenticatorData: rawResponse.response?.authenticatorData || rawResponse.response?.authenticatorData,
-            signature: rawResponse.response?.signature || rawResponse.response?.signature,
-            userHandle: rawResponse.response?.userHandle || rawResponse.response?.userHandle || null,
-          },
-          clientExtensionResults: rawResponse.clientExtensionResults || {},
-          authenticatorAttachment: rawResponse.authenticatorAttachment || undefined,
-        };
+        // rawResponse가 이미 올바른 형식인지 확인
+        // @simplewebauthn/browser는 이미 JSON 직렬화 가능한 객체를 반환
+        let response: AuthenticationResponseJSON;
+        
+        try {
+          // 이미 올바른 형식인 경우 그대로 사용
+          if (rawResponse && typeof rawResponse === 'object' && rawResponse.id && rawResponse.response) {
+            response = rawResponse as AuthenticationResponseJSON;
+          } else {
+            // 형식이 맞지 않는 경우 재구성
+            response = {
+              id: rawResponse.id,
+              rawId: rawResponse.rawId || rawResponse.id,
+              type: rawResponse.type || 'public-key',
+              response: {
+                clientDataJSON: rawResponse.response?.clientDataJSON,
+                authenticatorData: rawResponse.response?.authenticatorData,
+                signature: rawResponse.response?.signature,
+                userHandle: rawResponse.response?.userHandle || null,
+              },
+              clientExtensionResults: rawResponse.clientExtensionResults || {},
+              authenticatorAttachment: rawResponse.authenticatorAttachment || undefined,
+            };
+          }
+        } catch (error: any) {
+          console.error('[WebAuthn] Response normalization error:', {
+            error: error.message,
+            rawResponseKeys: Object.keys(rawResponse || {}),
+            rawResponseType: typeof rawResponse,
+          });
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `인증 응답 형식이 올바르지 않습니다: ${error.message}`,
+          });
+        }
         
         console.log('[WebAuthn] Authentication response received:', {
           hasRawId: !!response.rawId,
