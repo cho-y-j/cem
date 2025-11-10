@@ -586,10 +586,30 @@ export default function WorkerMain() {
             // 2. 인증 챌린지 가져오기
             let authOptions;
             try {
+              console.log('[BiometricCheckIn] Requesting authentication challenge...');
               authOptions = await utils.webauthn.generateAuthenticationChallenge.fetch();
+              console.log('[BiometricCheckIn] Challenge received:', {
+                hasChallenge: !!authOptions.challenge,
+                rpId: authOptions.rpId,
+                allowCredentials: authOptions.allowCredentials?.length || 0,
+              });
             } catch (error: any) {
-              console.error('[BiometricCheckIn] Challenge generation error:', error);
-              toast.error(`인증 챌린지 생성 실패: ${error.message || '알 수 없는 오류'}`);
+              console.error('[BiometricCheckIn] Challenge generation error:', {
+                errorMessage: error.message,
+                errorData: error.data,
+                errorCode: error.code,
+                errorStack: error.stack,
+                errorShape: error.shape,
+              });
+              
+              // 에러 메시지에 따라 다른 메시지 표시
+              if (error.data?.code === 'NOT_FOUND') {
+                toast.error("등록된 생체 인증이 없습니다. 먼저 생체 인증을 등록해주세요.");
+              } else if (error.data?.code === 'INTERNAL_SERVER_ERROR') {
+                toast.error(`서버 오류: ${error.message || '알 수 없는 오류'}`);
+              } else {
+                toast.error(`인증 챌린지 생성 실패: ${error.message || '알 수 없는 오류'}`);
+              }
               return; // 에러 발생 시 출근 기록 생성하지 않음
             }
 

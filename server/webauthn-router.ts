@@ -426,6 +426,12 @@ export const webauthnRouter = router({
       try {
         const user = ctx.user;
 
+        console.log('[WebAuthn] Generating authentication challenge for user:', {
+          userId: user.id,
+          userEmail: user.email,
+          userName: user.name,
+        });
+
         // 사용자의 등록된 크레덴셜 조회
         const supabase = db.getSupabase();
         const { data: credentials, error } = await supabase
@@ -434,13 +440,28 @@ export const webauthnRouter = router({
           .eq('user_id', user.id);
 
         if (error) {
+          console.error('[WebAuthn] Error fetching credentials:', {
+            error: error.message,
+            errorCode: error.code,
+            errorDetails: error.details,
+            userId: user.id,
+          });
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "크레덴셜 조회에 실패했습니다.",
+            message: `크레덴셜 조회에 실패했습니다: ${error.message || '알 수 없는 오류'}`,
           });
         }
 
+        console.log('[WebAuthn] Credentials fetched:', {
+          count: credentials?.length || 0,
+          userId: user.id,
+        });
+
         if (!credentials || credentials.length === 0) {
+          console.warn('[WebAuthn] No credentials found for user:', {
+            userId: user.id,
+            userEmail: user.email,
+          });
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "등록된 생체 인증이 없습니다. 먼저 생체 인증을 등록해주세요.",
@@ -512,13 +533,29 @@ export const webauthnRouter = router({
         // 하지만 보안을 위해 특정 크레덴셜만 허용하는 것이 좋음
         // 문제: generateAuthenticationOptions 내부 검증에서 Uint8Array를 문자열로 처리하려고 시도
         // 해결: allowCredentials를 전달하지 않고, verifyAuthentication에서 크레덴셜 검증
-        const options = await generateAuthenticationOptions({
-          rpID: RP_ID,
-          timeout: CHALLENGE_TIMEOUT,
-          // allowCredentials를 전달하지 않으면 모든 크레덴셜 허용 (보안상 좋지 않지만 작동함)
-          // allowCredentials, // 일시적으로 주석 처리하여 테스트
-          userVerification: 'required',
-        });
+        let options;
+        try {
+          options = await generateAuthenticationOptions({
+            rpID: RP_ID,
+            timeout: CHALLENGE_TIMEOUT,
+            // allowCredentials를 전달하지 않으면 모든 크레덴셜 허용 (보안상 좋지 않지만 작동함)
+            // allowCredentials, // 일시적으로 주석 처리하여 테스트
+            userVerification: 'required',
+          });
+        } catch (error: any) {
+          console.error('[WebAuthn] generateAuthenticationOptions error:', {
+            error: error.message,
+            errorStack: error.stack,
+            errorName: error.name,
+            rpID: RP_ID,
+            ORIGIN: ORIGIN,
+            credentialsCount: credentials.length,
+          });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `인증 옵션 생성 실패: ${error.message || '알 수 없는 오류'}`,
+          });
+        }
         
         console.log('[WebAuthn] Authentication options generated:', {
           challenge: options.challenge,
