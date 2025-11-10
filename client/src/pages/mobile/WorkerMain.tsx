@@ -100,11 +100,31 @@ export default function WorkerMain() {
   }, []);
 
   // 배정된 장비 조회
-  const { data: assignedEquipment, isLoading: isLoadingEquipment } = trpc.mobile.worker.getMyAssignedEquipment.useQuery();
-
+  const { 
+    data: assignedEquipment, 
+    isLoading: isLoadingEquipment,
+    error: equipmentError 
+  } = trpc.mobile.worker.getMyAssignedEquipment.useQuery(undefined, {
+    enabled: !!user && user.role === "worker",
+    retry: false,
+    onError: (error) => {
+      console.error('[WorkerMain] Equipment query error:', error);
+      toast.error("장비 정보를 불러오는 중 오류가 발생했습니다.");
+    },
+  });
 
   // 현재 투입 정보 조회 (BP사 정보 포함)
-  const { data: currentDeployment } = trpc.mobile.worker.getCurrentDeployment.useQuery();
+  const { 
+    data: currentDeployment,
+    error: deploymentError 
+  } = trpc.mobile.worker.getCurrentDeployment.useQuery(undefined, {
+    enabled: !!user && user.role === "worker",
+    retry: false,
+    onError: (error) => {
+      console.error('[WorkerMain] Deployment query error:', error);
+      // deployment 에러는 조용히 처리 (장비가 없을 수도 있음)
+    },
+  });
 
   // 디버깅: 장비 및 투입 정보 로그
   useEffect(() => {
@@ -114,11 +134,33 @@ export default function WorkerMain() {
   }, [user, assignedEquipment, currentDeployment]);
 
   // 현재 작업 세션 조회
-  const { data: currentSession, refetch: refetchSession, isLoading: isLoadingSession } =
-    trpc.mobile.worker.getCurrentSession.useQuery();
+  const { 
+    data: currentSession, 
+    refetch: refetchSession, 
+    isLoading: isLoadingSession,
+    error: sessionError 
+  } = trpc.mobile.worker.getCurrentSession.useQuery(undefined, {
+    enabled: !!user && user.role === "worker",
+    retry: false,
+    onError: (error) => {
+      console.error('[WorkerMain] Session query error:', error);
+      // 세션 에러는 조용히 처리 (세션이 없을 수도 있음)
+    },
+  });
 
   // 오늘 출근 상태 조회
-  const { data: todayCheckInStatus, refetch: refetchCheckIn } = trpc.checkIn.getTodayStatus.useQuery();
+  const { 
+    data: todayCheckInStatus, 
+    refetch: refetchCheckIn,
+    error: checkInError 
+  } = trpc.checkIn.getTodayStatus.useQuery(undefined, {
+    enabled: !!user && user.role === "worker",
+    retry: false,
+    onError: (error) => {
+      console.error('[WorkerMain] Check-in status query error:', error);
+      // 출근 상태 에러는 조용히 처리
+    },
+  });
 
   // 출근 시간 포맷팅 (클라이언트에서만)
   useEffect(() => {
@@ -619,6 +661,24 @@ export default function WorkerMain() {
       <MobileLayout title="장비 운전자" showMenu={false}>
         <div className="flex items-center justify-center h-screen">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MobileLayout>
+    );
+  }
+
+  // 에러 발생 시 처리
+  if (equipmentError) {
+    return (
+      <MobileLayout title="장비 운전자" showMenu={false}>
+        <div className="flex flex-col items-center justify-center h-screen p-4">
+          <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-lg font-bold mb-2">오류가 발생했습니다</h2>
+          <p className="text-sm text-gray-600 text-center mb-4">
+            {equipmentError.message || "장비 정보를 불러올 수 없습니다."}
+          </p>
+          <Button onClick={() => window.location.reload()}>
+            새로고침
+          </Button>
         </div>
       </MobileLayout>
     );
