@@ -492,7 +492,7 @@ export default function WorkZones() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 w-full max-w-7xl mx-auto">
+      <div className="space-y-6 w-full max-w-7xl mx-auto px-4">
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
@@ -636,7 +636,7 @@ export default function WorkZones() {
 
         {/* 작업 구역 생성/수정 다이얼로그 */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-5xl w-[90vw] max-h-[90vh] flex flex-col">
+          <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>
                 {editingZone ? "작업 구역 수정" : "새 작업 구역 생성"}
