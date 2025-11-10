@@ -494,14 +494,14 @@ export default function WorkZones() {
     <DashboardLayout>
       <div className="space-y-6 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* 헤더 */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">작업 구역 관리</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">작업 구역 관리</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
               GPS 기반 출근 체크를 위한 작업 구역을 설정합니다
             </p>
           </div>
-          <Button onClick={() => openDialog()}>
+          <Button onClick={() => openDialog()} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             새 작업 구역
           </Button>
@@ -682,7 +682,7 @@ export default function WorkZones() {
               </div>
 
               {/* 기본 정보 */}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name">구역 이름 *</Label>
                   <Input
@@ -781,7 +781,7 @@ export default function WorkZones() {
                   </div>
                 </div>
                 <div 
-                  className="h-[450px] border rounded-lg overflow-hidden relative"
+                  className="h-[400px] sm:h-[450px] lg:h-[500px] border rounded-lg overflow-hidden relative"
                   style={{ cursor: isDrawingMode ? 'crosshair' : 'default' }}
                 >
                   {GOOGLE_MAPS_API_KEY ? (
