@@ -3366,14 +3366,22 @@ export async function getAllActiveLocations(filters?: {
   console.log('[getAllActiveLocations] 최종 개수:', result.length);
   if (result.length > 0) {
     console.log('[getAllActiveLocations] 최종 샘플 (처음 3개):', result.slice(0, 3).map((loc: any) => ({
-      workerId: loc.workerId,
-      workerName: loc.workers?.name,
-      equipmentId: loc.equipmentId,
-      equipmentRegNum: loc.equipment?.regNum,
-      loggedAt: loc.loggedAt,
+      workerId: loc.worker_id || loc.workerId,
+      workerName: loc.workers?.name || loc.worker?.name || 'N/A',
+      equipmentId: loc.equipment_id || loc.equipmentId,
+      equipmentRegNum: loc.equipment?.reg_num || loc.equipment?.regNum || 'N/A',
+      equipmentTypeName: loc.equipment?.equip_types?.name || loc.equipment?.equipTypes?.name || 'N/A',
+      loggedAt: loc.logged_at || loc.loggedAt,
       hasDeployment: !!loc.deployment,
-      deploymentEpCompanyId: loc.deployment?.epCompanyId,
+      deploymentWorkerName: loc.deployment?.worker?.name || 'N/A',
+      deploymentEquipmentRegNum: loc.deployment?.equipment?.reg_num || loc.deployment?.equipment?.regNum || 'N/A',
+      deploymentEpCompanyId: loc.deployment?.ep_company_id || loc.deployment?.epCompanyId,
     })));
+    
+    // 상세 디버깅: 첫 번째 location의 전체 구조
+    if (result.length > 0) {
+      console.log('[getAllActiveLocations] 첫 번째 location 상세 구조:', JSON.stringify(result[0], null, 2));
+    }
   }
   
   return toCamelCaseArray(result);
