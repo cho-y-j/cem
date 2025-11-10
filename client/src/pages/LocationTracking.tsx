@@ -155,9 +155,14 @@ export default function LocationTracking() {
     const ownerCompanyName = deployment?.equipment?.ownerCompanies?.name || "";
     const bpCompanyName = deployment?.bpCompanies?.name || "";
     const epCompanyName = deployment?.epCompanies?.name || "";
-    const equipmentTypeName = loc.equipment?.equip_types?.name || "미지정";
-    const workerName = loc.workers?.name || "Unknown";
-    const vehicleNumber = loc.equipment?.reg_num || "미배정";
+    
+    // worker 정보: deployment의 worker 또는 location의 workers
+    const workerName = deployment?.worker?.name || loc.workers?.name || loc.worker?.name || "미배정";
+    
+    // equipment 정보: deployment의 equipment 또는 location의 equipment
+    const equipment = deployment?.equipment || loc.equipment;
+    const vehicleNumber = equipment?.reg_num || equipment?.regNum || "미배정";
+    const equipmentTypeName = equipment?.equip_types?.name || equipment?.equipTypes?.name || "미지정";
     
     return {
       id: loc.id,
@@ -169,18 +174,19 @@ export default function LocationTracking() {
       workerName,
       vehicleNumber,
       equipmentTypeName,
-      equipmentTypeId: loc.equipment?.equip_type_id,
-      workerId: loc.worker_id,
+      equipmentTypeId: equipment?.equip_type_id || equipment?.equipTypeId,
+      workerId: loc.worker_id || loc.workerId,
       info: `
         <div style="min-width: 200px;">
           <h3 style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">${workerName}</h3>
           <div style="font-size: 14px; line-height: 1.6;">
+            <p><strong>운전자:</strong> ${workerName}</p>
             <p><strong>차량번호:</strong> ${vehicleNumber}</p>
             <p><strong>차종:</strong> ${equipmentTypeName}</p>
             ${ownerCompanyName ? `<p><strong>오너사:</strong> ${ownerCompanyName}</p>` : ""}
             ${bpCompanyName ? `<p><strong>BP:</strong> ${bpCompanyName}</p>` : ""}
             ${epCompanyName ? `<p><strong>EP:</strong> ${epCompanyName}</p>` : ""}
-            <p><strong>시간:</strong> ${new Date(loc.logged_at).toLocaleString("ko-KR")}</p>
+            <p><strong>시간:</strong> ${new Date(loc.logged_at || loc.loggedAt).toLocaleString("ko-KR")}</p>
             <p><strong>정확도:</strong> ${loc.accuracy ? `${Math.round(parseFloat(loc.accuracy))}m` : "N/A"}</p>
           </div>
         </div>
