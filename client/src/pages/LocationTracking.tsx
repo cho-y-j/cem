@@ -273,21 +273,7 @@ export default function LocationTracking() {
     };
   }) || [];
 
-  // 마커 아이콘 캐싱 (간단한 객체 캐시 사용)
-  const iconCacheRef = useRef<Map<string, any>>(new Map());
-  
-  // 마커가 변경될 때 캐시 업데이트
-  useEffect(() => {
-    if (typeof google === 'undefined' || !google.maps) {
-      return;
-    }
-    markers.forEach((marker) => {
-      if (!iconCacheRef.current.has(marker.iconKey)) {
-        const icon = createMarkerIcon(marker.workStatus, marker.equipmentTypeId);
-        iconCacheRef.current.set(marker.iconKey, icon);
-      }
-    });
-  }, [markers]);
+  // 아이콘 캐싱 제거 - 매번 생성 (성능 문제 없음)
 
   // 필터 초기화
   const clearFilters = () => {
@@ -617,12 +603,10 @@ export default function LocationTracking() {
                   style={{ width: "100%", height: "100%" }}
                 >
                   {markers.map((marker) => {
-                    // 캐시된 아이콘 사용 (없으면 생성)
-                    let icon = iconCacheRef.current.get(marker.iconKey);
-                    if (!icon && typeof google !== 'undefined' && google.maps) {
-                      icon = createMarkerIcon(marker.workStatus, marker.equipmentTypeId);
-                      iconCacheRef.current.set(marker.iconKey, icon);
-                    }
+                    // 아이콘 직접 생성 (캐싱 없이)
+                    const icon = typeof google !== 'undefined' && google.maps
+                      ? createMarkerIcon(marker.workStatus, marker.equipmentTypeId)
+                      : undefined;
                     
                     return (
                       <Marker
