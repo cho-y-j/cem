@@ -603,7 +603,29 @@ export default function WorkerMain() {
               userVerification: authOptions.userVerification,
             });
             
-            const authResponse = await startAuthentication(authOptions);
+            let authResponse;
+            try {
+              authResponse = await startAuthentication(authOptions);
+            } catch (error: any) {
+              console.error('[BiometricCheckIn] startAuthentication error:', {
+                errorName: error.name,
+                errorMessage: error.message,
+                errorStack: error.stack,
+              });
+              
+              if (error.name === 'NotAllowedError') {
+                toast.error("생체 인증이 취소되었습니다.");
+              } else if (error.name === 'InvalidStateError') {
+                toast.error("생체 인증이 이미 사용 중입니다. 잠시 후 다시 시도해주세요.");
+              } else if (error.name === 'NotSupportedError') {
+                toast.error("이 기기는 생체 인증을 지원하지 않습니다.");
+              } else if (error.name === 'SecurityError') {
+                toast.error("보안 오류가 발생했습니다. HTTPS 연결을 확인해주세요.");
+              } else {
+                toast.error(`생체 인증 실패: ${error.message || error.name || '알 수 없는 오류'}`);
+              }
+              return;
+            }
             
             console.log('[BiometricCheckIn] Authentication response received:', {
               hasRawId: !!authResponse.rawId,
@@ -615,9 +637,23 @@ export default function WorkerMain() {
 
             // 4. 서버 검증
             console.log('[BiometricCheckIn] Sending to server for verification...');
-            const authResult = await trpc.webauthn.verifyAuthentication.mutate({
-              response: authResponse,
-            });
+            let authResult;
+            try {
+              authResult = await trpc.webauthn.verifyAuthentication.mutate({
+                response: authResponse,
+              });
+            } catch (error: any) {
+              console.error('[BiometricCheckIn] verifyAuthentication error:', {
+                errorMessage: error.message,
+                errorData: error.data,
+                errorCode: error.code,
+                errorStack: error.stack,
+              });
+              
+              // 서버 에러 메시지를 그대로 표시
+              toast.error(error.message || "인증 검증에 실패했습니다.");
+              return;
+            }
             
             console.log('[BiometricCheckIn] Verification result:', {
               verified: authResult.verified,
