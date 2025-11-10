@@ -550,6 +550,45 @@ export default function LocationTracking() {
         </CardHeader>
         <CardContent>
           <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
+            {/* 작업 상태별 색상 범례 - 지도 위 오버레이 */}
+            <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 bg-gradient-to-br from-white to-gray-50 backdrop-blur-md p-4 rounded-lg border-2 border-gray-200 shadow-xl max-w-[200px]">
+              <div className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                마커 범례
+              </div>
+              <div className="flex flex-col gap-2 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{ backgroundColor: "#10B981" }}></div>
+                  <span className="text-gray-700 font-medium">🟢 작업중</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{ backgroundColor: "#F59E0B" }}></div>
+                  <span className="text-gray-700 font-medium">🟡 휴식중</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{ backgroundColor: "#3B82F6" }}></div>
+                  <span className="text-gray-700 font-medium">🔵 연장작업</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{ backgroundColor: "#9CA3AF" }}></div>
+                  <span className="text-gray-700 font-medium">⚪ 작업종료</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0" style={{ backgroundColor: "#6B7280" }}></div>
+                  <span className="text-gray-700 font-medium">⚫ 상태없음</span>
+                </div>
+              </div>
+              <div className="text-xs text-gray-600 mt-3 pt-3 border-t border-gray-200">
+                <div className="font-semibold text-gray-800 mb-1.5 flex items-center gap-1">
+                  <span>💡</span>
+                  <span>참고</span>
+                </div>
+                <div className="text-gray-600 leading-relaxed space-y-1">
+                  <div>• <strong>색상</strong>: 작업 상태</div>
+                  <div>• <strong>모양</strong>: 차종 구분</div>
+                </div>
+              </div>
+            </div>
             {GOOGLE_MAPS_API_KEY ? (
               <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
                 <Map

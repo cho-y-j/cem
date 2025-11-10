@@ -2990,9 +2990,11 @@ export async function getAllActiveLocations(filters?: {
     
     if (role === 'owner') {
       // Owner: 자신의 회사 장비/인력만
-      if (filters.userCompanyId) {
-        query = query.or(`workers.owner_company_id.eq.${filters.userCompanyId},equipment.owner_company_id.eq.${filters.userCompanyId}`);
-      }
+      // Owner의 경우 userCompanyId는 company ID입니다 (check-in-router.ts 참고)
+      // equipment의 owner_company_id로 필터링해야 하므로, 
+      // 먼저 모든 location_logs를 가져온 후 equipment 정보로 필터링합니다
+      console.log('[getAllActiveLocations] Owner 필터링 시작 - userCompanyId:', filters.userCompanyId);
+      // 필터링은 equipment 정보 조회 후 클라이언트 사이드에서 처리
     } else if (role === 'ep') {
       // EP: 본인 회사에 투입된 장비만 (deployment에서 확인)
       if (filters.userCompanyId) {
@@ -3236,7 +3238,7 @@ export async function getAllActiveLocations(filters?: {
   });
 
   // worker와 equipment 정보를 location 객체에 매핑
-  const result = Array.from(latestByWorker.values()).map((loc: any) => {
+  let result = Array.from(latestByWorker.values()).map((loc: any) => {
     const mappedLoc = { ...loc };
     
     // worker 정보 매핑
@@ -3251,6 +3253,28 @@ export async function getAllActiveLocations(filters?: {
     
     return mappedLoc;
   });
+  
+  // Owner 권한 필터링 (equipment 정보가 매핑된 후)
+  if (filters?.userRole?.toLowerCase() === 'owner' && filters.userCompanyId) {
+    result = result.filter((loc: any) => {
+      const equipment = loc.equipment;
+      if (equipment) {
+        const ownerCompanyId = equipment.owner_company_id || equipment.ownerCompanyId;
+        const matches = ownerCompanyId === filters.userCompanyId;
+        if (!matches) {
+          console.log('[getAllActiveLocations] Owner 필터링 - 불일치:', {
+            equipmentId: loc.equipment_id,
+            equipmentOwnerCompanyId: ownerCompanyId,
+            userCompanyId: filters.userCompanyId,
+          });
+        }
+        return matches;
+      }
+      console.log('[getAllActiveLocations] Owner 필터링 - equipment 정보 없음:', loc.equipment_id);
+      return false;
+    });
+    console.log('[getAllActiveLocations] Owner 필터링 후 개수:', result.length);
+  }
   
   const resultEquipmentIds = result.map((loc: any) => loc.equipment_id).filter(Boolean);
   const resultWorkerIds = result.map((loc: any) => loc.worker_id).filter(Boolean);
