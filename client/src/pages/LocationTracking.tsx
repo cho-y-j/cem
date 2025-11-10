@@ -13,42 +13,63 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
-// 차종별 색상 팔레트 (차종 ID 기반으로 색상 할당)
-const MARKER_COLORS = [
-  "#3B82F6", // 파란색
-  "#EF4444", // 빨간색
-  "#10B981", // 초록색
-  "#F59E0B", // 주황색
-  "#8B5CF6", // 보라색
-  "#EC4899", // 핑크색
-  "#06B6D4", // 청록색
-  "#84CC16", // 라임색
-  "#F97316", // 오렌지색
-  "#6366F1", // 인디고색
-  "#14B8A6", // 틸색
-  "#A855F7", // 바이올렛색
-  "#22C55E", // 그린색
-  "#F43F5E", // 로즈색
-  "#0EA5E9", // 스카이색
-];
+// 작업 상태별 색상
+const getStatusColor = (status: string | undefined): string => {
+  switch (status) {
+    case 'working':
+      return "#10B981"; // 초록색 (작업중)
+    case 'break':
+      return "#F59E0B"; // 노란색 (휴식중)
+    case 'overtime':
+      return "#3B82F6"; // 파란색 (연장작업)
+    case 'completed':
+      return "#9CA3AF"; // 회색 (작업종료)
+    default:
+      return "#6B7280"; // 회색 (상태 없음)
+  }
+};
 
-// 차종 ID를 기반으로 색상 반환
-const getMarkerColor = (equipmentTypeId: string | undefined): string => {
-  if (!equipmentTypeId) return "#9CA3AF"; // 회색 (차종 미지정)
+// 차종별 모양 (차종 ID 기반)
+const getMarkerShape = (equipmentTypeId: string | undefined): google.maps.SymbolPath => {
+  if (typeof google === 'undefined' || !google.maps) {
+    // 기본값 반환 (실제로는 사용되지 않음)
+    return 0 as google.maps.SymbolPath;
+  }
   
-  // 차종 ID를 숫자로 변환하여 색상 인덱스 결정
+  if (!equipmentTypeId) return google.maps.SymbolPath.CIRCLE;
+  
+  // 차종 ID를 숫자로 변환하여 모양 결정
   let hash = 0;
   for (let i = 0; i < equipmentTypeId.length; i++) {
     hash = equipmentTypeId.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % MARKER_COLORS.length;
-  return MARKER_COLORS[index];
+  const index = Math.abs(hash) % 4;
+  
+  switch (index) {
+    case 0:
+      return google.maps.SymbolPath.CIRCLE; // 원형
+    case 1:
+      return google.maps.SymbolPath.BACKWARD_CLOSED_ARROW; // 삼각형 (화살표)
+    case 2:
+      return google.maps.SymbolPath.FORWARD_CLOSED_ARROW; // 역삼각형
+    case 3:
+      return google.maps.SymbolPath.CIRCLE; // 원형 (다시)
+    default:
+      return google.maps.SymbolPath.CIRCLE;
+  }
 };
 
-// 마커 아이콘 생성 (차종별 색상)
-const createMarkerIcon = (color: string) => {
+// 마커 아이콘 생성 (작업 상태별 색상 + 차종별 모양)
+const createMarkerIcon = (status: string | undefined, equipmentTypeId: string | undefined) => {
+  if (typeof google === 'undefined' || !google.maps) {
+    return undefined;
+  }
+  
+  const color = getStatusColor(status);
+  const shape = getMarkerShape(equipmentTypeId);
+  
   return {
-    path: google.maps.SymbolPath.CIRCLE,
+    path: shape,
     scale: 10,
     fillColor: color,
     fillOpacity: 1,
@@ -209,8 +230,12 @@ export default function LocationTracking() {
     const equipmentTypeName = equipment?.equip_types?.name || equipment?.equipTypes?.name || "미지정";
     const equipmentTypeId = equipment?.equip_type_id || equipment?.equipTypeId;
     
-    // 차종별 색상 결정
-    const markerColor = getMarkerColor(equipmentTypeId);
+    // 작업 상태 정보
+    const workStatus = loc.workSession?.status || loc.work_session?.status;
+    const statusLabel = workStatus === 'working' ? '작업중' : 
+                       workStatus === 'break' ? '휴식중' : 
+                       workStatus === 'overtime' ? '연장작업' : 
+                       workStatus === 'completed' ? '작업종료' : '상태없음';
     
     return {
       id: loc.id,
@@ -223,7 +248,8 @@ export default function LocationTracking() {
       vehicleNumber,
       equipmentTypeName,
       equipmentTypeId,
-      markerColor,
+      workStatus,
+      statusLabel,
       workerId: loc.worker_id || loc.workerId,
       info: `
         <div style="min-width: 200px;">
@@ -232,10 +258,12 @@ export default function LocationTracking() {
             <p><strong>운전자:</strong> ${workerName}</p>
             <p><strong>차량번호:</strong> ${vehicleNumber}</p>
             <p><strong>차종:</strong> ${equipmentTypeName}</p>
+            <p><strong>작업상태:</strong> ${statusLabel}</p>
+            ${loc.checkInTime ? `<p><strong>출근:</strong> ${new Date(loc.checkInTime).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</p>` : ""}
+            <p><strong>마지막 업데이트:</strong> ${new Date(loc.logged_at || loc.loggedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</p>
             ${ownerCompanyName ? `<p><strong>오너사:</strong> ${ownerCompanyName}</p>` : ""}
             ${bpCompanyName ? `<p><strong>BP:</strong> ${bpCompanyName}</p>` : ""}
             ${epCompanyName ? `<p><strong>EP:</strong> ${epCompanyName}</p>` : ""}
-            <p><strong>시간:</strong> ${new Date(loc.logged_at || loc.loggedAt).toLocaleString("ko-KR")}</p>
             <p><strong>정확도:</strong> ${loc.accuracy ? `${Math.round(parseFloat(loc.accuracy))}m` : "N/A"}</p>
           </div>
         </div>
@@ -532,9 +560,9 @@ export default function LocationTracking() {
                   style={{ width: "100%", height: "100%" }}
                 >
                   {markers.map((marker) => {
-                    // 차종별 색상 아이콘 생성 (google.maps가 로드된 후에만)
+                    // 작업 상태별 색상 + 차종별 모양 아이콘 생성
                     const icon = typeof google !== 'undefined' && google.maps
-                      ? createMarkerIcon(marker.markerColor)
+                      ? createMarkerIcon(marker.workStatus, marker.equipmentTypeId)
                       : undefined;
                     
                     return (

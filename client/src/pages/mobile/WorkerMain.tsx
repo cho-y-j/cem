@@ -44,14 +44,14 @@ export default function WorkerMain() {
   }, [user, setLocation]);
 
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [locationInterval, setLocationInterval] = useState<NodeJS.Timeout | null>(null);
-  const [gpsIntervalMinutes, setGpsIntervalMinutes] = useState<number>(5); // 기본값: 5분
+  const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [emergencyDialogOpen, setEmergencyDialogOpen] = useState(false);
   const [emergencyType, setEmergencyType] = useState<string>("");
   const [emergencyDescription, setEmergencyDescription] = useState<string>("");
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState<string>("");
   const [isMounted, setIsMounted] = useState(false);
+  const [showPWAHint, setShowPWAHint] = useState(false);
 
   // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
   useEffect(() => {
@@ -84,21 +84,24 @@ export default function WorkerMain() {
     }
   }, []);
 
+  // PWA 안내 표시 여부 체크
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    // 이미 설치되어 있으면 안내 표시 안 함
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) return;
+    
+    // 한 번 본 적이 있으면 안내 표시 안 함
+    const hasSeenHint = localStorage.getItem('pwa-hint-seen');
+    if (hasSeenHint) return;
+    
+    setShowPWAHint(true);
+  }, []);
+
   // 배정된 장비 조회
   const { data: assignedEquipment, isLoading: isLoadingEquipment } = trpc.mobile.worker.getMyAssignedEquipment.useQuery();
 
-  // GPS 전송 간격 조회
-  const { data: gpsIntervalData } = trpc.system.getGpsInterval.useQuery(undefined, {
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
-  });
-
-  // GPS 전송 간격 설정
-  useEffect(() => {
-    if (gpsIntervalData?.intervalMinutes) {
-      setGpsIntervalMinutes(gpsIntervalData.intervalMinutes);
-    }
-  }, [gpsIntervalData]);
 
   // 현재 투입 정보 조회 (BP사 정보 포함)
   const { data: currentDeployment } = trpc.mobile.worker.getCurrentDeployment.useQuery();
@@ -147,11 +150,11 @@ export default function WorkerMain() {
     onSuccess: () => {
       toast.success("작업이 시작되었습니다.");
       refetchSession();
-      // GPS 위치 전송 시작
+      // 즉시 위치 전송
       if (assignedEquipment) {
         toast.info("GPS로 현위치가 전송됩니다.");
+        sendLocationOnce();
       }
-      startLocationTracking();
     },
     onError: (error) => {
       toast.error("작업 시작 실패: " + error.message);
@@ -160,10 +163,40 @@ export default function WorkerMain() {
 
   // 작업 종료
   const endWorkMutation = trpc.mobile.worker.endWorkSession.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      // 퇴근 시 위치 전송
+      if (assignedEquipment && "geolocation" in navigator) {
+        try {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              try {
+                await sendLocationMutation.mutateAsync({
+                  equipmentId: assignedEquipment.id,
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy,
+                });
+                console.log('[GPS] 퇴근 시 위치 전송 성공');
+              } catch (error) {
+                console.error('[GPS] 퇴근 시 위치 전송 실패:', error);
+              }
+            },
+            (error) => {
+              console.error('[GPS] 퇴근 시 위치 수집 실패:', error);
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            }
+          );
+        } catch (error) {
+          console.error('[GPS] 퇴근 시 위치 전송 중 예외:', error);
+        }
+      }
+      
       toast.success("작업이 종료되었습니다.");
       refetchSession();
-      stopLocationTracking();
     },
     onError: (error) => {
       toast.error("작업 종료 실패: " + error.message);
@@ -172,10 +205,40 @@ export default function WorkerMain() {
 
   // 휴식 시작
   const startBreakMutation = trpc.mobile.worker.startBreak.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      // 휴식 시작 시 위치 전송
+      if (assignedEquipment && "geolocation" in navigator) {
+        try {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              try {
+                await sendLocationMutation.mutateAsync({
+                  equipmentId: assignedEquipment.id,
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy,
+                });
+                console.log('[GPS] 휴식 시작 시 위치 전송 성공');
+              } catch (error) {
+                console.error('[GPS] 휴식 시작 시 위치 전송 실패:', error);
+              }
+            },
+            (error) => {
+              console.error('[GPS] 휴식 시작 시 위치 수집 실패:', error);
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            }
+          );
+        } catch (error) {
+          console.error('[GPS] 휴식 시작 시 위치 전송 중 예외:', error);
+        }
+      }
+      
       toast.success("휴식이 시작되었습니다.");
       refetchSession();
-      stopLocationTracking(); // 휴식 중 GPS 전송 중지
     },
     onError: (error) => {
       toast.error("휴식 시작 실패: " + error.message);
@@ -185,12 +248,12 @@ export default function WorkerMain() {
   // 휴식 종료
   const endBreakMutation = trpc.mobile.worker.endBreak.useMutation({
     onSuccess: () => {
+      // 휴식 종료 시 위치 전송
+      if (assignedEquipment) {
+        sendLocationOnce();
+      }
       toast.success("작업을 재개합니다.");
       refetchSession();
-      // 휴식 종료 시 GPS 전송 재개 (작업 세션이 활성 상태인 경우에만)
-      if (currentSession && (currentSession.status === 'working' || currentSession.status === 'overtime')) {
-        startLocationTracking();
-      }
     },
     onError: (error) => {
       toast.error("휴식 종료 실패: " + error.message);
@@ -319,61 +382,16 @@ export default function WorkerMain() {
     }
   };
 
-  // 위치 추적 시작
-  const startLocationTracking = () => {
+  // 즉시 위치 전송 (작업 시작/휴식 종료 시 호출)
+  const sendLocationOnce = () => {
     if (!assignedEquipment) {
-      console.warn('[GPS] 배정된 장비가 없어 위치 추적을 시작할 수 없습니다.');
+      console.warn('[GPS] 배정된 장비가 없어 위치 전송을 할 수 없습니다.');
       return;
     }
 
-    console.log('[GPS] 위치 추적 시작 - 장비 ID:', assignedEquipment.id, '간격:', gpsIntervalMinutes, '분');
-
-    // 즉시 위치 전송
-    console.log('[GPS] 즉시 위치 전송 시작...');
+    console.log('[GPS] 즉시 위치 전송 시작 - 장비 ID:', assignedEquipment.id);
     sendLocationWithRetry();
-
-    // 설정된 간격으로 위치 전송 (기본값: 5분)
-    const intervalMs = gpsIntervalMinutes * 60 * 1000;
-    const interval = setInterval(() => {
-      console.log('[GPS] 주기적 위치 전송 실행 (간격:', gpsIntervalMinutes, '분)');
-      sendLocationWithRetry();
-    }, intervalMs);
-
-    setLocationInterval(interval);
-    console.log(`[GPS] 위치 추적 시작 완료 (간격: ${gpsIntervalMinutes}분, interval ID: ${interval})`);
   };
-
-  // 위치 추적 중지
-  const stopLocationTracking = () => {
-    if (locationInterval) {
-      clearInterval(locationInterval);
-      setLocationInterval(null);
-      console.log('[GPS] 위치 추적 중지');
-    }
-  };
-
-  // 작업 세션 상태 변경 시 GPS 전송 상태 업데이트
-  useEffect(() => {
-    if (!currentSession) {
-      // 작업 세션이 없으면 GPS 전송 중지
-      stopLocationTracking();
-      return;
-    }
-
-    const status = currentSession.status;
-    if (status === 'working' || status === 'overtime') {
-      // 작업 중이면 GPS 전송 시작 (이미 시작되어 있으면 재시작하지 않음)
-      if (!locationInterval) {
-        startLocationTracking();
-      }
-    } else if (status === 'break') {
-      // 휴식 중이면 GPS 전송 중지
-      stopLocationTracking();
-    } else if (status === 'completed') {
-      // 작업 종료면 GPS 전송 중지
-      stopLocationTracking();
-    }
-  }, [currentSession?.status, locationInterval]);
 
   // 경과 시간 계산
   useEffect(() => {
@@ -704,6 +722,42 @@ export default function WorkerMain() {
           </div>
         )}
 
+        {/* PWA 안내 */}
+        {showPWAHint && (
+          <div className="px-4 mb-4">
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <Settings className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-medium text-blue-900 mb-1">
+                      홈 화면에 추가
+                    </div>
+                    <div className="text-sm text-blue-800 mb-2">
+                      {/iPad|iPhone|iPod/.test(navigator.userAgent) ? (
+                        <>공유 버튼(□↑) → 홈 화면에 추가</>
+                      ) : (
+                        <>메뉴(⋮) → 홈 화면에 추가</>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-blue-700 h-8"
+                      onClick={() => {
+                        localStorage.setItem('pwa-hint-seen', 'true');
+                        setShowPWAHint(false);
+                      }}
+                    >
+                      닫기
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* 작업 상태 카드 - 큰 화면 상단 */}
         {currentSession && (
           <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 mb-4">
@@ -868,6 +922,71 @@ export default function WorkerMain() {
         {/* 빠른 메뉴 */}
         <div className="px-4 mt-6 space-y-3">
           <div className="text-sm font-medium text-gray-700 mb-2">빠른 메뉴</div>
+
+          {/* 현위치 전송 */}
+          <Button
+            size="lg"
+            className="w-full h-16 text-base font-bold bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg active:scale-95 transition-transform"
+            onClick={() => {
+              if (!assignedEquipment) {
+                toast.error("배정된 장비가 없습니다.");
+                return;
+              }
+
+              setIsSendingLocation(true);
+              
+              if (!("geolocation" in navigator)) {
+                toast.error("이 기기는 위치 정보를 지원하지 않습니다.");
+                setIsSendingLocation(false);
+                return;
+              }
+
+              navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                  try {
+                    await sendLocationMutation.mutateAsync({
+                      equipmentId: assignedEquipment.id,
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude,
+                      accuracy: position.coords.accuracy,
+                    });
+                    toast.success("위치가 전송되었습니다.");
+                  } catch (error: any) {
+                    toast.error("위치 전송에 실패했습니다: " + error.message);
+                  } finally {
+                    setIsSendingLocation(false);
+                  }
+                },
+                (error) => {
+                  toast.error("위치 정보를 가져올 수 없습니다.");
+                  setIsSendingLocation(false);
+                },
+                {
+                  enableHighAccuracy: true,
+                  timeout: 10000,
+                  maximumAge: 0,
+                }
+              );
+            }}
+            disabled={!assignedEquipment || isSendingLocation}
+          >
+            {isSendingLocation ? (
+              <>
+                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                전송 중...
+              </>
+            ) : (
+              <>
+                <MapPin className="mr-2 h-6 w-6" />
+                <div className="text-left flex-1">
+                  <div>현위치 전송</div>
+                  <div className="text-xs text-white/80 font-normal">
+                    관리자에게 현재 위치를 전송합니다
+                  </div>
+                </div>
+              </>
+            )}
+          </Button>
 
           {/* 운전자 점검표 */}
           <Button

@@ -3255,6 +3255,33 @@ export async function getAllActiveLocations(filters?: {
   const resultEquipmentIds = result.map((loc: any) => loc.equipment_id).filter(Boolean);
   const resultWorkerIds = result.map((loc: any) => loc.worker_id).filter(Boolean);
   
+  // 각 worker의 현재 작업 세션 상태 조회
+  const workSessionMap = new Map<string, any>();
+  if (resultWorkerIds.length > 0) {
+    const { data: workSessions } = await supabase
+      .from('work_sessions')
+      .select('worker_id, status')
+      .in('worker_id', resultWorkerIds)
+      .is('end_time', null) // 진행 중인 세션만
+      .order('start_time', { ascending: false });
+    
+    if (workSessions) {
+      // 각 worker별 최신 세션만 저장
+      workSessions.forEach((ws: any) => {
+        if (!workSessionMap.has(ws.worker_id)) {
+          workSessionMap.set(ws.worker_id, toCamelCase(ws));
+        }
+      });
+    }
+  }
+  
+  // 각 location에 작업 세션 상태 추가
+  result.forEach((loc: any) => {
+    if (loc.worker_id && workSessionMap.has(loc.worker_id)) {
+      loc.workSession = workSessionMap.get(loc.worker_id);
+    }
+  });
+  
   if (resultEquipmentIds.length > 0) {
     // 모든 활성 deployment 조회 (worker_id도 함께 조회)
     const { data: deployments } = await supabase
@@ -3371,17 +3398,13 @@ export async function getAllActiveLocations(filters?: {
       equipmentId: loc.equipment_id || loc.equipmentId,
       equipmentRegNum: loc.equipment?.reg_num || loc.equipment?.regNum || 'N/A',
       equipmentTypeName: loc.equipment?.equip_types?.name || loc.equipment?.equipTypes?.name || 'N/A',
+      workStatus: loc.workSession?.status || 'N/A',
       loggedAt: loc.logged_at || loc.loggedAt,
       hasDeployment: !!loc.deployment,
       deploymentWorkerName: loc.deployment?.worker?.name || 'N/A',
       deploymentEquipmentRegNum: loc.deployment?.equipment?.reg_num || loc.deployment?.equipment?.regNum || 'N/A',
       deploymentEpCompanyId: loc.deployment?.ep_company_id || loc.deployment?.epCompanyId,
     })));
-    
-    // 상세 디버깅: 첫 번째 location의 전체 구조
-    if (result.length > 0) {
-      console.log('[getAllActiveLocations] 첫 번째 location 상세 구조:', JSON.stringify(result[0], null, 2));
-    }
   }
   
   return toCamelCaseArray(result);

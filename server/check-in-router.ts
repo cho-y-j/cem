@@ -254,6 +254,26 @@ export const checkInRouter = router({
 
       console.log(`[CheckIn] Worker ${ctx.user.name} checked in at ${new Date().toISOString()}`);
 
+      // 출근 시 위치를 location_logs에도 기록
+      if (deployment?.equipmentId) {
+        try {
+          const locationLogId = nanoid();
+          await db.createLocationLog({
+            id: locationLogId,
+            equipmentId: deployment.equipmentId,
+            workerId: worker.id,
+            latitude: input.lat.toString(),
+            longitude: input.lng.toString(),
+            accuracy: undefined,
+            loggedAt: new Date(),
+          });
+          console.log(`[CheckIn] Location log created for check-in: ${locationLogId}`);
+        } catch (error) {
+          console.error('[CheckIn] Failed to create location log:', error);
+          // 위치 로그 실패해도 출근은 성공으로 처리
+        }
+      }
+
       return {
         ...checkIn,
         isWithinZone,
