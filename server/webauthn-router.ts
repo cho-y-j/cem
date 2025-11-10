@@ -12,10 +12,7 @@ import {
   type VerifiedRegistrationResponse,
   type VerifiedAuthenticationResponse,
 } from '@simplewebauthn/server';
-import type {
-  RegistrationResponseJSON,
-  AuthenticationResponseJSON,
-} from '@simplewebauthn/types';
+// Types from @simplewebauthn/types are not required at runtime; avoid hard dependency for now
 
 /**
  * WebAuthn 설정
@@ -196,10 +193,10 @@ export const webauthnRouter = router({
           responseKeys: input.response ? Object.keys(input.response) : [],
         });
 
-        let verification: VerifiedRegistrationResponse;
+        let verification: any;
         try {
           verification = await verifyRegistrationResponse({
-            response: input.response as RegistrationResponseJSON,
+            response: input.response as any,
             expectedChallenge,
             expectedOrigin: ORIGIN,
             expectedRPID: RP_ID,
@@ -377,6 +374,12 @@ export const webauthnRouter = router({
 
         // DB에 크레덴셜 저장
         const supabase = db.getSupabase();
+        if (!supabase) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
+        }
+        if (!supabase) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
+        }
         const { error } = await supabase.from('webauthn_credentials').insert({
           id: credentialIdBase64,
           user_id: user.id,
@@ -434,6 +437,9 @@ export const webauthnRouter = router({
 
         // 사용자의 등록된 크레덴셜 조회
         const supabase = db.getSupabase();
+        if (!supabase) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
+        }
         const { data: credentials, error } = await supabase
           .from('webauthn_credentials')
           .select('id')
@@ -475,51 +481,10 @@ export const webauthnRouter = router({
           credentialIds: credentials.map((c: any) => c.id),
         });
 
-        // allowCredentials의 id는 Uint8Array여야 함
-        // 하지만 generateAuthenticationOptions 내부 검증에서 문제가 발생하므로
-        // Uint8Array.from()을 사용하여 순수한 Uint8Array 생성
-        const allowCredentials = credentials.map((c: any) => {
-          let credentialId: Uint8Array;
-          try {
-            if (typeof c.id === 'string') {
-              // base64url 문자열을 디코딩하여 Uint8Array로 변환
-              const buffer = Buffer.from(c.id, 'base64url');
-              // Uint8Array.from()을 사용하여 순수한 Uint8Array 생성
-              credentialId = Uint8Array.from(buffer);
-            } else if (Buffer.isBuffer(c.id)) {
-              credentialId = Uint8Array.from(c.id);
-            } else if (c.id instanceof Uint8Array) {
-              credentialId = c.id;
-            } else {
-              throw new Error(`Unexpected credential ID type: ${typeof c.id}, value: ${JSON.stringify(c.id)}`);
-            }
-            
-            console.log('[WebAuthn] Credential ID prepared:', {
-              original: c.id,
-              originalType: typeof c.id,
-              credentialIdLength: credentialId.length,
-              isUint8Array: credentialId instanceof Uint8Array,
-              constructor: credentialId.constructor.name,
-            });
-          } catch (err: any) {
-            console.error('[WebAuthn] Error preparing credential ID:', {
-              credentialId: c.id,
-              credentialIdType: typeof c.id,
-              error: err.message,
-              stack: err.stack,
-            });
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `크레덴셜 ID 처리 실패: ${err.message}`,
-            });
-          }
-
-          return {
-            id: credentialId,
-            type: 'public-key' as const,
-            transports: ['internal'] as const,
-          };
-        });
+        // v13에서 allowCredentials.id는 Base64URLString (string) 허용
+        const allowCredentials = credentials.map((c: any) => ({
+          id: c.id as string, // DB 저장된 base64url
+        }));
 
         console.log('[WebAuthn] Calling generateAuthenticationOptions with:', {
           rpID: RP_ID,
@@ -529,17 +494,14 @@ export const webauthnRouter = router({
           firstCredentialIdLength: allowCredentials[0]?.id?.length,
         });
 
-        // allowCredentials를 전달하지 않으면 모든 등록된 크레덴셜 허용
-        // 하지만 보안을 위해 특정 크레덴셜만 허용하는 것이 좋음
-        // 문제: generateAuthenticationOptions 내부 검증에서 Uint8Array를 문자열로 처리하려고 시도
-        // 해결: allowCredentials를 전달하지 않고, verifyAuthentication에서 크레덴셜 검증
+        // 사용자에 대해 저장된 credential ID만 선택 가능하도록 제한
+        // (다른 기기/계정의 패스키가 노출되어 잘못 선택되는 문제 방지)
         let options;
         try {
           options = await generateAuthenticationOptions({
             rpID: RP_ID,
             timeout: CHALLENGE_TIMEOUT,
-            // allowCredentials를 전달하지 않으면 모든 크레덴셜 허용 (보안상 좋지 않지만 작동함)
-            // allowCredentials, // 일시적으로 주석 처리하여 테스트
+            allowCredentials, // 사용자 소유 passkey만 표시
             userVerification: 'required',
           });
         } catch (error: any) {
@@ -650,7 +612,7 @@ export const webauthnRouter = router({
         // @simplewebauthn/browser는 이미 JSON 직렬화 가능한 객체를 반환
         // 하지만 tRPC를 통해 전송될 때 ArrayBuffer/Uint8Array가 문자열로 변환될 수 있음
         // AuthenticationResponseJSON 형식으로 명시적으로 변환
-        let response: AuthenticationResponseJSON;
+        let response: any;
         
         try {
           // response 객체를 명시적으로 정규화
@@ -691,8 +653,11 @@ export const webauthnRouter = router({
             rawResponseKeys: Object.keys(rawResponse || {}),
             rawResponseType: typeof rawResponse,
             rawResponseString: JSON.stringify(rawResponse, (key, value) => {
-              if (value instanceof ArrayBuffer || value instanceof Uint8Array) {
-                return `[${value.constructor.name}: ${value.byteLength || value.length} bytes]`;
+              if (value instanceof ArrayBuffer) {
+                return `[ArrayBuffer: ${value.byteLength} bytes]`;
+              }
+              if (value instanceof Uint8Array) {
+                return `[Uint8Array: ${value.length} bytes]`;
               }
               return value;
             }, 2),
@@ -718,8 +683,11 @@ export const webauthnRouter = router({
           console.error('[WebAuthn] response.rawId and response.id are both undefined:', {
             responseKeys: Object.keys(response),
             response: JSON.stringify(response, (key, value) => {
-              if (value instanceof ArrayBuffer || value instanceof Uint8Array) {
-                return `[${value.constructor.name}: ${value.byteLength || value.length} bytes]`;
+              if (value instanceof ArrayBuffer) {
+                return `[ArrayBuffer: ${value.byteLength} bytes]`;
+              }
+              if (value instanceof Uint8Array) {
+                return `[Uint8Array: ${value.length} bytes]`;
               }
               return value;
             }),
@@ -753,6 +721,9 @@ export const webauthnRouter = router({
           credentialIdBase64Preview: credentialIdBase64.substring(0, 20) + '...',
         });
         const supabase = db.getSupabase();
+        if (!supabase) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
+        }
         const { data: credential, error: credError } = await supabase
           .from('webauthn_credentials')
           .select('*')
@@ -846,7 +817,11 @@ export const webauthnRouter = router({
 
         // 카운터 업데이트 (리플레이 공격 방지)
         const { authenticationInfo } = verification;
-        await supabase
+        const supabase2 = db.getSupabase();
+        if (!supabase2) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
+        }
+        await supabase2
           .from('webauthn_credentials')
           .update({
             counter: authenticationInfo.newCounter,
@@ -923,6 +898,9 @@ export const webauthnRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const supabase = db.getSupabase();
+      if (!supabase) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not initialized" });
+      }
       const { error } = await supabase
         .from('webauthn_credentials')
         .delete()
