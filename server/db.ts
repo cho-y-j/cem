@@ -3339,12 +3339,21 @@ export async function getAllActiveLocations(filters?: {
         if (loc.equipment_id && deploymentMap.has(loc.equipment_id)) {
           const dep = deploymentMap.get(loc.equipment_id);
           
-          // 오너사 정보 추가
-          if (loc.equipment?.owner_company_id && ownerCompaniesMap.has(loc.equipment.owner_company_id)) {
+          // deployment의 worker_id로 worker 정보 확인 및 매핑
+          if (dep.worker_id && workerMap.has(dep.worker_id)) {
+            dep.worker = workerMap.get(dep.worker_id);
+          }
+          
+          // equipment 정보가 있으면 deployment에 포함
+          if (loc.equipment) {
             dep.equipment = {
               ...loc.equipment,
-              ownerCompanies: ownerCompaniesMap.get(loc.equipment.owner_company_id),
             };
+            
+            // 오너사 정보 추가
+            if (loc.equipment.owner_company_id && ownerCompaniesMap.has(loc.equipment.owner_company_id)) {
+              dep.equipment.ownerCompanies = ownerCompaniesMap.get(loc.equipment.owner_company_id);
+            }
           }
           
           loc.deployment = toCamelCase(dep);
