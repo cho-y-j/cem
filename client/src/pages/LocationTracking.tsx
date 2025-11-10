@@ -275,17 +275,18 @@ export default function LocationTracking() {
 
   // 마커 아이콘 캐싱 (workStatus와 equipmentTypeId 조합별로)
   const iconCache = useMemo(() => {
-    const cache = new Map<string, google.maps.Icon | undefined>();
+    const cache = new Map<string, any>();
+    if (typeof google === 'undefined' || !google.maps) {
+      return cache;
+    }
     markers.forEach((marker) => {
       if (!cache.has(marker.iconKey)) {
-        const icon = typeof google !== 'undefined' && google.maps
-          ? createMarkerIcon(marker.workStatus, marker.equipmentTypeId)
-          : undefined;
+        const icon = createMarkerIcon(marker.workStatus, marker.equipmentTypeId);
         cache.set(marker.iconKey, icon);
       }
     });
     return cache;
-  }, [markers.map(m => `${m.workStatus || 'none'}-${m.equipmentTypeId || 'none'}`).join(',')]);
+  }, [markers.length, markers.map(m => m.iconKey).join(',')]);
 
   // 필터 초기화
   const clearFilters = () => {
