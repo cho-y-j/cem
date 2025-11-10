@@ -648,7 +648,7 @@ export default function WorkZones() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2 min-h-0">
               {/* 구역 타입 선택 */}
               <div className="space-y-2">
                 <Label>구역 타입 *</Label>
@@ -781,7 +781,7 @@ export default function WorkZones() {
                   </div>
                 </div>
                 <div 
-                  className="h-[400px] border rounded-lg overflow-hidden relative"
+                  className="h-[450px] border rounded-lg overflow-hidden relative"
                   style={{ cursor: isDrawingMode ? 'crosshair' : 'default' }}
                 >
                   {GOOGLE_MAPS_API_KEY ? (
