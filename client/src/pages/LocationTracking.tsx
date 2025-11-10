@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,10 +30,10 @@ const getStatusColor = (status: string | undefined): string => {
 };
 
 // 차종별 모양 (차종 ID 기반)
-const getMarkerShape = (equipmentTypeId: string | undefined): google.maps.SymbolPath => {
-  if (typeof google === 'undefined' || !google.maps) {
-    // 기본값 반환 (실제로는 사용되지 않음)
-    return 0 as google.maps.SymbolPath;
+const getMarkerShape = (equipmentTypeId: string | undefined): number => {
+  if (typeof google === 'undefined' || !google.maps || !google.maps.SymbolPath) {
+    // 기본값 반환 (CIRCLE = 0)
+    return 0;
   }
   
   if (!equipmentTypeId) return google.maps.SymbolPath.CIRCLE;
@@ -251,8 +251,6 @@ export default function LocationTracking() {
       workStatus,
       statusLabel,
       workerId: loc.worker_id || loc.workerId,
-      // 아이콘 키 생성 (캐싱용)
-      iconKey: `${workStatus || 'none'}-${equipmentTypeId || 'none'}`,
       info: `
         <div style="min-width: 200px;">
           <h3 style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">${workerName}</h3>
