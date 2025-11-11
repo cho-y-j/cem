@@ -163,6 +163,7 @@ export const equipment = pgTable("equipment", {
   specification: varchar("specification", { length: 200 }), // 장비 세부 규격
   ownerId: varchar("owner_id", { length: 64 }),
   currentBpId: varchar("current_bp_id", { length: 64 }),
+  nfcTagId: varchar("nfc_tag_id", { length: 128 }).unique(),
   status: varchar("status", { length: 50 }).default("idle").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

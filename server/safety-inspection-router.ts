@@ -177,6 +177,22 @@ export const safetyInspectionRouter = router({
     }),
 
   /**
+   * NFC 태그로 장비 컨텍스트 조회
+   */
+  getEquipmentByNfcTag: protectedProcedure
+    .input(z.object({ nfcTagId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const context = await db.getEquipmentInspectionContextByNfcTag(input.nfcTagId);
+      if (!context) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "NFC 태그에 해당하는 장비를 찾을 수 없습니다.",
+        });
+      }
+      return context;
+    }),
+
+  /**
    * 장비에 적용 가능한 템플릿 조회
    */
   getApplicableTemplates: protectedProcedure

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MobileLayout from "@/components/mobile/MobileLayout";
 import MobileBottomNav, { inspectorNavItems } from "@/components/mobile/MobileBottomNav";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { Search, Truck, AlertCircle, FileText, Settings, Lock, User } from "lucide-react";
+import { Search, Truck, AlertCircle, FileText, Settings, Lock, User, Nfc } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -25,6 +25,8 @@ export default function InspectorMain() {
   const { user } = useAuth();
   const [searchInput, setSearchInput] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isNfcSupported, setIsNfcSupported] = useState(false);
+  const [isNfcScanning, setIsNfcScanning] = useState(false);
 
   // PIN 변경 관련 상태
   const [showPinDialog, setShowPinDialog] = useState(false);
@@ -39,6 +41,83 @@ export default function InspectorMain() {
       enabled: false, // 수동으로 검색 트리거
     }
   );
+  const utils = trpc.useUtils();
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).NDEFReader) {
+      setIsNfcSupported(true);
+    }
+  }, []);
+
+  const handleNfcScan = async () => {
+    if (!isNfcSupported) {
+      toast.error("이 기기는 NFC 스캔을 지원하지 않습니다.");
+      return;
+    }
+
+    try {
+      const NDEFReader = (window as any).NDEFReader;
+      const reader = new NDEFReader();
+      await reader.scan();
+      setIsNfcScanning(true);
+      toast.info("NFC 태그를 기기에 가까이 가져다주세요.");
+
+      const handleError = (event: any) => {
+        console.error("[InspectorMain] NFC 스캔 오류:", event?.message || event);
+        setIsNfcScanning(false);
+        toast.error("NFC 스캔 중 오류가 발생했습니다.");
+        reader.removeEventListener("error", handleError);
+      };
+
+      const handleReading = async (event: any) => {
+        reader.removeEventListener("reading", handleReading);
+        reader.removeEventListener("error", handleError);
+        setIsNfcScanning(false);
+
+        try {
+          let tagValue = typeof event.serialNumber === "string" ? event.serialNumber.trim() : "";
+          if (event.message?.records?.length) {
+            for (const record of event.message.records) {
+              if (record.recordType === "text" || record.recordType === "url") {
+                const decoder = new TextDecoder(record.encoding || "utf-8");
+                const decoded = decoder.decode(record.data);
+                if (decoded?.trim()) {
+                  tagValue = decoded.trim();
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!tagValue) {
+            toast.error("인식된 NFC 태그에서 식별 정보를 찾지 못했습니다.");
+            return;
+          }
+
+          toast.info(`NFC 태그 인식: ${tagValue}`);
+          const context = await utils.safetyInspection.getEquipmentByNfcTag.fetch({ nfcTagId: tagValue });
+          if (!context?.equipment?.id) {
+            toast.error("해당 NFC 태그에 연결된 장비를 찾을 수 없습니다.");
+            return;
+          }
+
+          setSearchResults([]);
+          setSearchInput(context.equipment.regNum || "");
+          setLocation(`/mobile/inspector/inspection/${context.equipment.id}`);
+        } catch (error: any) {
+          console.error("[InspectorMain] NFC 태그 처리 중 오류:", error);
+          toast.error(error?.message || "NFC 태그를 처리하는 중 오류가 발생했습니다.");
+        }
+      };
+
+      reader.addEventListener("error", handleError);
+      reader.addEventListener("reading", handleReading, { once: true });
+    } catch (error: any) {
+      console.error("[InspectorMain] NFC 스캔 시작 실패:", error);
+      setIsNfcScanning(false);
+      toast.error(error?.message || "NFC 스캔을 시작할 수 없습니다.");
+    }
+  };
 
   const handleSearch = async () => {
     if (searchInput.trim().length === 0) {
@@ -126,6 +205,42 @@ export default function InspectorMain() {
                 • 예: "3456", "가3456", "12가3456" 모두 가능
               </p>
             </div>
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-muted-foreground">
+                  NFC 태그로 빠르게 찾기
+                </span>
+                {!isNfcSupported && (
+                  <Badge variant="outline" className="text-xs">
+                    지원되지 않는 기기
+                  </Badge>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleNfcScan}
+                disabled={!isNfcSupported || isNfcScanning}
+                className="w-full h-12 text-base"
+              >
+                {isNfcScanning ? (
+                  <>
+                    <div className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    NFC 태그 인식 중...
+                  </>
+                ) : (
+                  <>
+                    <Nfc className="h-5 w-5 mr-2" />
+                    NFC 태그 스캔하기
+                  </>
+                )}
+              </Button>
+              {!isNfcSupported && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  NFC 스캔은 Android Chrome 최신 버전에서만 지원됩니다.
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -190,6 +305,11 @@ export default function InspectorMain() {
                             <Badge variant="destructive" className="text-xs">
                               배정된 운전자 없음
                             </Badge>
+                          </div>
+                        )}
+                        {equipment.nfcTagId && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            NFC 태그: {equipment.nfcTagId}
                           </div>
                         )}
                       </div>

@@ -3088,6 +3088,28 @@ export async function getEquipmentInspectionContext(equipmentId: string) {
   };
 }
 
+export async function getEquipmentInspectionContextByNfcTag(nfcTagId: string) {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('equipment')
+    .select('id')
+    .eq('nfc_tag_id', nfcTagId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[Database] Error finding equipment by NFC tag:", nfcTagId, error);
+    return null;
+  }
+
+  if (!data?.id) {
+    return null;
+  }
+
+  return await getEquipmentInspectionContext(data.id);
+}
+
 /**
  * 모든 활성 위치 조회 (최근 10분 이내, 권한별 필터링 포함)
  */
