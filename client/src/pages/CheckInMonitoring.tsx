@@ -107,25 +107,32 @@ export default function CheckInMonitoring() {
       
       // 한국 시간으로 변환 (UTC + 9시간)
       let kstHours = utcHours + 9;
+      let kstDate = new Date(date);
+      kstDate.setUTCHours(utcHours + 9);
+      
+      // 날짜가 넘어가는 경우 처리
       if (kstHours >= 24) {
         kstHours = kstHours - 24;
+        kstDate.setUTCDate(kstDate.getUTCDate() + 1);
       }
       
       const hours = kstHours.toString().padStart(2, '0');
       const minutes = utcMinutes.toString().padStart(2, '0');
       
-      // 디버깅: 변환 과정 확인
-      console.log('[formatTime]', {
-        input: dateStr,
-        utcISO: date.toISOString(),
-        utcTime: `${utcHours}:${utcMinutes}`,
-        kstTime: `${hours}:${minutes}`,
-      });
-      
       return `${hours}:${minutes}`;
     } catch (error) {
       console.error('[CheckInMonitoring] formatTime error:', error, dateStr);
-      return String(dateStr);
+      // 에러 발생 시 브라우저 로컬 시간 사용
+      try {
+        const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+        return date.toLocaleTimeString("ko-KR", { 
+          hour: "2-digit", 
+          minute: "2-digit",
+          timeZone: "Asia/Seoul"
+        });
+      } catch {
+        return String(dateStr);
+      }
     }
   };
 
