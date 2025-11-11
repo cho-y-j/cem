@@ -173,6 +173,11 @@ export default function InspectorMain() {
                                   {equipment.activeDeployment.bpCompany.name}
                                 </Badge>
                               )}
+                              {equipment.ownerCompany?.name && (
+                                <Badge variant="outline" className="text-xs">
+                                  {equipment.ownerCompany.name}
+                                </Badge>
+                              )}
                             </div>
                             {equipment.activeDeployment.worker.licenseNum && (
                               <div className="text-xs text-muted-foreground">

@@ -2953,9 +2953,11 @@ export async function searchEquipmentByVehicleNumber(partialNumber: string) {
     return [];
   }
 
-  const equipmentIds = data.map((item) => item.id).filter(Boolean);
-  let deploymentMap = new Map<string, any>();
+  const equipments = toCamelCaseArray(data);
+  const equipmentIds = equipments.map((item: any) => item.id).filter(Boolean);
+  const ownerIds = equipments.map((item: any) => item.ownerId).filter((id: string | undefined) => !!id);
 
+  let deploymentMap = new Map<string, any>();
   if (equipmentIds.length > 0) {
     const { data: deployments, error: deploymentError } = await supabase
       .from('deployments')
@@ -2969,7 +2971,8 @@ export async function searchEquipmentByVehicleNumber(partialNumber: string) {
           phone
         ),
         bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
-        ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
+        ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type),
+        owner_company:companies!deployments_owner_id_fkey(id, name, company_type)
       `)
       .in('equipment_id', equipmentIds)
       .eq('status', 'active')
@@ -2978,26 +2981,107 @@ export async function searchEquipmentByVehicleNumber(partialNumber: string) {
     if (deploymentError) {
       console.error('[Database] Error fetching deployments for equipment search:', deploymentError);
     } else if (deployments) {
-      deploymentMap = deployments.reduce((map, deployment) => {
+      deployments.forEach((deployment: any) => {
         const equipmentId = deployment.equipment_id;
-        if (!equipmentId) return map;
-        if (!map.has(equipmentId)) {
-          map.set(equipmentId, deployment);
-        }
-        return map;
-      }, new Map<string, any>());
+        if (!equipmentId || deploymentMap.has(equipmentId)) return;
+        deploymentMap.set(equipmentId, toCamelCase(deployment));
+      });
     }
   }
 
-  const equipments = toCamelCaseArray(data);
+  let ownerMap = new Map<string, any>();
+  if (ownerIds.length > 0) {
+    const { data: owners, error: ownerError } = await supabase
+      .from('companies')
+      .select('id, name, company_type')
+      .in('id', ownerIds);
+    if (ownerError) {
+      console.error('[Database] Error fetching owner companies for equipment search:', ownerError);
+    } else if (owners) {
+      owners.forEach((owner) => {
+        ownerMap.set(owner.id, toCamelCase(owner));
+      });
+    }
+  }
 
   return equipments.map((equipment: any) => {
-    const deployment = deploymentMap.get(equipment.id);
+    const deployment = deploymentMap.get(equipment.id) || null;
+    const ownerCompany = equipment.ownerId ? ownerMap.get(equipment.ownerId) || null : null;
     return {
       ...equipment,
-      activeDeployment: deployment ? toCamelCase(deployment) : null,
+      ownerCompany,
+      activeDeployment: deployment,
     };
   });
+}
+
+export async function getActiveDeploymentByEquipmentId(equipmentId: string): Promise<Deployment | undefined> {
+  const supabase = getSupabase();
+  if (!supabase) return undefined;
+
+  const { data, error } = await supabase
+    .from('deployments')
+    .select(`
+      *,
+      worker:workers!deployments_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        owner_id,
+        phone
+      ),
+      bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
+      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type),
+      owner_company:companies!deployments_owner_id_fkey(id, name, company_type)
+    `)
+    .eq('equipment_id', equipmentId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[Database] Error getting active deployment by equipment:", equipmentId, error);
+    return undefined;
+  }
+
+  return data ? (toCamelCase(data) as Deployment) : undefined;
+}
+
+export async function getEquipmentInspectionContext(equipmentId: string) {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('equipment')
+    .select(`
+      *,
+      equip_type:equip_types(*),
+      owner_company:companies!equipment_owner_id_fkey(id, name, company_type)
+    `)
+    .eq('id', equipmentId)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error("[Database] Error getting equipment inspection context:", equipmentId, error);
+    return null;
+  }
+
+  const equipment = toCamelCase(data) as any;
+  const activeDeployment = await getActiveDeploymentByEquipmentId(equipmentId);
+
+  const equipmentDocs = await getDocsComplianceByTarget("equipment", equipmentId);
+  const workerDocs =
+    activeDeployment?.workerId ? await getDocsComplianceByTarget("worker", activeDeployment.workerId) : [];
+
+  return {
+    equipment,
+    activeDeployment: activeDeployment || null,
+    docs: {
+      equipment: equipmentDocs,
+      worker: workerDocs,
+    },
+  };
 }
 
 /**

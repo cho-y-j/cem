@@ -161,6 +161,22 @@ export const safetyInspectionRouter = router({
     }),
 
   /**
+   * 장비 상세 컨텍스트 조회 (장비 + 배정 운전자 + 서류)
+   */
+  getEquipmentContext: protectedProcedure
+    .input(z.object({ equipmentId: z.string() }))
+    .query(async ({ input }) => {
+      const context = await db.getEquipmentInspectionContext(input.equipmentId);
+      if (!context) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "장비 정보를 찾을 수 없습니다.",
+        });
+      }
+      return context;
+    }),
+
+  /**
    * 장비에 적용 가능한 템플릿 조회
    */
   getApplicableTemplates: protectedProcedure

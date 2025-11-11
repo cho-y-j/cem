@@ -9,6 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import {
   AlertCircle,
@@ -52,12 +59,15 @@ export default function SafetyInspectionNew() {
   const [createdInspectionId, setCreatedInspectionId] = useState<string | null>(null);
 
   // 장비 정보 조회
-  const { data: equipmentList } = trpc.safetyInspection.searchEquipment.useQuery(
-    { partialNumber: equipmentId || "" },
-    { enabled: false }
+  const { data: equipmentContext, isLoading: equipmentLoading } = trpc.safetyInspection.getEquipmentContext.useQuery(
+    { equipmentId: equipmentId || "" },
+    { enabled: !!equipmentId }
   );
 
-  const equipment = equipmentList?.[0];
+  const equipment = equipmentContext?.equipment;
+  const activeDeployment = equipmentContext?.activeDeployment;
+  const equipmentDocs = equipmentContext?.docs?.equipment || [];
+  const workerDocs = equipmentContext?.docs?.worker || [];
 
   // 작업계획서 조회
   const { data: workPlan } = trpc.entryRequestsV2.getWorkPlanByEquipment.useQuery(
@@ -151,6 +161,9 @@ export default function SafetyInspectionNew() {
       toast.error("작업계획서를 찾을 수 없습니다.");
     }
   };
+
+  const [showDocsDialog, setShowDocsDialog] = useState(false);
+  const [docTab, setDocTab] = useState<"equipment" | "worker">("equipment");
 
   // 필터링된 항목들
   const filteredItems = template?.items?.filter(
@@ -299,7 +312,7 @@ export default function SafetyInspectionNew() {
     }
   };
 
-  if (templatesLoading) {
+  if (templatesLoading || equipmentLoading) {
     return (
       <MobileLayout title="안전점검" showBack showBottomNav={false}>
         <div className="flex items-center justify-center h-64">
@@ -311,7 +324,7 @@ export default function SafetyInspectionNew() {
     );
   }
 
-  if (!templates || templates.length === 0) {
+  if (!equipment || !templates || templates.length === 0) {
     return (
       <MobileLayout title="안전점검" showBack showBottomNav={false}>
         <div className="p-4">
@@ -358,9 +371,9 @@ export default function SafetyInspectionNew() {
               <div className="border-t pt-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">배정 운전자</span>
-                  {equipment?.activeDeployment?.worker ? (
+                  {activeDeployment?.worker ? (
                     <span className="font-semibold text-blue-700">
-                      {equipment.activeDeployment.worker.name}
+                      {activeDeployment.worker.name}
                     </span>
                   ) : (
                     <Badge variant="destructive" className="text-xs">
@@ -368,16 +381,22 @@ export default function SafetyInspectionNew() {
                     </Badge>
                   )}
                 </div>
-                {equipment?.activeDeployment?.worker?.licenseNum && (
+                {activeDeployment?.worker?.licenseNum && (
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>면허번호</span>
-                    <span>{equipment.activeDeployment.worker.licenseNum}</span>
+                    <span>{activeDeployment.worker.licenseNum}</span>
                   </div>
                 )}
-                {equipment?.activeDeployment?.bpCompany?.name && (
+                {activeDeployment?.bpCompany?.name && (
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>소속 (BP)</span>
-                    <span>{equipment.activeDeployment.bpCompany.name}</span>
+                    <span>{activeDeployment.bpCompany.name}</span>
+                  </div>
+                )}
+                {equipment.ownerCompany?.name && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Owner</span>
+                    <span>{equipment.ownerCompany.name}</span>
                   </div>
                 )}
               </div>
@@ -391,6 +410,20 @@ export default function SafetyInspectionNew() {
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   작업계획서 보기
+                </Button>
+              )}
+
+              {(equipmentDocs.length > 0 || workerDocs.length > 0) && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setDocTab(equipmentDocs.length > 0 ? "equipment" : "worker");
+                    setShowDocsDialog(true);
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  서류 보기
                 </Button>
               )}
             </div>
@@ -761,6 +794,78 @@ export default function SafetyInspectionNew() {
           </div>
         </div>
       </div>
+
+      <Dialog open={showDocsDialog} onOpenChange={setShowDocsDialog}>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>서류 목록</DialogTitle>
+            <DialogDescription>
+              장비 및 운전자 서류를 확인합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mb-4 flex gap-2">
+            <Button
+              variant={docTab === "equipment" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDocTab("equipment")}
+              disabled={equipmentDocs.length === 0}
+            >
+              장비 서류 ({equipmentDocs.length})
+            </Button>
+            <Button
+              variant={docTab === "worker" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDocTab("worker")}
+              disabled={workerDocs.length === 0}
+            >
+              운전자 서류 ({workerDocs.length})
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {(docTab === "equipment" ? equipmentDocs : workerDocs).map((doc: any) => (
+              <Card key={doc.id}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{doc.docType}</span>
+                    <Badge
+                      variant={
+                        doc.status === "approved" || doc.status === "valid"
+                          ? "outline"
+                          : doc.status === "expired"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {doc.status || "미정"}
+                    </Badge>
+                  </div>
+                  {doc.expiryDate && (
+                    <div className="text-xs text-muted-foreground">
+                      만료일: {new Date(doc.expiryDate).toLocaleDateString("ko-KR")}
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.open(doc.fileUrl, "_blank")}
+                  >
+                    파일 열기
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+
+            {(docTab === "equipment" ? equipmentDocs : workerDocs).length === 0 && (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  서류가 없습니다.
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </MobileLayout>
   );
 }
