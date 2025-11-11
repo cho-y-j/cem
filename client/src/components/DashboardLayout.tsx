@@ -29,8 +29,8 @@ import { Button } from "./ui/button";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "대시보드", path: "/", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: Truck, label: "장비 관리", path: "/equipment", roles: ["owner", "admin"] },
-  { icon: HardHat, label: "인력 관리", path: "/workers", roles: ["owner", "admin"] },
+  { icon: Truck, label: "장비 관리", path: "/equipment", roles: ["owner", "admin", "bp", "ep"] },
+  { icon: HardHat, label: "인력 관리", path: "/workers", roles: ["owner", "admin", "bp", "ep"] },
   { icon: FileText, label: "서류 관리", path: "/documents", roles: ["owner", "ep", "bp", "admin"] },
   { icon: ArrowRightLeft, label: "반입 요청", path: "/entry-requests", roles: ["owner", "ep", "bp", "admin"] },
   { icon: PackageCheck, label: "투입 관리", path: "/deployments", roles: ["owner", "ep", "bp", "admin"] },

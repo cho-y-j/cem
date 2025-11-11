@@ -29,7 +29,7 @@ export default function BiometricSetup() {
       toast.success("생체 인증이 등록되었습니다!");
       // 즉시 refetch하여 UI 업데이트
       setTimeout(() => {
-        refetch();
+      refetch();
       }, 500);
     },
     onError: (error) => {

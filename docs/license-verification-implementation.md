@@ -423,3 +423,9 @@ const licenseNo = extractLicenseNumber(text); // 정규식으로 면허번호 �
 
 
 
+
+
+
+
+
+

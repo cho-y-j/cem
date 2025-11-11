@@ -87,15 +87,15 @@ export default function Equipment() {
   const utils = trpc.useUtils();
   const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
     { companyType: "owner" },
-    { enabled: role === "admin" || role === "bp" || role === "ep" }
+    { enabled: role === "admin" || role === "bp" || role === "ep" || role === "owner" }
   );
   const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery(
     { companyType: "bp" },
-    { enabled: role === "admin" || role === "ep" }
+    { enabled: role === "admin" || role === "ep" || role === "owner" }
   );
   const { data: epCompanies = [] } = trpc.companies.listByType.useQuery(
     { companyType: "ep" },
-    { enabled: role === "admin" }
+    { enabled: role === "admin" || role === "owner" }
   );
 
   useEffect(() => {
@@ -414,7 +414,7 @@ export default function Equipment() {
               </div>
             )}
 
-            {(role === "admin" || role === "ep") && (
+            {(role === "admin" || role === "ep" || role === "owner") && (
               <div className="w-full md:w-56">
                 <Label>BP 회사</Label>
                 <Select

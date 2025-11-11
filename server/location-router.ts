@@ -35,21 +35,21 @@ export const locationRouter = router({
           throw new Error("유효하지 않은 GPS 좌표입니다.");
         }
 
-        const id = `location-${nanoid()}`;
+      const id = `location-${nanoid()}`;
 
-        await db.createLocationLog({
-          id,
-          workerId: input.workerId,
-          equipmentId: input.equipmentId,
-          latitude: input.latitude.toString(),
-          longitude: input.longitude.toString(),
-          accuracy: input.accuracy?.toString(),
-          loggedAt: new Date(),
-        });
+      await db.createLocationLog({
+        id,
+        workerId: input.workerId,
+        equipmentId: input.equipmentId,
+        latitude: input.latitude.toString(),
+        longitude: input.longitude.toString(),
+        accuracy: input.accuracy?.toString(),
+        loggedAt: new Date(),
+      });
 
-        console.log(`[Location] Logged: Worker ${input.workerId} at (${input.latitude}, ${input.longitude})`);
+      console.log(`[Location] Logged: Worker ${input.workerId} at (${input.latitude}, ${input.longitude})`);
 
-        return { success: true };
+      return { success: true };
       } catch (error: any) {
         console.error('[Location] 위치 기록 실패:', error);
         throw error;

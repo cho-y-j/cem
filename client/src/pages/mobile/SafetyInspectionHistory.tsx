@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import MobileLayout from "@/components/mobile/MobileLayout";
@@ -17,15 +17,33 @@ import {
 import { Search, FileText, Calendar, Eye, Filter, Truck, User } from "lucide-react";
 
 export default function SafetyInspectionHistory() {
-  const [, setLocation] = useLocation();
+  const [currentLocation, setLocation] = useLocation();
   const [searchVehicle, setSearchVehicle] = useState("");
   const [searchDate, setSearchDate] = useState("");
   const [selectedInspection, setSelectedInspection] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [equipmentFilterId, setEquipmentFilterId] = useState<string>("");
+
+  const queryParams = useMemo(() => {
+    const [, search = ""] = currentLocation.split("?");
+    try {
+      return new URLSearchParams(search);
+    } catch {
+      return new URLSearchParams();
+    }
+  }, [currentLocation]);
+
+  useEffect(() => {
+    const equipmentId = queryParams.get("equipmentId") || "";
+    const vehicleNumber = queryParams.get("vehicleNumber") || "";
+
+    setEquipmentFilterId(equipmentId);
+    setSearchVehicle(vehicleNumber);
+  }, [queryParams]);
 
   // 점검 내역 조회
   const { data: inspections, isLoading } = trpc.safetyInspection.listInspections.useQuery({
-    equipmentId: undefined,
+    equipmentId: equipmentFilterId || undefined,
     inspectorId: undefined, // 현재 로그인한 사용자의 것만
     status: undefined,
   });
@@ -38,8 +56,11 @@ export default function SafetyInspectionHistory() {
 
   // 필터링된 내역
   const filteredInspections = inspections?.filter((inspection: any) => {
-    const matchVehicle = !searchVehicle ||
-      inspection.vehicleNumber?.includes(searchVehicle);
+    const normalizedVehicle = searchVehicle.trim().toLowerCase();
+    const matchVehicle =
+      !normalizedVehicle ||
+      inspection.vehicleNumber?.toLowerCase().includes(normalizedVehicle) ||
+      inspection.equipmentName?.toLowerCase().includes(normalizedVehicle);
     const matchDate = !searchDate ||
       inspection.inspectionDate?.startsWith(searchDate);
     return matchVehicle && matchDate;
@@ -70,6 +91,26 @@ export default function SafetyInspectionHistory() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {equipmentFilterId && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 flex items-center justify-between">
+                <span>
+                  선택한 장비의 점검 이력을 보고 있습니다.
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-blue-700 hover:text-blue-800"
+                  onClick={() => {
+                    setEquipmentFilterId("");
+                    setSearchVehicle("");
+                    const basePath = currentLocation.split("?")[0];
+                    setLocation(basePath);
+                  }}
+                >
+                  전체 보기
+                </Button>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">차량번호</label>
               <Input

@@ -26,8 +26,8 @@ import {
   Save,
   Send,
   X,
-  Search,
-  BookOpen
+  BookOpen,
+  ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
 import SignatureCanvas from "react-signature-canvas";
@@ -165,6 +165,16 @@ export default function SafetyInspectionNew() {
 
   const [showDocsDialog, setShowDocsDialog] = useState(false);
   const [docTab, setDocTab] = useState<"equipment" | "worker">("equipment");
+const hasDocs = (equipmentDocs.length > 0) || (workerDocs.length > 0);
+
+const handleOpenDocs = () => {
+  if (!hasDocs) {
+    toast.info("확인 가능한 서류가 없습니다.");
+    return;
+  }
+  setDocTab(equipmentDocs.length > 0 ? "equipment" : "worker");
+  setShowDocsDialog(true);
+};
 
   // 필터링된 항목들
   const filteredItems = template?.items?.filter(
@@ -315,10 +325,20 @@ export default function SafetyInspectionNew() {
 
   if (templatesLoading || equipmentLoading) {
     return (
-      <MobileLayout title="안전점검" showBack showBottomNav={false}>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="text-muted-foreground">로딩 중...</div>
+      <MobileLayout showHeader={false} showBottomNav={false}>
+        <div className="mx-auto flex max-w-md flex-col px-4 py-6 space-y-6">
+          <div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full shadow-sm"
+              onClick={() => setLocation("/mobile/inspector")}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="flex flex-1 items-center justify-center">
+            <div className="text-sm text-muted-foreground">로딩 중...</div>
           </div>
         </div>
       </MobileLayout>
@@ -327,8 +347,16 @@ export default function SafetyInspectionNew() {
 
   if (!equipment || !templates || templates.length === 0) {
     return (
-      <MobileLayout title="안전점검" showBack showBottomNav={false}>
-        <div className="p-4">
+      <MobileLayout showHeader={false} showBottomNav={false}>
+        <div className="mx-auto max-w-md px-4 py-6 space-y-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 rounded-full shadow-sm"
+            onClick={() => setLocation("/mobile/inspector")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <Card className="border-orange-200 bg-orange-50">
             <CardContent className="py-8 text-center">
               <AlertCircle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
@@ -346,8 +374,56 @@ export default function SafetyInspectionNew() {
   }
 
   return (
-    <MobileLayout title="안전점검" showBack showBottomNav={false}>
-      <div className="p-4 space-y-4 pb-48">
+    <MobileLayout showHeader={false} showBottomNav={false}>
+      <div className="mx-auto max-w-md px-4 pb-12">
+        <div className="flex items-center justify-between pt-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 rounded-full shadow-sm"
+            onClick={() => setLocation("/mobile/inspector")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full px-4"
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (equipment?.id) {
+                  params.set("equipmentId", equipment.id);
+                }
+                if (equipment?.regNum) {
+                  params.set("vehicleNumber", equipment.regNum);
+                }
+                const query = params.toString();
+                setLocation(`/mobile/inspector/history${query ? `?${query}` : ""}`);
+              }}
+            >
+              점검 내역
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full px-4"
+              onClick={handleOpenDocs}
+            >
+              <BookOpen className="mr-2 h-4 w-4" />
+              서류 보기
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-2 mb-4 space-y-1">
+          <h1 className="text-xl font-semibold text-slate-900">안전 점검</h1>
+          <p className="text-xs text-muted-foreground">
+            장비 상태를 확인하고 점검 결과를 기록하세요.
+          </p>
+        </div>
+
+        <div className="space-y-4">
         {/* 장비 정보 */}
         <Card>
           <CardHeader>
@@ -414,19 +490,6 @@ export default function SafetyInspectionNew() {
                 </Button>
               )}
 
-              {(equipmentDocs.length > 0 || workerDocs.length > 0) && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setDocTab(equipmentDocs.length > 0 ? "equipment" : "worker");
-                    setShowDocsDialog(true);
-                  }}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  서류 보기
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -736,77 +799,44 @@ export default function SafetyInspectionNew() {
           </CardContent>
         </Card>
 
-        {/* 제출 버튼 */}
-        <div className="fixed bottom-16 left-0 right-0 p-4 bg-white border-t-2 shadow-lg space-y-3 z-40">
+        </div>
+
+        <div className="mt-8 space-y-3">
           <Button
             variant="outline"
-            className="w-full h-14 text-base font-semibold"
+            className="h-14 w-full text-base font-semibold"
             onClick={handleSaveDraft}
             disabled={createInspectionMutation.isPending || saveResultMutation.isPending}
           >
             {createInspectionMutation.isPending || saveResultMutation.isPending ? (
               <>
-                <div className="animate-spin h-5 w-5 border-2 border-gray-600 border-t-transparent rounded-full mr-2" />
+                <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-transparent" />
                 저장 중...
               </>
             ) : (
               <>
-                <Save className="h-5 w-5 mr-2" />
+                <Save className="mr-2 h-5 w-5" />
                 임시 저장
               </>
             )}
           </Button>
           <Button
-            className="w-full h-14 text-base font-semibold bg-green-600 hover:bg-green-700"
+            className="h-14 w-full bg-green-600 text-base font-semibold hover:bg-green-700"
             onClick={handleSubmit}
             disabled={submitInspectionMutation.isPending}
           >
             {submitInspectionMutation.isPending ? (
               <>
-                <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 저장 중...
               </>
             ) : (
               <>
-                <CheckCircle className="h-5 w-5 mr-2" />
+                <CheckCircle className="mr-2 h-5 w-5" />
                 저장 완료
               </>
             )}
           </Button>
-        </div>
-
-        {/* 하단 네비게이션 */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50">
-          <div className="flex items-center justify-around py-3">
-            <button
-              onClick={() => setLocation("/mobile/inspector")}
-              className="flex flex-col items-center gap-1 px-6 py-2"
-            >
-              <Search className="h-6 w-6 text-gray-600" />
-              <span className="text-xs font-medium text-gray-600">점검 작성</span>
-            </button>
-            <button
-              onClick={() => setLocation("/mobile/inspector/history")}
-              className="flex flex-col items-center gap-1 px-6 py-2"
-            >
-              <FileText className="h-6 w-6 text-gray-600" />
-              <span className="text-xs font-medium text-gray-600">점검 내역</span>
-            </button>
-            <button
-              onClick={() => {
-                if ((equipmentDocs.length === 0) && (workerDocs.length === 0)) {
-                  toast.info("확인 가능한 서류가 없습니다.");
-                  return;
-                }
-                setDocTab(equipmentDocs.length > 0 ? "equipment" : "worker");
-                setShowDocsDialog(true);
-              }}
-              className="flex flex-col items-center gap-1 px-6 py-2"
-            >
-              <BookOpen className="h-6 w-6 text-gray-600" />
-              <span className="text-xs font-medium text-gray-600">서류 보기</span>
-            </button>
-          </div>
         </div>
       </div>
 

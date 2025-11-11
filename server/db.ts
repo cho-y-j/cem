@@ -602,13 +602,14 @@ export type EquipmentFilterOptions = {
   bpCompanyId?: string;
   epCompanyId?: string;
   search?: string;
+  ownerId?: string;
 };
 
 export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = {}): Promise<Equipment[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  const { ownerCompanyId, bpCompanyId, epCompanyId, search } = filters;
+  const { ownerCompanyId, bpCompanyId, epCompanyId, search, ownerId } = filters;
 
   let query = supabase
     .from('equipment')
@@ -621,6 +622,10 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
 
   if (bpCompanyId) {
     query = query.eq('current_bp_id', bpCompanyId);
+  }
+
+  if (ownerId) {
+    query = query.eq('owner_id', ownerId);
   }
 
   if (search?.trim()) {
@@ -850,13 +855,14 @@ export type WorkerFilterOptions = {
   bpCompanyId?: string;
   epCompanyId?: string;
   search?: string;
+  ownerId?: string;
 };
 
 export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): Promise<Worker[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  const { ownerCompanyId, bpCompanyId, epCompanyId, search } = filters;
+  const { ownerCompanyId, bpCompanyId, epCompanyId, search, ownerId } = filters;
 
   let allowedWorkerIds: Set<string> | null = null;
 
@@ -927,6 +933,10 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
 
   if (allowedWorkerIds !== null) {
     query = query.in('id', Array.from(allowedWorkerIds));
+  }
+
+  if (ownerId) {
+    query = query.eq('owner_id', ownerId);
   }
 
   if (search?.trim()) {
@@ -3017,6 +3027,113 @@ export async function getSafetyInspections(filters?: {
   }
 
   return toCamelCaseArray(data || []);
+}
+
+export type SafetyInspectionReviewFilterOptions = {
+  status?: string;
+  ownerCompanyId?: string;
+  bpCompanyId?: string;
+  epCompanyId?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+export async function getSafetyInspectionsForReview(filters: SafetyInspectionReviewFilterOptions = {}) {
+  const baseFilters: {
+    inspectorType: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  } = {
+    inspectorType: "inspector",
+  };
+
+  if (filters.status) {
+    baseFilters.status = filters.status;
+  }
+  if (filters.startDate) {
+    baseFilters.startDate = filters.startDate;
+  }
+  if (filters.endDate) {
+    baseFilters.endDate = filters.endDate;
+  }
+
+  let inspections = await getSafetyInspections(baseFilters);
+
+  // submitted/reviewed만 유지
+  inspections = inspections.filter((inspection: any) =>
+    inspection.status === "submitted" || inspection.status === "reviewed"
+  );
+
+  if (inspections.length === 0) {
+    return [];
+  }
+
+  const equipmentIds = Array.from(
+    new Set(
+      inspections
+        .map((inspection: any) => inspection.equipmentId)
+        .filter((id: string | null | undefined): id is string => Boolean(id))
+    )
+  );
+
+  const contextMap = new Map<string, Awaited<ReturnType<typeof getEquipmentInspectionContext>>>();
+  for (const equipmentId of equipmentIds) {
+    const context = await getEquipmentInspectionContext(equipmentId);
+    contextMap.set(equipmentId, context);
+  }
+
+  const normalizedSearch = filters.search?.trim().toLowerCase();
+
+  return inspections
+    .map((inspection: any) => {
+      const context = inspection.equipmentId ? contextMap.get(inspection.equipmentId) : undefined;
+      const ownerCompanyId =
+        (context?.equipment?.ownerCompany as any)?.id ||
+        context?.equipment?.ownerId ||
+        null;
+      const bpCompanyId =
+        (context?.activeDeployment?.bpCompany as any)?.id ||
+        context?.equipment?.currentBpId ||
+        null;
+      const epCompanyId =
+        (context?.activeDeployment?.epCompany as any)?.id || null;
+
+      const matchesOwner =
+        !filters.ownerCompanyId || filters.ownerCompanyId === ownerCompanyId;
+      const matchesBp =
+        !filters.bpCompanyId || filters.bpCompanyId === bpCompanyId;
+      const matchesEp =
+        !filters.epCompanyId || filters.epCompanyId === epCompanyId;
+
+      const matchesSearch =
+        !normalizedSearch ||
+        Boolean(
+          inspection.vehicleNumber &&
+            inspection.vehicleNumber
+              .toLowerCase()
+              .includes(normalizedSearch)
+        ) ||
+        Boolean(
+          inspection.equipmentName &&
+            inspection.equipmentName
+              .toLowerCase()
+              .includes(normalizedSearch)
+        );
+
+      if (!matchesOwner || !matchesBp || !matchesEp || !matchesSearch) {
+        return null;
+      }
+
+      return {
+        ...inspection,
+        ownerCompany: context?.equipment?.ownerCompany || null,
+        bpCompany: context?.activeDeployment?.bpCompany || null,
+        epCompany: context?.activeDeployment?.epCompany || null,
+      };
+    })
+    .filter((inspection): inspection is any => inspection !== null);
 }
 
 /**

@@ -12,6 +12,7 @@ interface MobileLayoutProps {
   showMenu?: boolean;
   showBottomNav?: boolean; // 하단 네비게이션 표시 여부
   headerAction?: ReactNode;
+  showHeader?: boolean;
 }
 
 export default function MobileLayout({
@@ -21,6 +22,7 @@ export default function MobileLayout({
   showMenu = false,
   showBottomNav = true,
   headerAction,
+  showHeader = true,
 }: MobileLayoutProps) {
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
@@ -28,40 +30,42 @@ export default function MobileLayout({
   return (
     <div className="min-h-screen bg-gray-50 safe-area-inset">
       {/* 헤더 - 모바일 최적화 */}
-      <header className="sticky top-0 z-50 bg-white border-b shadow-sm safe-area-inset-top">
-        <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {showBack && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => window.history.back()}
-                className="h-10 w-10 shrink-0"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            )}
-            {showMenu && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 shrink-0"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-            )}
-            <div className="flex-1 min-w-0">
-              {title && <h1 className="text-lg font-bold truncate">{title}</h1>}
-              {user && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {user.name || user.email}
-                </p>
+      {showHeader && (
+        <header className="sticky top-0 z-50 bg-white border-b shadow-sm safe-area-inset-top">
+          <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {showBack && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => window.history.back()}
+                  className="h-10 w-10 shrink-0"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
               )}
+              {showMenu && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              )}
+              <div className="flex-1 min-w-0">
+                {title && <h1 className="text-lg font-bold truncate">{title}</h1>}
+                {user && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user.name || user.email}
+                  </p>
+                )}
+              </div>
             </div>
+            {headerAction && <div className="shrink-0">{headerAction}</div>}
           </div>
-          {headerAction && <div className="shrink-0">{headerAction}</div>}
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* 메인 컨텐츠 - 모바일 최적화 */}
       <main className={cn(showBottomNav && "pb-24 safe-area-inset-bottom")}>

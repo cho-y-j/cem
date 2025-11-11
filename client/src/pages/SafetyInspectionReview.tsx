@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
@@ -28,6 +28,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   CheckCircle,
   Clock,
@@ -36,19 +44,79 @@ import {
   FileText,
   Calendar,
   User,
-  Eye
+  Eye,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function SafetyInspectionReview() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const role = user?.role?.toLowerCase();
+  const isAdmin = role === "admin";
+  const isEp = role === "ep";
+  const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "reviewed">("all");
+  const [ownerFilter, setOwnerFilter] = useState<string>("");
+  const [bpFilter, setBpFilter] = useState<string>("");
+  const [epFilter, setEpFilter] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedInspection, setSelectedInspection] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [reviewComments, setReviewComments] = useState("");
 
+  const reviewFilters = useMemo(() => {
+    const payload: Record<string, string> = {};
+    if (statusFilter !== "all") {
+      payload.status = statusFilter;
+    }
+    if (ownerFilter) {
+      payload.ownerCompanyId = ownerFilter;
+    }
+    if (bpFilter) {
+      payload.bpCompanyId = bpFilter;
+    }
+    if (epFilter) {
+      payload.epCompanyId = epFilter;
+    }
+    const trimmedSearch = searchTerm.trim();
+    if (trimmedSearch) {
+      payload.search = trimmedSearch;
+    }
+    if (startDate) {
+      payload.startDate = startDate;
+    }
+    if (endDate) {
+      payload.endDate = endDate;
+    }
+    return Object.keys(payload).length > 0 ? payload : undefined;
+  }, [statusFilter, ownerFilter, bpFilter, epFilter, searchTerm, startDate, endDate]);
+
   // 제출된 점검 목록 조회
-  const { data: inspections, refetch } = trpc.safetyInspection.listSubmittedInspections.useQuery();
+  const {
+    data: inspectionsData,
+    refetch,
+    isLoading,
+  } = trpc.safetyInspection.listSubmittedInspections.useQuery(reviewFilters, {
+    keepPreviousData: true,
+  });
+  const inspections = inspectionsData || [];
+
+  const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "owner" },
+    { enabled: isAdmin }
+  );
+  const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "bp" },
+    { enabled: isAdmin || isEp }
+  );
+  const { data: epCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "ep" },
+    { enabled: isAdmin }
+  );
 
   // 점검 상세 조회
   const { data: inspectionDetail } = trpc.safetyInspection.getInspection.useQuery(
@@ -126,6 +194,141 @@ export default function SafetyInspectionReview() {
         </p>
       </div>
 
+      {/* 필터 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg font-semibold">검색 및 필터</CardTitle>
+          <CardDescription>차량번호, 날짜, 소속별로 점검 내역을 좁혀보세요</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="inspection-search">차량 / 장비 검색</Label>
+              <Input
+                id="inspection-search"
+                placeholder="차량번호 또는 장비명"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>점검 상태</Label>
+              <Select
+                value={statusFilter}
+                onValueChange={(value: "all" | "submitted" | "reviewed") => setStatusFilter(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="submitted">제출됨</SelectItem>
+                  <SelectItem value="reviewed">확인완료</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="inspection-start">시작일</Label>
+              <Input
+                id="inspection-start"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="inspection-end">종료일</Label>
+              <Input
+                id="inspection-end"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+            </div>
+            {isAdmin && (
+              <div className="flex flex-col gap-1.5">
+                <Label>Owner 회사</Label>
+                <Select
+                  value={ownerFilter || "all"}
+                  onValueChange={(value) => setOwnerFilter(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {ownerCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(isAdmin || isEp) && (
+              <div className="flex flex-col gap-1.5">
+                <Label>BP 회사</Label>
+                <Select
+                  value={bpFilter || "all"}
+                  onValueChange={(value) => setBpFilter(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {bpCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isAdmin && (
+              <div className="flex flex-col gap-1.5">
+                <Label>EP 회사</Label>
+                <Select
+                  value={epFilter || "all"}
+                  onValueChange={(value) => setEpFilter(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {epCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStatusFilter("all");
+                setOwnerFilter("");
+                setBpFilter("");
+                setEpFilter("");
+                setSearchTerm("");
+                setStartDate("");
+                setEndDate("");
+                refetch();
+              }}
+            >
+              초기화
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -138,7 +341,7 @@ export default function SafetyInspectionReview() {
             <div className="flex items-center gap-2">
               <Clock className="h-8 w-8 text-blue-500" />
               <div className="text-3xl font-bold">
-                {inspections?.filter((i: any) => i.status === "submitted").length || 0}
+                {inspections.filter((i: any) => i.status === "submitted").length}
               </div>
             </div>
           </CardContent>
@@ -154,7 +357,7 @@ export default function SafetyInspectionReview() {
             <div className="flex items-center gap-2">
               <CheckCircle className="h-8 w-8 text-green-500" />
               <div className="text-3xl font-bold">
-                {inspections?.filter((i: any) => i.status === "reviewed").length || 0}
+                {inspections.filter((i: any) => i.status === "reviewed").length}
               </div>
             </div>
           </CardContent>
@@ -170,7 +373,7 @@ export default function SafetyInspectionReview() {
             <div className="flex items-center gap-2">
               <FileText className="h-8 w-8 text-gray-500" />
               <div className="text-3xl font-bold">
-                {inspections?.length || 0}
+                {inspections.length}
               </div>
             </div>
           </CardContent>
@@ -186,9 +389,14 @@ export default function SafetyInspectionReview() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!inspections || inspections.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              불러오는 중입니다...
+            </div>
+          ) : inspections.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              제출된 점검이 없습니다.
+              조건에 맞는 점검이 없습니다.
             </div>
           ) : (
             <Table>
@@ -198,6 +406,7 @@ export default function SafetyInspectionReview() {
                   <TableHead>차량번호</TableHead>
                   <TableHead>장비명</TableHead>
                   <TableHead>점검 빈도</TableHead>
+                  <TableHead>Owner / BP</TableHead>
                   <TableHead>점검원</TableHead>
                   <TableHead>제출일시</TableHead>
                   <TableHead>상태</TableHead>
@@ -224,6 +433,13 @@ export default function SafetyInspectionReview() {
                           ? "월간"
                           : "필요시"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <span>Owner: {inspection.ownerCompany?.name || "-"}</span>
+                        <span>BP: {inspection.bpCompany?.name || "-"}</span>
+                        <span>EP: {inspection.epCompany?.name || "-"}</span>
+                      </div>
                     </TableCell>
                     <TableCell>{inspection.inspector?.name || "-"}</TableCell>
                     <TableCell>

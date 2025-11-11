@@ -453,23 +453,35 @@ export const safetyInspectionRouter = router({
    * 제출된 점검 목록 조회 (EP용)
    * 제출됨(submitted)과 확인완료(reviewed) 모두 조회
    */
-  listSubmittedInspections: protectedProcedure.query(async ({ ctx }) => {
-    const userRole = ctx.user.role?.toLowerCase();
-    if (userRole !== "ep" && userRole !== "admin") {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "EP 또는 Admin만 조회할 수 있습니다.",
-      });
-    }
+  listSubmittedInspections: protectedProcedure
+    .input(
+      z
+        .object({
+          status: z.enum(["submitted", "reviewed"]).optional(),
+          ownerCompanyId: z.string().optional(),
+          bpCompanyId: z.string().optional(),
+          epCompanyId: z.string().optional(),
+          search: z.string().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const userRole = ctx.user.role?.toLowerCase();
+      if (userRole !== "ep" && userRole !== "admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "EP 또는 Admin만 조회할 수 있습니다.",
+        });
+      }
 
-    // submitted와 reviewed 둘 다 조회 (draft은 제외)
-    const inspections = await db.getSafetyInspections({
-      inspectorType: "inspector", // 점검원이 작성한 것만
-    });
+      const filters: db.SafetyInspectionReviewFilterOptions = { ...(input || {}) };
 
-    // draft 상태 제외 (submitted와 reviewed만)
-    return inspections.filter((i: any) =>
-      i.status === "submitted" || i.status === "reviewed"
-    );
-  }),
+      if (userRole === "ep" && ctx.user.companyId) {
+        filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
+      }
+
+      return await db.getSafetyInspectionsForReview(filters);
+    }),
 });

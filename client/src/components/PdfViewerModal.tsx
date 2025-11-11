@@ -77,7 +77,7 @@ export function PdfViewerModal({
     link.click();
     // removeChild 전에 부모 노드 확인
     if (link.parentNode === document.body) {
-      document.body.removeChild(link);
+    document.body.removeChild(link);
     }
   };
 

@@ -426,16 +426,17 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const role = ctx.user.role?.toLowerCase();
 
-        if (role === "owner") {
-          return await db.getEquipmentByOwner(ctx.user.id);
-        }
-
         const filters: db.EquipmentFilterOptions = { ...(input || {}) };
 
         if (role === "bp" && ctx.user.companyId) {
           filters.bpCompanyId = filters.bpCompanyId || ctx.user.companyId;
         } else if (role === "ep" && ctx.user.companyId) {
           filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
+        } else if (role === "owner") {
+          filters.ownerId = ctx.user.id;
+          if (ctx.user.companyId) {
+            filters.ownerCompanyId = filters.ownerCompanyId || ctx.user.companyId;
+          }
         }
 
         return await db.getEquipmentWithFilters(filters);
@@ -643,16 +644,17 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const role = ctx.user.role?.toLowerCase();
 
-        if (role === "owner") {
-          return await db.getWorkersByOwner(ctx.user.id);
-        }
-
         const filters: db.WorkerFilterOptions = { ...(input || {}) };
 
         if (role === "bp" && ctx.user.companyId) {
           filters.bpCompanyId = filters.bpCompanyId || ctx.user.companyId;
         } else if (role === "ep" && ctx.user.companyId) {
           filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
+        } else if (role === "owner") {
+          filters.ownerId = ctx.user.id;
+          if (ctx.user.companyId) {
+            filters.ownerCompanyId = filters.ownerCompanyId || ctx.user.companyId;
+          }
         }
 
         return await db.getWorkersWithFilters(filters);

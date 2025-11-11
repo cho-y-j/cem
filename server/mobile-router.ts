@@ -471,7 +471,7 @@ export const mobileRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         try {
-          const workerId = await getWorkerIdFromContext(ctx);
+        const workerId = await getWorkerIdFromContext(ctx);
           
           // 좌표 유효성 검사
           if (
@@ -488,20 +488,20 @@ export const mobileRouter = router({
             });
           }
 
-          const id = nanoid();
+        const id = nanoid();
 
-          await db.createLocationLog({
-            id,
-            equipmentId: input.equipmentId,
-            workerId,
-            latitude: input.latitude.toString(),
-            longitude: input.longitude.toString(),
-            accuracy: input.accuracy?.toString(),
-            loggedAt: new Date(),
-          });
+        await db.createLocationLog({
+          id,
+          equipmentId: input.equipmentId,
+          workerId,
+          latitude: input.latitude.toString(),
+          longitude: input.longitude.toString(),
+          accuracy: input.accuracy?.toString(),
+          loggedAt: new Date(),
+        });
 
           console.log(`[Location] 위치 기록 성공: Worker ${workerId} at (${input.latitude}, ${input.longitude})`);
-          return { success: true };
+        return { success: true };
         } catch (error: any) {
           console.error('[Location] 위치 기록 실패:', error);
           

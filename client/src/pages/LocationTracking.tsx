@@ -373,11 +373,11 @@ export default function LocationTracking() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            <Badge variant="outline" className="text-sm">
-              {markers.length}개 활성 위치
-            </Badge>
+        <div className="flex items-center gap-2">
+          <MapPin className="h-5 w-5 text-primary" />
+          <Badge variant="outline" className="text-sm">
+            {markers.length}개 활성 위치
+          </Badge>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="text-sm">
@@ -543,14 +543,14 @@ export default function LocationTracking() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>실시간 지도</CardTitle>
-          <CardDescription>
-            지도의 마커를 클릭하면 상세 정보를 확인할 수 있습니다. (10초마다 자동 새로고침)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <Card>
+          <CardHeader>
+            <CardTitle>실시간 지도</CardTitle>
+            <CardDescription>
+              지도의 마커를 클릭하면 상세 정보를 확인할 수 있습니다. (10초마다 자동 새로고침)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
           <div className="relative w-full h-[600px] rounded-lg overflow-hidden">
             {/* 작업 상태별 색상 범례 - 지도 위 오버레이 */}
             <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 bg-gradient-to-br from-white to-gray-50 backdrop-blur-md p-4 rounded-lg border-2 border-gray-200 shadow-xl max-w-[200px]">
@@ -637,8 +637,8 @@ export default function LocationTracking() {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       {/* 위치 목록 */}
       {markers.length > 0 && (
