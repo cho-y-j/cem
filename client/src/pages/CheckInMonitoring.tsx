@@ -89,23 +89,18 @@ export default function CheckInMonitoring() {
     // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
     try {
       const date = new Date(dateStr);
+      
       // UTC 시간에 9시간 추가 (한국 시간)
-      const kstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-      // 또는 toLocaleTimeString 사용 (브라우저 지원 확인)
-      if (Intl && Intl.DateTimeFormat) {
-        return date.toLocaleTimeString('ko-KR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Asia/Seoul',
-        });
-      } else {
-        // 폴백: 수동으로 시간 변환
-        const hours = kstDate.getUTCHours().toString().padStart(2, '0');
-        const minutes = kstDate.getUTCMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
-      }
+      const kstTime = date.getTime() + 9 * 60 * 60 * 1000;
+      const kstDate = new Date(kstTime);
+      
+      // 한국 시간으로 포맷팅 (UTC 기준이 아닌 로컬 시간 기준)
+      const hours = kstDate.getUTCHours().toString().padStart(2, '0');
+      const minutes = kstDate.getUTCMinutes().toString().padStart(2, '0');
+      
+      return `${hours}:${minutes}`;
     } catch (error) {
-      console.error('[CheckInMonitoring] formatTime error:', error);
+      console.error('[CheckInMonitoring] formatTime error:', error, dateStr);
       return String(dateStr);
     }
   };

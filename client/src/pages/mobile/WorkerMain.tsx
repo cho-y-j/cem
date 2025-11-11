@@ -167,13 +167,22 @@ export default function WorkerMain() {
   useEffect(() => {
     if (isMounted && todayCheckInStatus?.checkIn?.checkInTime) {
       // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
-      const date = new Date(todayCheckInStatus.checkIn.checkInTime);
-      const timeStr = date.toLocaleTimeString('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Seoul',
-      });
-      setCheckInTimeDisplay(timeStr);
+      try {
+        const date = new Date(todayCheckInStatus.checkIn.checkInTime);
+        // UTC 시간에 9시간 추가 (한국 시간)
+        const kstTime = date.getTime() + 9 * 60 * 60 * 1000;
+        const kstDate = new Date(kstTime);
+        
+        // 한국 시간으로 포맷팅
+        const hours = kstDate.getUTCHours().toString().padStart(2, '0');
+        const minutes = kstDate.getUTCMinutes().toString().padStart(2, '0');
+        const timeStr = `${hours}:${minutes}`;
+        
+        setCheckInTimeDisplay(timeStr);
+      } catch (error) {
+        console.error('[WorkerMain] formatTime error:', error);
+        setCheckInTimeDisplay('');
+      }
     }
   }, [isMounted, todayCheckInStatus?.checkIn?.checkInTime]);
 
