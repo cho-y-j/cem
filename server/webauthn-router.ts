@@ -348,7 +348,12 @@ export const webauthnRouter = router({
         console.log('[WebAuthn] Registration info:', {
           credentialIDType: typeof finalCredentialID,
           credentialIDIsBuffer: Buffer.isBuffer(finalCredentialID),
+          credentialIDIsUint8Array: finalCredentialID instanceof Uint8Array,
+          credentialIDIsString: typeof finalCredentialID === 'string',
           credentialIDLength: finalCredentialID?.length,
+          credentialIDPreview: typeof finalCredentialID === 'string' 
+            ? finalCredentialID.substring(0, 30) + '...' 
+            : 'not a string',
           credentialPublicKeyType: typeof finalCredentialPublicKey,
           credentialPublicKeyIsBuffer: Buffer.isBuffer(finalCredentialPublicKey),
           credentialPublicKeyLength: finalCredentialPublicKey?.length,
@@ -356,12 +361,28 @@ export const webauthnRouter = router({
         });
 
         // Base64URL 인코딩 (저장용)
-        // credentialID는 Uint8Array이므로 Buffer.from()으로 변환
-        const credentialIdBuffer = finalCredentialID instanceof Uint8Array 
-          ? Buffer.from(finalCredentialID) 
-          : Buffer.isBuffer(finalCredentialID) 
-            ? finalCredentialID 
-            : Buffer.from(finalCredentialID as any);
+        // credentialID는 Uint8Array/Buffer이거나 이미 base64url 문자열일 수 있음
+        let credentialIdBase64: string;
+        if (typeof finalCredentialID === 'string') {
+          // 이미 base64url 문자열인 경우 그대로 사용
+          credentialIdBase64 = finalCredentialID;
+          console.log('[WebAuthn] credentialID is already a string, using as-is:', {
+            credentialIdBase64: credentialIdBase64.substring(0, 30) + '...',
+            length: credentialIdBase64.length,
+          });
+        } else {
+          // Uint8Array/Buffer인 경우 base64url로 인코딩
+          const credentialIdBuffer = finalCredentialID instanceof Uint8Array 
+            ? Buffer.from(finalCredentialID) 
+            : Buffer.isBuffer(finalCredentialID) 
+              ? finalCredentialID 
+              : Buffer.from(finalCredentialID as any);
+          credentialIdBase64 = credentialIdBuffer.toString('base64url');
+          console.log('[WebAuthn] credentialID converted from Buffer/Uint8Array:', {
+            credentialIdBase64: credentialIdBase64.substring(0, 30) + '...',
+            length: credentialIdBase64.length,
+          });
+        }
         
         const publicKeyBuffer = finalCredentialPublicKey instanceof Uint8Array
           ? Buffer.from(finalCredentialPublicKey)
@@ -369,8 +390,12 @@ export const webauthnRouter = router({
             ? finalCredentialPublicKey
             : Buffer.from(finalCredentialPublicKey as any);
 
-        const credentialIdBase64 = credentialIdBuffer.toString('base64url');
         const publicKeyBase64 = publicKeyBuffer.toString('base64');
+        
+        console.log('[WebAuthn] Final credential ID to save:', {
+          credentialIdBase64: credentialIdBase64.substring(0, 30) + '...',
+          credentialIdBase64Length: credentialIdBase64.length,
+        });
 
         // DB에 크레덴셜 저장
         const supabase = db.getSupabase();
