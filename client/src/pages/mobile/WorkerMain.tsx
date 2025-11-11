@@ -169,14 +169,27 @@ export default function WorkerMain() {
       // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
       try {
         const date = new Date(todayCheckInStatus.checkIn.checkInTime);
-        // UTC 시간에 9시간 추가 (한국 시간)
-        const kstTime = date.getTime() + 9 * 60 * 60 * 1000;
-        const kstDate = new Date(kstTime);
         
-        // 한국 시간으로 포맷팅
-        const hours = kstDate.getUTCHours().toString().padStart(2, '0');
-        const minutes = kstDate.getUTCMinutes().toString().padStart(2, '0');
+        // 디버깅: 원본 시간 확인
+        console.log('[WorkerMain] Input:', todayCheckInStatus.checkIn.checkInTime, 'UTC:', date.toISOString());
+        
+        // UTC 시간에서 직접 시간과 분 추출
+        const utcHours = date.getUTCHours();
+        const utcMinutes = date.getUTCMinutes();
+        
+        console.log('[WorkerMain] UTC:', utcHours, ':', utcMinutes);
+        
+        // 한국 시간으로 변환 (UTC + 9시간)
+        let kstHours = utcHours + 9;
+        if (kstHours >= 24) {
+          kstHours = kstHours - 24;
+        }
+        
+        const hours = kstHours.toString().padStart(2, '0');
+        const minutes = utcMinutes.toString().padStart(2, '0');
         const timeStr = `${hours}:${minutes}`;
+        
+        console.log('[WorkerMain] KST:', timeStr);
         
         setCheckInTimeDisplay(timeStr);
       } catch (error) {

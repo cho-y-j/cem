@@ -88,15 +88,30 @@ export default function CheckInMonitoring() {
   const formatTime = (dateStr: string | Date) => {
     // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
     try {
-      const date = new Date(dateStr);
+      // ISO 문자열로 명시적으로 파싱
+      const date = typeof dateStr === 'string' 
+        ? new Date(dateStr) 
+        : dateStr;
       
-      // UTC 시간에 9시간 추가 (한국 시간)
-      const kstTime = date.getTime() + 9 * 60 * 60 * 1000;
-      const kstDate = new Date(kstTime);
+      // 디버깅: 원본 시간 확인
+      console.log('[formatTime] Input:', dateStr, 'UTC:', date.toISOString());
       
-      // 한국 시간으로 포맷팅 (UTC 기준이 아닌 로컬 시간 기준)
-      const hours = kstDate.getUTCHours().toString().padStart(2, '0');
-      const minutes = kstDate.getUTCMinutes().toString().padStart(2, '0');
+      // UTC 시간에서 직접 시간과 분 추출
+      const utcHours = date.getUTCHours();
+      const utcMinutes = date.getUTCMinutes();
+      
+      console.log('[formatTime] UTC:', utcHours, ':', utcMinutes);
+      
+      // 한국 시간으로 변환 (UTC + 9시간)
+      let kstHours = utcHours + 9;
+      if (kstHours >= 24) {
+        kstHours = kstHours - 24;
+      }
+      
+      const hours = kstHours.toString().padStart(2, '0');
+      const minutes = utcMinutes.toString().padStart(2, '0');
+      
+      console.log('[formatTime] KST:', hours, ':', minutes);
       
       return `${hours}:${minutes}`;
     } catch (error) {
