@@ -3787,7 +3787,10 @@ export async function isWithinWorkZone(
     });
 
     const distance = calculateDistance(centerLat, centerLng, lat, lng);
-    const isWithin = distance <= radiusMeters;
+    // GPS 정확도 허용 오차 추가 (약 10% 또는 최소 50m)
+    // 실내/건물 내에서 GPS 오차가 발생할 수 있으므로 여유를 둠
+    const tolerance = Math.max(radiusMeters * 0.1, 50);
+    const isWithin = distance <= (radiusMeters + tolerance);
 
     console.log(`[isWithinWorkZone] Circle result:`, {
       distance: Math.round(distance),

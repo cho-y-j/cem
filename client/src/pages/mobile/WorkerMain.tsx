@@ -179,23 +179,40 @@ export default function WorkerMain() {
 
   // 출근 체크
   const checkInMutation = trpc.checkIn.create.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const distanceMsg = data.isWithinZone
         ? `작업 구역 내에서 출근하셨습니다 (${data.distanceFromZone}m)`
         : `작업 구역 밖에서 출근하셨습니다 (${data.distanceFromZone}m 떨어짐)`;
       toast.success(`출근이 완료되었습니다!\n${distanceMsg}`);
-      refetchCheckIn();
+      
+      // 출근 상태 즉시 새로고침
+      try {
+        await refetchCheckIn();
+        // utils를 사용하여 캐시 무효화 및 강제 새로고침
+        await utils.checkIn.getTodayStatus.invalidate();
+        await utils.checkIn.getTodayStatus.refetch();
+      } catch (error) {
+        console.error('[WorkerMain] Error refetching check-in status:', error);
+      }
     },
     onError: (error) => {
+      console.error('[WorkerMain] Check-in error:', error);
       toast.error("출근 체크 실패: " + error.message);
     },
   });
 
   // 출근 기록 삭제 (테스트용)
   const deleteCheckInMutation = trpc.checkIn.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("출근 기록이 삭제되었습니다.");
-      refetchCheckIn();
+      // 출근 상태 즉시 새로고침
+      try {
+        await refetchCheckIn();
+        await utils.checkIn.getTodayStatus.invalidate();
+        await utils.checkIn.getTodayStatus.refetch();
+      } catch (error) {
+        console.error('[WorkerMain] Error refetching after delete:', error);
+      }
     },
     onError: (error) => {
       toast.error("출근 기록 삭제 실패: " + error.message);
@@ -720,12 +737,18 @@ export default function WorkerMain() {
             }
             
             // 5. 출근 체크 (생체 인증 성공)
-            checkInMutation.mutate({
-              lat: latitude,
-              lng: longitude,
-              authMethod: "webauthn",
-              webauthnCredentialId: credentialId,
-            });
+            try {
+              await checkInMutation.mutateAsync({
+                lat: latitude,
+                lng: longitude,
+                authMethod: "webauthn",
+                webauthnCredentialId: credentialId,
+              });
+              console.log('[BiometricCheckIn] Check-in mutation succeeded');
+            } catch (error: any) {
+              console.error('[BiometricCheckIn] Check-in mutation error:', error);
+              toast.error(`출근 체크 실패: ${error.message || '알 수 없는 오류'}`);
+            }
           } catch (error: any) {
             console.error('[BiometricCheckIn] Error:', error);
 
@@ -893,30 +916,39 @@ export default function WorkerMain() {
                           : `⚠ 작업 구역 밖 (${todayCheckInStatus.checkIn.distanceFromZone}m)`}
                       </div>
                     )}
+                    {todayCheckInStatus?.checkIn?.authMethod === "webauthn" && (
+                      <div className="text-xs text-green-600 mt-1">
+                        생체 인증
+                      </div>
+                    )}
                   </div>
-                  {/* 테스트용 삭제 버튼 - 출근 기록이 있을 때만 표시 */}
-                  {todayCheckInStatus?.checkIn?.id && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
-                      onClick={handleDeleteCheckIn}
-                      disabled={deleteCheckInMutation.isPending}
-                      title="테스트용: 출근 기록 삭제"
-                    >
-                      {deleteCheckInMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          <span className="text-xs">삭제</span>
-                        </>
-                      )}
-                    </Button>
-                  )}
                 </div>
               </CardContent>
             </Card>
+            {/* 삭제 버튼 - 카드 오른쪽에 별도로 배치 */}
+            {todayCheckInStatus?.checkIn?.id && (
+              <div className="px-4 mt-2 flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 border-red-300 hover:text-red-700 hover:bg-red-50"
+                  onClick={handleDeleteCheckIn}
+                  disabled={deleteCheckInMutation.isPending}
+                >
+                  {deleteCheckInMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      삭제 중...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      삭제
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
