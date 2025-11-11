@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { Search, Truck, AlertCircle, FileText, Settings, Lock } from "lucide-react";
+import { Search, Truck, AlertCircle, FileText, Settings, Lock, User } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -158,6 +159,32 @@ export default function InspectorMain() {
                         {equipment.specification && (
                           <div className="text-sm text-gray-500 mt-0.5">
                             {equipment.specification}
+                          </div>
+                        )}
+                        {equipment.activeDeployment?.worker ? (
+                          <div className="mt-2 space-y-1">
+                            <div className="flex items-center gap-2 text-sm text-blue-700">
+                              <User className="h-4 w-4" />
+                              <span className="font-semibold">
+                                {equipment.activeDeployment.worker.name}
+                              </span>
+                              {equipment.activeDeployment?.bpCompany?.name && (
+                                <Badge variant="outline" className="text-xs">
+                                  {equipment.activeDeployment.bpCompany.name}
+                                </Badge>
+                              )}
+                            </div>
+                            {equipment.activeDeployment.worker.licenseNum && (
+                              <div className="text-xs text-muted-foreground">
+                                면허번호: {equipment.activeDeployment.worker.licenseNum}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-2">
+                            <Badge variant="destructive" className="text-xs">
+                              배정된 운전자 없음
+                            </Badge>
                           </div>
                         )}
                       </div>

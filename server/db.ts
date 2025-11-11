@@ -2949,7 +2949,55 @@ export async function searchEquipmentByVehicleNumber(partialNumber: string) {
     return [];
   }
 
-  return toCamelCaseArray(data || []);
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  const equipmentIds = data.map((item) => item.id).filter(Boolean);
+  let deploymentMap = new Map<string, any>();
+
+  if (equipmentIds.length > 0) {
+    const { data: deployments, error: deploymentError } = await supabase
+      .from('deployments')
+      .select(`
+        *,
+        worker:workers!deployments_worker_id_fkey(
+          id,
+          name,
+          license_num,
+          owner_id,
+          phone
+        ),
+        bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
+        ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
+      `)
+      .in('equipment_id', equipmentIds)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    if (deploymentError) {
+      console.error('[Database] Error fetching deployments for equipment search:', deploymentError);
+    } else if (deployments) {
+      deploymentMap = deployments.reduce((map, deployment) => {
+        const equipmentId = deployment.equipment_id;
+        if (!equipmentId) return map;
+        if (!map.has(equipmentId)) {
+          map.set(equipmentId, deployment);
+        }
+        return map;
+      }, new Map<string, any>());
+    }
+  }
+
+  const equipments = toCamelCaseArray(data);
+
+  return equipments.map((equipment: any) => {
+    const deployment = deploymentMap.get(equipment.id);
+    return {
+      ...equipment,
+      activeDeployment: deployment ? toCamelCase(deployment) : null,
+    };
+  });
 }
 
 /**

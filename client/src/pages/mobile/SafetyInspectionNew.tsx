@@ -355,6 +355,33 @@ export default function SafetyInspectionNew() {
                 </div>
               </div>
 
+              <div className="border-t pt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">배정 운전자</span>
+                  {equipment?.activeDeployment?.worker ? (
+                    <span className="font-semibold text-blue-700">
+                      {equipment.activeDeployment.worker.name}
+                    </span>
+                  ) : (
+                    <Badge variant="destructive" className="text-xs">
+                      배정된 운전자 없음
+                    </Badge>
+                  )}
+                </div>
+                {equipment?.activeDeployment?.worker?.licenseNum && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>면허번호</span>
+                    <span>{equipment.activeDeployment.worker.licenseNum}</span>
+                  </div>
+                )}
+                {equipment?.activeDeployment?.bpCompany?.name && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>소속 (BP)</span>
+                    <span>{equipment.activeDeployment.bpCompany.name}</span>
+                  </div>
+                )}
+              </div>
+
               {/* 작업계획서 보기 버튼 */}
               {workPlan?.hasWorkPlan && (
                 <Button
