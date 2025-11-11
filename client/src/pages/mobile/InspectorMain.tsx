@@ -10,7 +10,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,6 +27,11 @@ export default function InspectorMain() {
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isNfcScanning, setIsNfcScanning] = useState(false);
   const [lastNfcTag, setLastNfcTag] = useState<string | null>(null);
+  const [pendingNfcTag, setPendingNfcTag] = useState<string | null>(null);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [tagDialogEquipment, setTagDialogEquipment] = useState<any | null>(null);
+  const [tagInputValue, setTagInputValue] = useState("");
+  const [isDialogScanning, setIsDialogScanning] = useState(false);
 
   // PIN 변경 관련 상태
   const [showPinDialog, setShowPinDialog] = useState(false);
@@ -43,6 +47,7 @@ export default function InspectorMain() {
     }
   );
   const utils = trpc.useUtils();
+  const assignNfcTagMutation = trpc.safetyInspection.assignNfcTag.useMutation();
 
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).NDEFReader) {
@@ -98,7 +103,10 @@ export default function InspectorMain() {
           toast.info(`NFC 태그 인식: ${tagValue}`);
           const context = await utils.safetyInspection.getEquipmentByNfcTag.fetch({ nfcTagId: tagValue });
           if (!context?.equipment?.id) {
-            toast.error("해당 NFC 태그에 연결된 장비를 찾을 수 없습니다.");
+            setPendingNfcTag(tagValue);
+            setLastNfcTag(null);
+            setSearchResults([]);
+            toast.error("등록되지 않은 태그입니다. 장비를 검색한 뒤 '태그 등록'을 눌러 연결해주세요.");
             return;
           }
 
@@ -107,6 +115,7 @@ export default function InspectorMain() {
             activeDeployment: context.activeDeployment || null,
           };
 
+          setPendingNfcTag(null);
           setLastNfcTag(tagValue);
           setSearchInput(context.equipment.regNum || "");
           setSearchResults([equipmentResult]);
@@ -126,6 +135,103 @@ export default function InspectorMain() {
     }
   };
 
+  const handleDialogNfcScan = async () => {
+    if (!isNfcSupported) {
+      toast.error("이 기기는 NFC 스캔을 지원하지 않습니다.");
+      return;
+    }
+
+    try {
+      const NDEFReader = (window as any).NDEFReader;
+      const reader = new NDEFReader();
+      await reader.scan();
+      setIsDialogScanning(true);
+      toast.info("등록할 NFC 태그를 기기에 가까이 가져다주세요.");
+
+      const handleError = (event: any) => {
+        console.error("[InspectorMain] NFC 스캔 오류:", event?.message || event);
+        setIsDialogScanning(false);
+        toast.error("NFC 스캔 중 오류가 발생했습니다.");
+        reader.removeEventListener("error", handleError);
+      };
+
+      const handleReading = (event: any) => {
+        reader.removeEventListener("reading", handleReading);
+        reader.removeEventListener("error", handleError);
+        setIsDialogScanning(false);
+
+        try {
+          let tagValue = typeof event.serialNumber === "string" ? event.serialNumber.trim() : "";
+          if (event.message?.records?.length) {
+            for (const record of event.message.records) {
+              if (record.recordType === "text" || record.recordType === "url") {
+                const decoder = new TextDecoder(record.encoding || "utf-8");
+                const decoded = decoder.decode(record.data);
+                if (decoded?.trim()) {
+                  tagValue = decoded.trim();
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!tagValue) {
+            toast.error("인식된 NFC 태그에서 식별 정보를 찾지 못했습니다.");
+            return;
+          }
+
+          setTagInputValue(tagValue);
+          toast.success(`NFC 태그 인식: ${tagValue}`);
+        } catch (error: any) {
+          console.error("[InspectorMain] NFC 태그 처리 중 오류:", error);
+          toast.error(error?.message || "NFC 태그를 처리하는 중 오류가 발생했습니다.");
+        }
+      };
+
+      reader.addEventListener("error", handleError);
+      reader.addEventListener("reading", handleReading, { once: true });
+    } catch (error: any) {
+      console.error("[InspectorMain] NFC 스캔 시작 실패:", error);
+      setIsDialogScanning(false);
+      toast.error(error?.message || "NFC 스캔을 시작할 수 없습니다.");
+    }
+  };
+
+  const openTagDialog = (equipment: any) => {
+    setTagDialogEquipment(equipment);
+    setTagInputValue(equipment.nfcTagId || pendingNfcTag || "");
+    setTagDialogOpen(true);
+  };
+
+  const handleAssignNfcTag = async () => {
+    if (!tagDialogEquipment) return;
+
+    const value = tagInputValue.trim();
+    if (!value) {
+      toast.error("등록할 NFC 태그를 입력해주세요.");
+      return;
+    }
+
+    try {
+      const updated = await assignNfcTagMutation.mutateAsync({
+        equipmentId: tagDialogEquipment.id,
+        nfcTagId: value,
+      });
+
+      setSearchResults((prev) =>
+        prev.map((item) =>
+          item.id === updated.id ? { ...item, nfcTagId: updated.nfcTagId } : item
+        )
+      );
+      setTagDialogOpen(false);
+      setPendingNfcTag(null);
+      setLastNfcTag(updated.nfcTagId || null);
+      toast.success("NFC 태그를 등록했습니다.");
+    } catch (error: any) {
+      toast.error(error?.message || "NFC 태그 등록에 실패했습니다.");
+    }
+  };
+
   const handleSearch = async () => {
     if (searchInput.trim().length === 0) {
       toast.error("차량번호를 입력해주세요.");
@@ -135,6 +241,7 @@ export default function InspectorMain() {
     const result = await refetch();
 
     setLastNfcTag(null);
+    setPendingNfcTag(null);
 
     if (!result.data || result.data.length === 0) {
       toast.error("해당 차량번호를 가진 장비를 찾을 수 없습니다.");
@@ -331,6 +438,32 @@ export default function InspectorMain() {
                             NFC 태그: {equipment.nfcTagId}
                           </div>
                         )}
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openTagDialog(equipment);
+                            }}
+                          >
+                            <Nfc className="h-4 w-4 mr-2" />
+                            태그 등록
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setLocation(`/mobile/inspector/inspection/${equipment.id}`);
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            점검 시작
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex-shrink-0">
                         <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
@@ -440,6 +573,97 @@ export default function InspectorMain() {
           </button>
         </div>
       </div>
+
+      <Dialog
+        open={tagDialogOpen}
+        onOpenChange={(open) => {
+          setTagDialogOpen(open);
+          if (!open) {
+            setTagDialogEquipment(null);
+            setTagInputValue("");
+            setIsDialogScanning(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[95vw]">
+          <DialogHeader>
+            <DialogTitle>NFC 태그 등록</DialogTitle>
+            <DialogDescription>
+              선택한 장비에 연결할 NFC 태그를 입력하거나 스캔하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {tagDialogEquipment && (
+              <Card className="bg-slate-50 border-slate-200">
+                <CardContent className="py-3 text-sm space-y-1">
+                  <div className="font-semibold text-slate-800">
+                    {tagDialogEquipment.regNum}
+                  </div>
+                  <div className="text-slate-600">
+                    {tagDialogEquipment.equipType?.name || "장비 종류 미상"}
+                  </div>
+                  {tagDialogEquipment.activeDeployment?.worker?.name && (
+                    <div className="text-xs text-slate-500">
+                      배정 운전자: {tagDialogEquipment.activeDeployment.worker.name}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="nfcTagInput">NFC 태그 ID</Label>
+              <Input
+                id="nfcTagInput"
+                placeholder="태그 값을 입력하거나 스캔하세요."
+                value={tagInputValue}
+                onChange={(e) => setTagInputValue(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                태그 표면에 인쇄된 값이 있으면 그대로 입력해도 됩니다.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                disabled={!isNfcSupported || isDialogScanning}
+                onClick={handleDialogNfcScan}
+              >
+                {isDialogScanning ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    스캔 중...
+                  </>
+                ) : (
+                  <>
+                    <Nfc className="h-4 w-4 mr-2" />
+                    태그 스캔
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={handleAssignNfcTag}
+                disabled={assignNfcTagMutation.isPending}
+              >
+                {assignNfcTagMutation.isPending ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    저장 중...
+                  </>
+                ) : (
+                  "태그 저장"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MobileLayout>
   );
 }

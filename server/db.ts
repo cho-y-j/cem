@@ -640,6 +640,49 @@ export async function updateEquipment(id: string, data: Partial<InsertEquipment>
   }
 }
 
+export async function assignNfcTagToEquipment(equipmentId: string, nfcTagId: string | null): Promise<Equipment | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const trimmedTag = nfcTagId ? nfcTagId.trim() : null;
+
+  if (trimmedTag) {
+    const { data: existing, error: existingError } = await supabase
+      .from('equipment')
+      .select('id, reg_num')
+      .eq('nfc_tag_id', trimmedTag)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("[Database] Error checking existing NFC tag:", existingError);
+      throw existingError;
+    }
+
+    if (existing && existing.id !== equipmentId) {
+      const error = new Error("NFC_TAG_IN_USE");
+      (error as any).existingEquipment = existing;
+      throw error;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('equipment')
+    .update({ nfc_tag_id: trimmedTag })
+    .eq('id', equipmentId)
+    .select(`
+      *,
+      equip_type:equip_types(*)
+    `)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[Database] Error assigning NFC tag:", error);
+    throw error;
+  }
+
+  return data ? (toCamelCase(data) as Equipment) : null;
+}
+
 export async function deleteEquipment(id: string) {
   const supabase = getSupabase();
   if (!supabase) return;

@@ -193,6 +193,42 @@ export const safetyInspectionRouter = router({
     }),
 
   /**
+   * NFC 태그 등록/변경
+   */
+  assignNfcTag: protectedProcedure
+    .input(
+      z.object({
+        equipmentId: z.string(),
+        nfcTagId: z.string().trim().min(1, "NFC 태그를 입력해주세요.").max(128).optional().nullable(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const updated = await db.assignNfcTagToEquipment(input.equipmentId, input.nfcTagId ?? null);
+        if (!updated) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "장비 정보를 업데이트하지 못했습니다.",
+          });
+        }
+        return updated;
+      } catch (error: any) {
+        if (error?.message === "NFC_TAG_IN_USE") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "이미 다른 장비에 등록된 NFC 태그입니다.",
+          });
+        }
+
+        console.error("[SafetyInspection] assignNfcTag error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "NFC 태그를 등록하는 중 오류가 발생했습니다.",
+        });
+      }
+    }),
+
+  /**
    * 장비에 적용 가능한 템플릿 조회
    */
   getApplicableTemplates: protectedProcedure
