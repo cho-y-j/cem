@@ -481,11 +481,11 @@ export const webauthnRouter = router({
           credentialIds: credentials.map((c: any) => c.id),
         });
 
-        // 브라우저는 기기에 저장된 패스키 ID를 ArrayBuffer 형식으로 비교하므로
-        // DB에 저장된 base64url 문자열을 Buffer로 변환하여 전달해야 함
+        // @simplewebauthn/server의 generateAuthenticationOptions는 allowCredentials.id를 base64url 문자열로 기대
+        // 라이브러리가 내부적으로 브라우저에 전달할 때 적절한 형식으로 변환함
         const allowCredentials = credentials.map((c: any) => ({
-          id: Buffer.from(c.id, 'base64url'), // base64url 문자열을 Buffer(Uint8Array)로 변환
-          type: 'public-key',
+          id: c.id as string, // DB에 저장된 base64url 문자열 그대로 사용
+          type: 'public-key' as const,
         }));
 
         console.log('[WebAuthn] Calling generateAuthenticationOptions with:', {
