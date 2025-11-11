@@ -1,9 +1,103 @@
 # 건설장비 및 인력 관리 시스템 (ERMS) - TODO 및 작업 가이드
 
-**마지막 업데이트**: 2025-11-10
+**마지막 업데이트**: 2025-11-11 (오후)
 **프로젝트**: Equipment and Resource Management System (ERMS)
 **Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY
-**현재 단계**: 🔄 **Worker 지문 출근 문제 해결**
+**현재 단계**: ✅ **시간 표시 및 UI/UX 개선 완료** → 🔄 **워커-차량 매칭 및 GPS 위치 추적 개선 준비**
+
+---
+
+## 🎉 오늘 완료한 작업 (2025-11-11)
+
+### ✅ 출근 시간 표시 문제 완전 해결
+
+**문제:**
+- 출근 시간이 UTC 시간(예: 05:11)으로 표시됨
+- 한국 시간(KST, 예: 14:11)으로 변환되지 않음
+- 클라이언트 측 시간 변환은 올바르게 작동하지만 데이터베이스 저장이 문제
+
+**근본 원인:**
+- `drizzle/schema.ts`에서 `checkInTime` 컬럼이 `timestamp`로 정의됨
+- PostgreSQL의 `timestamp`는 타임존 정보를 포함하지 않음
+- `timestamptz` (timestamp with time zone)를 사용해야 타임존 정보 저장
+
+**해결 방법:**
+- ✅ `drizzle/schema.ts`에서 `checkInTime` 컬럼을 `timestamp`에서 `timestamp with timezone`로 변경
+- ✅ `createdAt` 컬럼도 동일하게 `timestamp with timezone`로 변경
+- ✅ Drizzle 마이그레이션 SQL 생성 (`0008_moaning_dark_beast.sql`)
+- ✅ Supabase SQL 에디터에서 마이그레이션 실행 완료
+- ✅ 클라이언트에서 `toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' })` 사용하여 정확한 표시
+
+**수정된 파일:**
+- `drizzle/schema.ts` - checkInTime, createdAt 컬럼 타입 변경
+- `drizzle/migrations-pg/0008_moaning_dark_beast.sql` - 마이그레이션 SQL
+- `fix-check-in-time-timezone.sql` - 수동 마이그레이션 파일
+
+**결과:**
+- ✅ 출근 시간이 정확한 한국 시간(KST)으로 저장되고 표시됨
+- ✅ 브라우저 타임존과 무관하게 정확한 시간 표시
+- ✅ 타임존 정보가 데이터베이스에 저장되어 데이터 무결성 보장
+
+**상태:** ✅ **완료 및 테스트 성공**
+
+---
+
+### ✅ WorkZones 페이지 레이아웃 문제 완전 해결
+
+**문제:**
+- 왼쪽 메뉴바와 본문 사이에 불필요한 빈 공간 존재
+- 콘텐츠가 우측으로 밀려나 보임
+- 다른 페이지는 정상인데 WorkZones 페이지만 문제
+
+**근본 원인 발견:**
+- `App.tsx`에서 이미 **모든 페이지를 DashboardLayout으로 감싸고 있음** (라우터 레벨)
+- `WorkZones.tsx`가 **내부에서 다시 DashboardLayout을 사용**하여 **이중 적용**됨
+- 결과: 레이아웃 패딩과 마진이 두 번 적용되어 빈 공간 발생
+
+**비교:**
+- `CheckInMonitoring.tsx`: ✅ DashboardLayout 없음 (App.tsx에서만 적용) - 정상
+- `WorkZones.tsx`: ❌ DashboardLayout 이중 사용 - 레이아웃 깨짐
+
+**해결 방법:**
+- ✅ `WorkZones.tsx`에서 `DashboardLayout` import 제거
+- ✅ `WorkZones.tsx`에서 `<DashboardLayout>` 래퍼 제거
+- ✅ `DashboardLayout.tsx`를 원래 상태(`p-4`)로 복원
+- ✅ WorkZones를 CheckInMonitoring과 동일한 구조로 변경
+
+**수정된 파일:**
+- `client/src/pages/WorkZones.tsx` - DashboardLayout 이중 사용 제거
+- `client/src/components/DashboardLayout.tsx` - 원래 패딩 복원
+
+**결과:**
+- ✅ 왼쪽 사이드바와 콘텐츠 사이 빈 공간 완전 제거
+- ✅ 다른 페이지들과 동일한 레이아웃으로 정상 표시
+- ✅ 반응형 동작 정상
+
+**상태:** ✅ **완료 및 테스트 성공**
+
+---
+
+### ✅ 모바일 출근 체크 에러 수정
+
+**문제:**
+- "출근체크 실패: deployment not defined" 에러 발생
+- 출근 완료 후 화면이 자동으로 업데이트되지 않음
+
+**해결 방법:**
+- ✅ 서버 코드에서 `deployment` 변수를 `activeDeployment`로 수정
+- ✅ `equipment_id` 필드명 수정 (`equipmentId` → `equipment_id`)
+- ✅ 출근 완료 후 여러 방법으로 강제 새로고침:
+  - `utils.checkIn.getTodayStatus.invalidate()` 호출
+  - `utils.checkIn.getTodayStatus.refetch()` 호출
+  - `refetchCheckIn()` 호출
+  - 500ms 후 한 번 더 refetch (UI 업데이트 보장)
+- ✅ 에러 메시지 개선 (deployment → 투입)
+
+**수정된 파일:**
+- `server/check-in-router.ts` - `activeDeployment` 사용
+- `client/src/pages/mobile/WorkerMain.tsx` - UI 새로고침 로직 개선
+
+**상태:** ✅ **완료**
 
 ---
 
@@ -149,7 +243,7 @@
 
 ---
 
-## 🐛 현재 발견된 문제 (2025-11-10)
+## 🐛 현재 발견된 문제 (2025-11-11)
 
 ### 1. 🟠 DashboardLayout 반응형 개선 필요
 
@@ -881,8 +975,10 @@ pnpm db:push          # 마이그레이션 생성 및 적용
 
 ---
 
-**마지막 업데이트**: 2025-11-09 (오후)
+**마지막 업데이트**: 2025-11-11 (오후)
 **다음 작업**: 워커-차량 매칭 및 GPS 위치 추적 시스템 개선
 **Supabase MCP**: ✅ 연결됨 및 사용 가능
 **Render MCP**: ✅ 연결됨 및 사용 가능
-**오늘 작업 요약**: WebAuthn 생체 인증 버그 수정 완료, GPS 위치 추적 시스템 개선 계획 수립
+**오늘 작업 요약**:
+- ✅ 출근 시간 표시 문제 완전 해결 (timestamptz 적용)
+- ✅ WorkZones 페이지 레이아웃 문제 완전 해결 (DashboardLayout 이중 사용 제거)
