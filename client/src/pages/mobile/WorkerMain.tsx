@@ -162,12 +162,15 @@ export default function WorkerMain() {
     },
   });
 
-  // 출근 시간 포맷팅 (클라이언트에서만)
+  // 출근 시간 포맷팅 (클라이언트에서만, 한국 시간으로 변환)
   useEffect(() => {
     if (isMounted && todayCheckInStatus?.checkIn?.checkInTime) {
-      const timeStr = new Date(todayCheckInStatus.checkIn.checkInTime).toLocaleTimeString('ko-KR', {
+      // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
+      const date = new Date(todayCheckInStatus.checkIn.checkInTime);
+      const timeStr = date.toLocaleTimeString('ko-KR', {
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Asia/Seoul',
       });
       setCheckInTimeDisplay(timeStr);
     }
@@ -774,12 +777,17 @@ export default function WorkerMain() {
                 size="lg"
                 className="w-full h-16 text-xl font-bold bg-white text-indigo-700 hover:bg-gray-100 shadow-lg active:scale-95 transition-transform"
                 onClick={handleCheckIn}
-                disabled={checkInMutation.isPending}
+                disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
               >
                 {checkInMutation.isPending ? (
                   <>
                     <Loader2 className="mr-3 h-6 w-6 animate-spin" />
                     GPS 확인 중...
+                  </>
+                ) : todayCheckInStatus?.checkIn ? (
+                  <>
+                    <CheckCircle className="mr-3 h-6 w-6" />
+                    출근 완료
                   </>
                 ) : (
                   <>
@@ -806,11 +814,11 @@ export default function WorkerMain() {
                   }
                   handleBiometricCheckIn();
                 }}
-                disabled={checkInMutation.isPending}
+                disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
               >
                 <Fingerprint className="mr-2 h-5 w-5" />
-                생체 인증으로 출근
-                {!isBiometricAvailable && (
+                {todayCheckInStatus?.checkIn ? "출근 완료" : "생체 인증으로 출근"}
+                {!isBiometricAvailable && !todayCheckInStatus?.checkIn && (
                   <span className="ml-2 text-xs opacity-60">(HTTPS 필요)</span>
                 )}
               </Button>

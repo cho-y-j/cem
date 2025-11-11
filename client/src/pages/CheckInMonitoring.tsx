@@ -66,7 +66,14 @@ export default function CheckInMonitoring() {
   }, [checkIns]);
 
   const formatTime = (dateStr: string | Date) => {
-    return format(new Date(dateStr), "HH:mm", { locale: ko });
+    // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
+    const date = new Date(dateStr);
+    // toLocaleTimeString은 timeZone 옵션을 지원
+    return date.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Seoul',
+    });
   };
 
   const formatDate = (dateStr: string | Date) => {
