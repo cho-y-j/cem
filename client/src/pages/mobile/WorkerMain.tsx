@@ -25,6 +25,7 @@ import {
   CheckCircle,
   Fingerprint,
   Settings,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -189,6 +190,39 @@ export default function WorkerMain() {
       toast.error("출근 체크 실패: " + error.message);
     },
   });
+
+  // 출근 기록 삭제 (테스트용)
+  const deleteCheckInMutation = trpc.checkIn.delete.useMutation({
+    onSuccess: () => {
+      toast.success("출근 기록이 삭제되었습니다.");
+      refetchCheckIn();
+    },
+    onError: (error) => {
+      toast.error("출근 기록 삭제 실패: " + error.message);
+    },
+  });
+
+  const handleDeleteCheckIn = () => {
+    console.log('[WorkerMain] Delete check-in clicked:', {
+      hasCheckIn: !!todayCheckInStatus?.checkIn,
+      checkInId: todayCheckInStatus?.checkIn?.id,
+      todayCheckInStatus,
+    });
+
+    if (!todayCheckInStatus?.checkIn?.id) {
+      toast.error("삭제할 출근 기록이 없습니다.");
+      console.error('[WorkerMain] No check-in ID found');
+      return;
+    }
+
+    if (confirm("오늘 출근 기록을 삭제하시겠습니까?\n(테스트를 위해 삭제합니다)")) {
+      console.log('[WorkerMain] Deleting check-in:', todayCheckInStatus.checkIn.id);
+      deleteCheckInMutation.mutate({
+        checkInId: todayCheckInStatus.checkIn.id,
+        deleteToday: true,
+      });
+    }
+  };
 
   // 작업 시작
   const startWorkMutation = trpc.mobile.worker.startWorkSession.useMutation({
@@ -852,7 +886,7 @@ export default function WorkerMain() {
                         {checkInTimeDisplay}
                       </div>
                     )}
-                    {todayCheckInStatus.checkIn?.isWithinZone !== undefined && (
+                    {todayCheckInStatus?.checkIn?.isWithinZone !== undefined && (
                       <div className="text-xs text-green-600 mt-1">
                         {todayCheckInStatus.checkIn.isWithinZone
                           ? `✓ 작업 구역 내 (${todayCheckInStatus.checkIn.distanceFromZone}m)`
@@ -860,6 +894,26 @@ export default function WorkerMain() {
                       </div>
                     )}
                   </div>
+                  {/* 테스트용 삭제 버튼 - 출근 기록이 있을 때만 표시 */}
+                  {todayCheckInStatus?.checkIn?.id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
+                      onClick={handleDeleteCheckIn}
+                      disabled={deleteCheckInMutation.isPending}
+                      title="테스트용: 출근 기록 삭제"
+                    >
+                      {deleteCheckInMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          <span className="text-xs">삭제</span>
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
