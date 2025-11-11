@@ -511,7 +511,7 @@ export default function WorkZones() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 w-full px-6">
+      <div className="space-y-6 w-full">
         {/* 헤더 */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
