@@ -799,7 +799,7 @@ export const checkIns = pgTable("check_ins", {
   workZoneId: varchar("work_zone_id", { length: 64 }),
 
   // 출근 시간
-  checkInTime: timestamp("check_in_time").notNull(),
+  checkInTime: timestamp("check_in_time", { withTimezone: true }).notNull(),
 
   // GPS 위치
   checkInLat: decimal("check_in_lat", { precision: 10, scale: 8 }),
@@ -818,7 +818,7 @@ export const checkIns = pgTable("check_ins", {
   deviceInfo: text("device_info"), // 기기 정보 (User-Agent)
   notes: text("notes"),
 
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CheckIn = typeof checkIns.$inferSelect;
