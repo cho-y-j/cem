@@ -69,6 +69,33 @@
 
 ---
 
+### ✅ Inspector NFC 태그 연동
+
+**요구사항:**
+- 현장에서 차량에 부착된 NFC 태그를 스캔해 즉시 장비/운전자 정보를 띄우고 점검을 시작하고자 함.
+- 태그로 장비를 찾을 수 있도록 DB/서버/모바일 UI 전반의 연동 필요.
+
+**구현 내용:**
+- ✅ 데이터베이스
+  - `equipment` 테이블에 `nfc_tag_id` 컬럼 추가 (`drizzle/schema.ts`, `0009_add_nfc_tag_to_equipment.sql`)
+  - NULL 허용 + 유니크 인덱스 (태그 하나당 하나의 장비 매칭)
+- ✅ 서버
+  - `getEquipmentInspectionContextByNfcTag` 유틸 추가 (`server/db.ts`)
+  - `safetyInspection.getEquipmentByNfcTag` tRPC 쿼리 노출 (`server/safety-inspection-router.ts`)
+- ✅ 모바일 Inspector UI
+  - 차량 검색 카드에 `NFC 태그 스캔` 버튼 추가 (`client/src/pages/mobile/InspectorMain.tsx`)
+  - Web NFC API(`NDEFReader`) 기반으로 태그 스캔 → TRPC fetch → 점검 화면으로 네비게이션
+  - 스캔 진행/미지원 상태 안내, 태그값 토스트 노출, 검색 결과 카드에 NFC 태그 표시
+
+**주의/후속 작업:**
+- 실사용 전에 Supabase에 `0009_add_nfc_tag_to_equipment.sql` 마이그레이션 적용 필수
+- Web NFC는 Android Chrome 최신 버전에서만 지원 (iOS/데스크톱은 비활성 안내 문구 표시)
+- 향후 Admin/Owner UI에서 태그를 등록/수정하는 기능 추가 검토
+
+**상태:** ✅ **완료 및 배포, 실기기 테스트 대기**
+
+---
+
 ### ✅ WorkZones 페이지 레이아웃 문제 완전 해결
 
 **문제:**
