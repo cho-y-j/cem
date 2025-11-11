@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import MobileLayout from "@/components/mobile/MobileLayout";
+import MobileBottomNav, { inspectorNavItems } from "@/components/mobile/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import { Search, FileText, Calendar, Eye, Filter, Truck, User } from "lucide-rea
 export default function SafetyInspectionHistory() {
   const [currentLocation, setLocation] = useLocation();
   const [searchVehicle, setSearchVehicle] = useState("");
+  const [searchVehicleInput, setSearchVehicleInput] = useState("");
   const [searchDate, setSearchDate] = useState("");
   const [selectedInspection, setSelectedInspection] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -39,7 +41,20 @@ export default function SafetyInspectionHistory() {
 
     setEquipmentFilterId(equipmentId);
     setSearchVehicle(vehicleNumber);
+    setSearchVehicleInput(vehicleNumber);
   }, [queryParams]);
+
+  const handleVehicleSearch = (event?: React.FormEvent) => {
+    if (event) {
+      event.preventDefault();
+    }
+    setSearchVehicle(searchVehicleInput.trim());
+  };
+
+  const handleResetVehicleSearch = () => {
+    setSearchVehicle("");
+    setSearchVehicleInput("");
+  };
 
   // 점검 내역 조회
   const { data: inspections, isLoading } = trpc.safetyInspection.listInspections.useQuery({
@@ -81,7 +96,7 @@ export default function SafetyInspectionHistory() {
 
   return (
     <MobileLayout title="점검 내역" showBottomNav={false}>
-      <div className="p-4 space-y-4 pb-24">
+      <div className="p-4 space-y-4 pb-32">
         {/* 검색 필터 */}
         <Card>
           <CardHeader>
@@ -111,15 +126,37 @@ export default function SafetyInspectionHistory() {
                 </Button>
               </div>
             )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">차량번호</label>
-              <Input
-                placeholder="차량번호 입력"
-                value={searchVehicle}
-                onChange={(e) => setSearchVehicle(e.target.value)}
-                className="h-12 text-base"
-              />
-            </div>
+            <form className="space-y-2" onSubmit={handleVehicleSearch}>
+              <label className="text-sm font-medium" htmlFor="vehicle-search-input">
+                차량번호
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="vehicle-search-input"
+                  placeholder="차량번호 입력"
+                  value={searchVehicleInput}
+                  onChange={(e) => setSearchVehicleInput(e.target.value)}
+                  className="h-12 text-base flex-1"
+                />
+                <Button
+                  type="submit"
+                  className="h-12 px-4 text-sm font-semibold"
+                  disabled={!searchVehicleInput.trim()}
+                >
+                  <Search className="h-4 w-4 mr-1" />
+                  검색
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 px-3 text-sm"
+                  onClick={handleResetVehicleSearch}
+                  disabled={!searchVehicle && !searchVehicleInput}
+                >
+                  초기화
+                </Button>
+              </div>
+            </form>
             <div className="space-y-2">
               <label className="text-sm font-medium">점검 날짜</label>
               <Input
@@ -411,6 +448,8 @@ export default function SafetyInspectionHistory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <MobileBottomNav items={inspectorNavItems} />
     </MobileLayout>
   );
 }

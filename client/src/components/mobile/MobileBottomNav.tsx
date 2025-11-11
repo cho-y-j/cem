@@ -5,6 +5,8 @@ interface NavItem {
   icon: React.ElementType;
   label: string;
   path: string;
+  exact?: boolean;
+  matchPaths?: string[];
 }
 
 interface MobileBottomNavProps {
@@ -15,11 +17,17 @@ export default function MobileBottomNav({ items }: MobileBottomNavProps) {
   const [location, setLocation] = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg safe-area-inset-bottom">
       <div className="flex items-center justify-around px-2 py-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const isActive = location === item.path;
+          const matches =
+            item.matchPaths && item.matchPaths.length > 0
+              ? item.matchPaths.some((matchPath) => location.startsWith(matchPath))
+              : item.exact
+              ? location === item.path
+              : location.startsWith(item.path);
+          const isActive = matches;
 
           return (
             <button
@@ -53,9 +61,13 @@ export const workerNavItems: NavItem[] = [
 
 // 현장 안전점검원용 네비게이션 아이템
 export const inspectorNavItems: NavItem[] = [
-  { icon: Home, label: "메인", path: "/mobile/inspector" },
-  { icon: ClipboardCheck, label: "점검", path: "/mobile/inspector/inspection" },
-  { icon: History, label: "이력", path: "/mobile/inspector/history" },
-  { icon: Settings, label: "설정", path: "/mobile/inspector/settings" },
+  { icon: Home, label: "홈", path: "/mobile/inspector", exact: true },
+  {
+    icon: ClipboardCheck,
+    label: "점검 작성",
+    path: "/mobile/inspector",
+    matchPaths: ["/mobile/inspector/inspection"],
+  },
+  { icon: History, label: "점검 내역", path: "/mobile/inspector/history" },
 ];
 

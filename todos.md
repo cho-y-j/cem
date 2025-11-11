@@ -123,6 +123,28 @@
 
 ---
 
+### ✅ Inspector 하단 내비게이션 및 점검 내역 검색 UX 개선
+
+**개선 포인트:**
+- ✅ Inspector 전용 하단 내비게이션 도입  
+  - `MobileBottomNav`에 Inspector용 아이템 정의 (`홈 / 점검 작성 / 점검 내역`)  
+  - `InspectorMain`, `SafetyInspectionNew`, `SafetyInspectionHistory` 화면에서 공통 네비게이션 사용  
+  - 각 화면의 하단 여백을 조정하여 버튼과 콘텐츠가 겹치지 않도록 개선
+- ✅ 점검 내역 검색 UX 향상  
+  - 차량번호 입력 후 명시적으로 검색할 수 있는 버튼 추가  
+  - 입력값 초기화 버튼 제공으로 빠른 재검색 지원  
+  - 입력값과 실제 필터 값 분리 → 검색 버튼 누를 때만 필터 적용, 사용자가 흐름을 명확히 인지 가능
+
+**관련 파일:**
+- `client/src/components/mobile/MobileBottomNav.tsx`  
+- `client/src/pages/mobile/InspectorMain.tsx`  
+- `client/src/pages/mobile/SafetyInspectionNew.tsx`  
+- `client/src/pages/mobile/SafetyInspectionHistory.tsx`
+
+**상태:** ✅ **완료 및 테스트 대기**
+
+---
+
 ### ✅ 관리자 장비 관리에서 NFC 태그 등록/수정 지원
 
 **개요:**

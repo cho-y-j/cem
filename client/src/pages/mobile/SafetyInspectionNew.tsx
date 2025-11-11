@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import MobileLayout from "@/components/mobile/MobileLayout";
+import MobileBottomNav, { inspectorNavItems } from "@/components/mobile/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -375,7 +376,7 @@ const handleOpenDocs = () => {
 
   return (
     <MobileLayout showHeader={false} showBottomNav={false}>
-      <div className="mx-auto max-w-md px-4 pb-12">
+      <div className="mx-auto max-w-md px-4 pb-32">
         <div className="flex items-center justify-between pt-4">
           <Button
             variant="ghost"
@@ -911,6 +912,8 @@ const handleOpenDocs = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <MobileBottomNav items={inspectorNavItems} />
     </MobileLayout>
   );
 }

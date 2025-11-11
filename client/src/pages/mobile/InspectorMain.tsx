@@ -254,7 +254,7 @@ export default function InspectorMain() {
 
   return (
     <MobileLayout title="안전점검" showBottomNav={false}>
-      <div className="p-4 space-y-5 pb-24">
+      <div className="p-4 space-y-5 pb-32">
         <div className="space-y-1.5">
           <p className="text-sm font-semibold text-slate-700">장비 검색</p>
           <p className="text-xs text-muted-foreground leading-relaxed">
@@ -550,25 +550,7 @@ export default function InspectorMain() {
         </Card>
       </div>
 
-      {/* 간단한 하단 네비게이션 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50">
-        <div className="flex items-center justify-around py-3">
-          <button
-            onClick={() => setLocation("/mobile/inspector")}
-            className="flex flex-col items-center gap-1 px-6 py-2"
-          >
-            <Search className="h-6 w-6 text-blue-600" />
-            <span className="text-xs font-medium text-blue-600">점검 작성</span>
-          </button>
-          <button
-            onClick={() => setLocation("/mobile/inspector/history")}
-            className="flex flex-col items-center gap-1 px-6 py-2"
-          >
-            <FileText className="h-6 w-6 text-gray-600" />
-            <span className="text-xs font-medium text-gray-600">점검 내역</span>
-          </button>
-        </div>
-      </div>
+      <MobileBottomNav items={inspectorNavItems} />
 
       <Dialog
         open={tagDialogOpen}
