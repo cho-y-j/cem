@@ -598,13 +598,19 @@ export default function WorkerMain() {
       toast.info("GPS 위치를 확인하는 중...");
 
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           console.log('[CheckIn] GPS Position:', position.coords.latitude, position.coords.longitude);
-          checkInMutation.mutate({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            authMethod: "pin",
-          });
+          try {
+            await checkInMutation.mutateAsync({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              authMethod: "pin",
+            });
+            console.log('[CheckIn] PIN check-in mutation succeeded');
+          } catch (error: any) {
+            console.error('[CheckIn] PIN check-in mutation error:', error);
+            toast.error(`출근 체크 실패: ${error.message || '알 수 없는 오류'}`);
+          }
         },
         (error) => {
           console.error('[CheckIn] GPS Error:', error);
