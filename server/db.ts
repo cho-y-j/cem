@@ -2971,8 +2971,7 @@ export async function searchEquipmentByVehicleNumber(partialNumber: string) {
           phone
         ),
         bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
-        ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type),
-        owner_company:companies!deployments_owner_id_fkey(id, name, company_type)
+        ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
       `)
       .in('equipment_id', equipmentIds)
       .eq('status', 'active')
@@ -3031,8 +3030,7 @@ export async function getActiveDeploymentByEquipmentId(equipmentId: string): Pro
         phone
       ),
       bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
-      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type),
-      owner_company:companies!deployments_owner_id_fkey(id, name, company_type)
+      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
     `)
     .eq('equipment_id', equipmentId)
     .eq('status', 'active')
@@ -3056,8 +3054,7 @@ export async function getEquipmentInspectionContext(equipmentId: string) {
     .from('equipment')
     .select(`
       *,
-      equip_type:equip_types(*),
-      owner_company:companies!equipment_owner_id_fkey(id, name, company_type)
+      equip_type:equip_types(*)
     `)
     .eq('id', equipmentId)
     .maybeSingle();
@@ -3068,6 +3065,13 @@ export async function getEquipmentInspectionContext(equipmentId: string) {
   }
 
   const equipment = toCamelCase(data) as any;
+  if (equipment.ownerId) {
+    const ownerData = await getCompanyById(equipment.ownerId);
+    equipment.ownerCompany = ownerData ? toCamelCase(ownerData) : null;
+  } else {
+    equipment.ownerCompany = null;
+  }
+
   const activeDeployment = await getActiveDeploymentByEquipmentId(equipmentId);
 
   const equipmentDocs = await getDocsComplianceByTarget("equipment", equipmentId);
