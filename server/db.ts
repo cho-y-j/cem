@@ -597,6 +597,69 @@ export async function getEquipmentByOwner(ownerId: string): Promise<Equipment[]>
   return toCamelCaseArray(data || []) as Equipment[];
 }
 
+export type EquipmentFilterOptions = {
+  ownerCompanyId?: string;
+  bpCompanyId?: string;
+  epCompanyId?: string;
+  search?: string;
+};
+
+export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = {}): Promise<Equipment[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  const { ownerCompanyId, bpCompanyId, epCompanyId, search } = filters;
+
+  let query = supabase
+    .from('equipment')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (ownerCompanyId) {
+    query = query.eq('owner_company_id', ownerCompanyId);
+  }
+
+  if (bpCompanyId) {
+    query = query.eq('current_bp_id', bpCompanyId);
+  }
+
+  if (search?.trim()) {
+    const keyword = `%${search.trim()}%`;
+    query = query.or(`reg_num.ilike.${keyword},nfc_tag_id.ilike.${keyword},specification.ilike.${keyword}`);
+  }
+
+  let equipmentIdsFromEp: string[] | null = null;
+  if (epCompanyId) {
+    const { data: epDeployments, error: epError } = await supabase
+      .from('deployments')
+      .select('equipment_id, status')
+      .eq('ep_company_id', epCompanyId);
+
+    if (epError) {
+      console.error("[Database] Error getting deployments for EP filter:", epError);
+    } else if (epDeployments) {
+      const allowedStatuses = new Set(['active', 'extended']);
+      equipmentIdsFromEp = epDeployments
+        .filter((dep: any) => dep?.equipment_id)
+        .filter((dep: any) => !dep.status || allowedStatuses.has(dep.status))
+        .map((dep: any) => dep.equipment_id as string);
+      if (equipmentIdsFromEp.length === 0) {
+        return [];
+      }
+      query = query.in('id', Array.from(new Set(equipmentIdsFromEp)));
+    }
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[Database] Error getting filtered equipment:", error);
+    return [];
+  }
+
+  return toCamelCaseArray(data || []) as Equipment[];
+}
+
 export async function getEquipmentByAssignedWorker(workerId: string): Promise<Equipment | undefined> {
   const supabase = getSupabase();
   if (!supabase) return undefined;
@@ -776,6 +839,105 @@ export async function getWorkersByOwner(ownerId: string): Promise<Worker[]> {
 
   if (error) {
     console.error("[Database] Error getting workers by owner:", error);
+    return [];
+  }
+
+  return toCamelCaseArray(data || []) as Worker[];
+}
+
+export type WorkerFilterOptions = {
+  ownerCompanyId?: string;
+  bpCompanyId?: string;
+  epCompanyId?: string;
+  search?: string;
+};
+
+export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): Promise<Worker[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  const { ownerCompanyId, bpCompanyId, epCompanyId, search } = filters;
+
+  let allowedWorkerIds: Set<string> | null = null;
+
+  const collectWorkerIds = (ids: string[] | undefined | null) => {
+    if (!ids) return;
+    const cleaned = ids.filter(Boolean);
+    if (allowedWorkerIds === null) {
+      allowedWorkerIds = new Set(cleaned);
+    } else {
+      const intersection = new Set<string>();
+      for (const id of cleaned) {
+        if (allowedWorkerIds.has(id)) {
+          intersection.add(id);
+        }
+      }
+      allowedWorkerIds = intersection;
+    }
+  };
+
+  if (bpCompanyId) {
+    const { data, error } = await supabase
+      .from('deployments')
+      .select('worker_id, status')
+      .eq('bp_company_id', bpCompanyId);
+
+    if (error) {
+      console.error("[Database] Error getting deployments for BP filter:", error);
+    } else if (data) {
+      const allowedStatuses = new Set(['active', 'extended']);
+      const ids = data
+        .filter((dep: any) => dep?.worker_id)
+        .filter((dep: any) => !dep.status || allowedStatuses.has(dep.status))
+        .map((dep: any) => dep.worker_id as string);
+      collectWorkerIds(ids);
+    }
+  }
+
+  if (epCompanyId) {
+    const { data, error } = await supabase
+      .from('deployments')
+      .select('worker_id, status')
+      .eq('ep_company_id', epCompanyId);
+
+    if (error) {
+      console.error("[Database] Error getting deployments for EP filter:", error);
+    } else if (data) {
+      const allowedStatuses = new Set(['active', 'extended']);
+      const ids = data
+        .filter((dep: any) => dep?.worker_id)
+        .filter((dep: any) => !dep.status || allowedStatuses.has(dep.status))
+        .map((dep: any) => dep.worker_id as string);
+      collectWorkerIds(ids);
+    }
+  }
+
+  if (allowedWorkerIds !== null && allowedWorkerIds.size === 0) {
+    return [];
+  }
+
+  let query = supabase
+    .from('workers')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (ownerCompanyId) {
+    query = query.eq('owner_company_id', ownerCompanyId);
+  }
+
+  if (allowedWorkerIds !== null) {
+    query = query.in('id', Array.from(allowedWorkerIds));
+  }
+
+  if (search?.trim()) {
+    const keyword = `%${search.trim()}%`;
+    query = query.or(`name.ilike.${keyword},license_num.ilike.${keyword},email.ilike.${keyword}`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[Database] Error getting filtered workers:", error);
     return [];
   }
 

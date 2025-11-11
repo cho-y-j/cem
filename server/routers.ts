@@ -412,12 +412,34 @@ export const appRouter = router({
   // ============================================================
 
   equipment: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role === "owner") {
-        return await db.getEquipmentByOwner(ctx.user.id);
-      }
-      return await db.getAllEquipment();
-    }),
+    list: protectedProcedure
+      .input(
+        z
+          .object({
+            ownerCompanyId: z.string().optional(),
+            bpCompanyId: z.string().optional(),
+            epCompanyId: z.string().optional(),
+            search: z.string().optional(),
+          })
+          .optional()
+      )
+      .query(async ({ ctx, input }) => {
+        const role = ctx.user.role?.toLowerCase();
+
+        if (role === "owner") {
+          return await db.getEquipmentByOwner(ctx.user.id);
+        }
+
+        const filters: db.EquipmentFilterOptions = { ...(input || {}) };
+
+        if (role === "bp" && ctx.user.companyId) {
+          filters.bpCompanyId = filters.bpCompanyId || ctx.user.companyId;
+        } else if (role === "ep" && ctx.user.companyId) {
+          filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
+        }
+
+        return await db.getEquipmentWithFilters(filters);
+      }),
 
     getById: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
       return await db.getEquipmentById(input.id);
@@ -607,12 +629,34 @@ export const appRouter = router({
   // ============================================================
 
   workers: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role === "owner") {
-        return await db.getWorkersByOwner(ctx.user.id);
-      }
-      return await db.getAllWorkers();
-    }),
+    list: protectedProcedure
+      .input(
+        z
+          .object({
+            ownerCompanyId: z.string().optional(),
+            bpCompanyId: z.string().optional(),
+            epCompanyId: z.string().optional(),
+            search: z.string().optional(),
+          })
+          .optional()
+      )
+      .query(async ({ ctx, input }) => {
+        const role = ctx.user.role?.toLowerCase();
+
+        if (role === "owner") {
+          return await db.getWorkersByOwner(ctx.user.id);
+        }
+
+        const filters: db.WorkerFilterOptions = { ...(input || {}) };
+
+        if (role === "bp" && ctx.user.companyId) {
+          filters.bpCompanyId = filters.bpCompanyId || ctx.user.companyId;
+        } else if (role === "ep" && ctx.user.companyId) {
+          filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
+        }
+
+        return await db.getWorkersWithFilters(filters);
+      }),
 
     getById: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
       return await db.getWorkerById(input.id);

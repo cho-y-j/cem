@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,13 +27,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Loader2, FileText, X, UserPlus, Eye, ClipboardCheck, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, X, UserPlus, Eye, ClipboardCheck, Check, Filter } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { toast } from "sonner";
 import AssignDriverDialog from "@/components/AssignDriverDialog";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 interface DocFile {
   docTypeId: string;
@@ -61,6 +62,8 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 export default function Equipment() {
+  const { user } = useAuth();
+  const role = user?.role?.toLowerCase();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -75,9 +78,65 @@ export default function Equipment() {
   const [selectedEquipment, setSelectedEquipment] = useState<any>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [viewingEquipmentId, setViewingEquipmentId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("");
+  const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("");
+  const [epCompanyFilter, setEpCompanyFilter] = useState<string>("");
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
 
   const utils = trpc.useUtils();
-  const { data: equipmentList, isLoading } = trpc.equipment.list.useQuery();
+  const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "owner" },
+    { enabled: role === "admin" || role === "bp" || role === "ep" }
+  );
+  const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "bp" },
+    { enabled: role === "admin" || role === "ep" }
+  );
+  const { data: epCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "ep" },
+    { enabled: role === "admin" }
+  );
+
+  useEffect(() => {
+    if (!user || filtersInitialized) return;
+
+    if (role === "bp" && user.companyId) {
+      setBpCompanyFilter(user.companyId);
+    }
+
+    if (role === "ep" && user.companyId) {
+      setEpCompanyFilter(user.companyId);
+    }
+
+    setFiltersInitialized(true);
+  }, [user, role, filtersInitialized]);
+
+  const equipmentFilters = useMemo(() => {
+    const input: Record<string, string> = {};
+    if (searchTerm.trim()) {
+      input.search = searchTerm.trim();
+    }
+    if (ownerCompanyFilter) {
+      input.ownerCompanyId = ownerCompanyFilter;
+    }
+
+    if (role === "bp" && user?.companyId) {
+      input.bpCompanyId = user.companyId;
+    } else if (bpCompanyFilter) {
+      input.bpCompanyId = bpCompanyFilter;
+    }
+
+    if (role === "ep" && user?.companyId) {
+      input.epCompanyId = user.companyId;
+    } else if (epCompanyFilter) {
+      input.epCompanyId = epCompanyFilter;
+    }
+
+    return Object.keys(input).length > 0 ? input : undefined;
+  }, [searchTerm, ownerCompanyFilter, bpCompanyFilter, epCompanyFilter, role, user?.companyId]);
+
+  const { data: equipmentList, isLoading } = trpc.equipment.list.useQuery(equipmentFilters);
   const { data: equipTypes } = trpc.equipTypes.list.useQuery();
   const { data: typeDocs } = trpc.typeDocs.listByEquipType.useQuery(
     { equipTypeId: formData.equipTypeId },
@@ -309,6 +368,98 @@ export default function Equipment() {
           장비 등록
         </Button>
       </div>
+
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-base font-semibold">필터</CardTitle>
+          </div>
+          <CardDescription className="text-xs text-muted-foreground">
+            회사별 필터와 검색어를 사용해 장비를 빠르게 찾을 수 있습니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
+            <div className="w-full md:w-56">
+              <Label htmlFor="equipment-search">검색</Label>
+              <Input
+                id="equipment-search"
+                placeholder="차량번호 또는 태그"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            {(role === "admin" || role === "bp" || role === "ep") && (
+              <div className="w-full md:w-56">
+                <Label>Owner 회사</Label>
+                <Select
+                  value={ownerCompanyFilter || "all"}
+                  onValueChange={(value) => setOwnerCompanyFilter(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {ownerCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {(role === "admin" || role === "ep") && (
+              <div className="w-full md:w-56">
+                <Label>BP 회사</Label>
+                <Select
+                  value={bpCompanyFilter || "all"}
+                  onValueChange={(value) => setBpCompanyFilter(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {bpCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {role === "admin" && (
+              <div className="w-full md:w-56">
+                <Label>EP 회사</Label>
+                <Select
+                  value={epCompanyFilter || "all"}
+                  onValueChange={(value) => setEpCompanyFilter(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {epCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
