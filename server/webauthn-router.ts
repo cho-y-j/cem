@@ -481,9 +481,10 @@ export const webauthnRouter = router({
           credentialIds: credentials.map((c: any) => c.id),
         });
 
-        // v13에서 allowCredentials.id는 Base64URLString (string) 허용
+        // 브라우저는 기기에 저장된 패스키 ID를 ArrayBuffer 형식으로 비교하므로
+        // DB에 저장된 base64url 문자열을 Buffer로 변환하여 전달해야 함
         const allowCredentials = credentials.map((c: any) => ({
-          id: c.id as string, // DB 저장된 base64url
+          id: Buffer.from(c.id, 'base64url'), // base64url 문자열을 Buffer(Uint8Array)로 변환
           type: 'public-key',
         }));
 
@@ -613,20 +614,45 @@ export const webauthnRouter = router({
         // @simplewebauthn/browser는 이미 JSON 직렬화 가능한 객체를 반환
         // 하지만 tRPC를 통해 전송될 때 ArrayBuffer/Uint8Array가 문자열로 변환될 수 있음
         // AuthenticationResponseJSON 형식으로 명시적으로 변환
+        // verifyAuthenticationResponse는 base64url 문자열을 기대하므로 문자열로 수신된 경우 그대로 사용
         let response: any;
+        
+        // Helper function: 값이 base64url 문자열인지 확인하고 변환
+        const normalizeBase64Url = (value: any): string => {
+          if (typeof value === 'string') {
+            // 이미 base64url 문자열인 경우 그대로 반환
+            return value;
+          } else if (value instanceof ArrayBuffer) {
+            // ArrayBuffer인 경우 base64url로 변환
+            return Buffer.from(value).toString('base64url');
+          } else if (value instanceof Uint8Array) {
+            // Uint8Array인 경우 base64url로 변환
+            return Buffer.from(value).toString('base64url');
+          } else if (Buffer.isBuffer(value)) {
+            // Buffer인 경우 base64url로 변환
+            return value.toString('base64url');
+          } else {
+            // 기타 타입은 문자열로 변환 시도
+            return String(value);
+          }
+        };
         
         try {
           // response 객체를 명시적으로 정규화
-          // 모든 필드가 올바른 형식인지 확인
+          // tRPC를 거치면서 ArrayBuffer가 문자열로 변환되었을 수 있으므로
+          // 모든 필드를 base64url 문자열로 정규화
+          const normalizedId = normalizeBase64Url(rawResponse.id);
+          const normalizedRawId = normalizeBase64Url(rawResponse.rawId || rawResponse.id);
+          
           response = {
-            id: rawResponse.id,
-            rawId: rawResponse.rawId || rawResponse.id,
+            id: normalizedId,
+            rawId: normalizedRawId,
             type: rawResponse.type || 'public-key',
             response: {
-              clientDataJSON: rawResponse.response?.clientDataJSON,
-              authenticatorData: rawResponse.response?.authenticatorData,
-              signature: rawResponse.response?.signature,
-              userHandle: rawResponse.response?.userHandle || null,
+              clientDataJSON: normalizeBase64Url(rawResponse.response?.clientDataJSON),
+              authenticatorData: normalizeBase64Url(rawResponse.response?.authenticatorData),
+              signature: normalizeBase64Url(rawResponse.response?.signature),
+              userHandle: rawResponse.response?.userHandle ? normalizeBase64Url(rawResponse.response.userHandle) : null,
             },
             clientExtensionResults: rawResponse.clientExtensionResults || {},
             authenticatorAttachment: rawResponse.authenticatorAttachment || undefined,
@@ -669,11 +695,20 @@ export const webauthnRouter = router({
           });
         }
         
-        console.log('[WebAuthn] Authentication response received:', {
+        console.log('[WebAuthn] Authentication response normalized:', {
           hasRawId: !!response.rawId,
           rawIdType: typeof response.rawId,
+          rawIdLength: response.rawId?.length,
           hasId: !!response.id,
+          idType: typeof response.id,
+          idLength: response.id?.length,
           hasResponse: !!response.response,
+          clientDataJSONType: typeof response.response?.clientDataJSON,
+          clientDataJSONLength: response.response?.clientDataJSON?.length,
+          authenticatorDataType: typeof response.response?.authenticatorData,
+          authenticatorDataLength: response.response?.authenticatorData?.length,
+          signatureType: typeof response.response?.signature,
+          signatureLength: response.response?.signature?.length,
           hasClientExtensionResults: !!response.clientExtensionResults,
           type: response.type,
           responseKeys: Object.keys(response.response || {}),
@@ -700,20 +735,8 @@ export const webauthnRouter = router({
         }
 
         // 크레덴셜 조회
-        // rawId 또는 id를 사용 (브라우저에 따라 다를 수 있음)
-        const rawIdSource = response.rawId || response.id;
-        
-        let credentialIdBase64: string;
-        if (typeof rawIdSource === 'string') {
-          credentialIdBase64 = rawIdSource;
-        } else if (rawIdSource instanceof ArrayBuffer) {
-          credentialIdBase64 = Buffer.from(rawIdSource).toString('base64url');
-        } else if (rawIdSource instanceof Uint8Array) {
-          credentialIdBase64 = Buffer.from(rawIdSource).toString('base64url');
-        } else {
-          // 이미 base64url 문자열로 가정
-          credentialIdBase64 = Buffer.from(rawIdSource as any, 'base64url').toString('base64url');
-        }
+        // rawId 또는 id를 사용 (이미 정규화되어 base64url 문자열임)
+        const credentialIdBase64 = response.rawId || response.id;
         
         console.log('[WebAuthn] Credential ID extracted:', {
           rawIdType: typeof response.rawId,
