@@ -379,6 +379,19 @@ export default function InspectorMain() {
                 </p>
               </div>
             )}
+            {pendingNfcTag && (
+              <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    등록되지 않은 태그
+                  </Badge>
+                  <span className="text-xs font-medium text-slate-700">{pendingNfcTag}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  장비를 검색한 뒤 카드의 <strong>태그 등록</strong> 버튼을 눌러 연결해 주세요.
+                </p>
+              </div>
+            )}
               <div className="space-y-3">
                 {searchResults.map((equipment) => (
                   <button
@@ -438,11 +451,11 @@ export default function InspectorMain() {
                             NFC 태그: {equipment.nfcTagId}
                           </div>
                         )}
-                        <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full"
+                            className="w-full text-sm py-3"
                             onClick={(event) => {
                               event.stopPropagation();
                               openTagDialog(equipment);
@@ -454,7 +467,7 @@ export default function InspectorMain() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full"
+                            className="w-full text-sm py-3"
                             onClick={(event) => {
                               event.stopPropagation();
                               setLocation(`/mobile/inspector/inspection/${equipment.id}`);

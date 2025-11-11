@@ -220,10 +220,18 @@ export const safetyInspectionRouter = router({
           });
         }
 
+        const rawMessage: string | undefined = error?.message || error?.cause?.message;
+        if (rawMessage && rawMessage.toLowerCase().includes("nfc_tag_id")) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "NFC 태그 컬럼이 아직 생성되지 않았습니다. Supabase에 0009_add_nfc_tag_to_equipment.sql 마이그레이션을 적용한 뒤 다시 시도해주세요.",
+          });
+        }
+
         console.error("[SafetyInspection] assignNfcTag error:", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "NFC 태그를 등록하는 중 오류가 발생했습니다.",
+          message: rawMessage || "NFC 태그를 등록하는 중 오류가 발생했습니다.",
         });
       }
     }),
