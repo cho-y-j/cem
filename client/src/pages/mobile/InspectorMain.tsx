@@ -27,6 +27,7 @@ export default function InspectorMain() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isNfcSupported, setIsNfcSupported] = useState(false);
   const [isNfcScanning, setIsNfcScanning] = useState(false);
+  const [lastNfcTag, setLastNfcTag] = useState<string | null>(null);
 
   // PIN 변경 관련 상태
   const [showPinDialog, setShowPinDialog] = useState(false);
@@ -101,9 +102,15 @@ export default function InspectorMain() {
             return;
           }
 
-          setSearchResults([]);
+          const equipmentResult = {
+            ...context.equipment,
+            activeDeployment: context.activeDeployment || null,
+          };
+
+          setLastNfcTag(tagValue);
           setSearchInput(context.equipment.regNum || "");
-          setLocation(`/mobile/inspector/inspection/${context.equipment.id}`);
+          setSearchResults([equipmentResult]);
+          toast.success("태그와 매칭된 장비를 불러왔습니다. 목록에서 선택해 주세요.");
         } catch (error: any) {
           console.error("[InspectorMain] NFC 태그 처리 중 오류:", error);
           toast.error(error?.message || "NFC 태그를 처리하는 중 오류가 발생했습니다.");
@@ -126,6 +133,8 @@ export default function InspectorMain() {
     }
 
     const result = await refetch();
+
+    setLastNfcTag(null);
 
     if (!result.data || result.data.length === 0) {
       toast.error("해당 차량번호를 가진 장비를 찾을 수 없습니다.");
@@ -253,6 +262,16 @@ export default function InspectorMain() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+            {lastNfcTag && (
+              <div className="mb-3">
+                <Badge variant="outline" className="text-xs">
+                  NFC 태그 인식: {lastNfcTag}
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  태그와 연결된 장비를 확인 후 선택해 주세요.
+                </p>
+              </div>
+            )}
               <div className="space-y-3">
                 {searchResults.map((equipment) => (
                   <button
