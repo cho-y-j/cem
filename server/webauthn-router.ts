@@ -801,11 +801,32 @@ export const webauthnRouter = router({
             counter: credential.counter,
           });
           
-          // 라이브러리 v13.2.2 타입 정의는 문자열(Base64URL/Base64)을 기대
-          // DB에는 id(base64url), public_key(base64)로 저장되어 있으므로 그대로 전달
-          console.log('[WebAuthn] Credential strings prepared (using raw DB values):', {
+          // @simplewebauthn/server v13.2.2는 credential.id와 credential.publicKey를 문자열로 기대
+          // 하지만 내부적으로 올바른 형식인지 검증하므로, 명시적으로 형식 확인 및 변환
+          // DB에 저장된 값: id는 base64url, public_key는 base64
+          // 라이브러리는 base64url 문자열을 기대하므로 public_key를 base64url로 변환 필요
+          
+          // publicKey가 base64로 저장되어 있으면 base64url로 변환
+          // base64와 base64url의 차이: + -> -, / -> _, 패딩(=) 처리
+          let publicKeyBase64Url: string;
+          try {
+            // base64를 디코딩한 후 base64url로 재인코딩
+            const publicKeyBuffer = Buffer.from(credential.public_key, 'base64');
+            publicKeyBase64Url = publicKeyBuffer.toString('base64url');
+          } catch (error) {
+            // 이미 base64url 형식이거나 변환 실패 시 그대로 사용
+            console.warn('[WebAuthn] Failed to convert publicKey from base64 to base64url, using as-is:', error);
+            publicKeyBase64Url = credential.public_key;
+          }
+          
+          console.log('[WebAuthn] Credential prepared for verification:', {
+            credentialIdType: typeof credential.id,
             credentialIdPreview: credential.id.substring(0, 20) + '...',
-            credentialPublicKeyPreview: credential.public_key.substring(0, 20) + '...',
+            credentialIdLength: credential.id.length,
+            publicKeyType: typeof publicKeyBase64Url,
+            publicKeyPreview: publicKeyBase64Url.substring(0, 20) + '...',
+            publicKeyLength: publicKeyBase64Url.length,
+            counter: credential.counter,
           });
           
           verification = await verifyAuthenticationResponse({
@@ -814,8 +835,8 @@ export const webauthnRouter = router({
             expectedOrigin: ORIGIN,
             expectedRPID: RP_ID,
             credential: {
-              id: credential.id,                // base64url string
-              publicKey: credential.public_key, // base64 string
+              id: credential.id,           // base64url string (그대로 사용)
+              publicKey: publicKeyBase64Url, // base64url string (base64에서 변환)
               counter: credential.counter,
             },
             requireUserVerification: true,
