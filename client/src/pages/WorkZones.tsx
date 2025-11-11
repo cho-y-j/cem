@@ -20,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import DashboardLayout from "@/components/DashboardLayout";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
@@ -510,8 +509,7 @@ export default function WorkZones() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 w-full">
+    <div className="space-y-6 w-full">
         {/* 헤더 */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -993,6 +991,5 @@ export default function WorkZones() {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
   );
 }

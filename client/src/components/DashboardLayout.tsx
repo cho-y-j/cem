@@ -357,7 +357,7 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 py-4 pr-6">{children}</main>
+        <main className="flex-1 p-4">{children}</main>
       </SidebarInset>
     </>
   );
