@@ -491,30 +491,35 @@ export default function InspectorMain() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              {
-                title: "장비 검색 또는 태그 인식",
-                desc: "차량번호·태그로 장비 정보를 확인합니다.",
-              },
-              {
-                title: "점검표 작성",
-                desc: "차종별 템플릿으로 체크리스트를 진행합니다.",
-              },
-              {
-                title: "제출 및 공유",
-                desc: "점검 결과와 사진을 저장하고 관리자에게 공유합니다.",
-              },
-            ].map((step, index) => (
-              <div key={step.title} className="flex items-start gap-3">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
-                  {index + 1}
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-slate-800">{step.title}</div>
-                  <div className="text-xs text-muted-foreground">{step.desc}</div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                1
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-800">장비 검색 또는 태그 인식</div>
+                <div className="text-xs text-muted-foreground">차량번호·태그로 장비 정보를 확인합니다.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                2
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-800">점검표 작성</div>
+                <div className="text-xs text-muted-foreground">차종별 템플릿으로 체크리스트를 진행합니다.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                3
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-800">제출 및 공유</div>
+                <div className="text-xs text-muted-foreground">
+                  점검 결과와 사진을 저장하고 관리자에게 공유합니다.
                 </div>
               </div>
-            ))}
+            </div>
           </CardContent>
         </Card>
 
