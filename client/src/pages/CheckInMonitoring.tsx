@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, XCircle, MapPin, Clock, Users, Calendar, RefreshCw, Search, Download, Filter, X, ListChecks, FileText } from "lucide-react";
+import { CheckCircle, XCircle, MapPin, Clock, Users, Calendar, RefreshCw, Search, Download, Filter, X, ListChecks, FileText, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { toast } from "sonner";
@@ -50,6 +50,26 @@ export default function CheckInMonitoring() {
   const { data: todayStats } = trpc.checkIn.getTodayStats.useQuery(undefined, {
     // Admin은 전체 조회, EP/BP/Owner는 자신과 관련된 데이터만 조회
   });
+
+  // 출근 기록 삭제 (테스트용)
+  const deleteCheckInMutation = trpc.checkIn.delete.useMutation({
+    onSuccess: () => {
+      toast.success("출근 기록이 삭제되었습니다.");
+      refetch();
+    },
+    onError: (error) => {
+      toast.error("출근 기록 삭제 실패: " + error.message);
+    },
+  });
+
+  const handleDeleteCheckIn = (checkInId: string) => {
+    if (confirm("이 출근 기록을 삭제하시겠습니까?\n(테스트를 위해 삭제합니다)")) {
+      deleteCheckInMutation.mutate({
+        checkInId,
+        deleteToday: false,
+      });
+    }
+  };
 
   // 디버깅: 출근 통계 로그
   console.log('[CheckInMonitoring] Today stats:', todayStats);
@@ -619,6 +639,17 @@ export default function CheckInMonitoring() {
                           생체
                         </Badge>
                       )}
+                      {/* 삭제 버튼 */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteCheckIn(checkIn.id)}
+                        disabled={deleteCheckInMutation.isPending}
+                        title="출근 기록 삭제 (테스트용)"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
