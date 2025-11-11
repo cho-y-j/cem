@@ -26,7 +26,8 @@ import {
   Save,
   Send,
   X,
-  Search
+  Search,
+  BookOpen
 } from "lucide-react";
 import { toast } from "sonner";
 import SignatureCanvas from "react-signature-canvas";
@@ -790,6 +791,20 @@ export default function SafetyInspectionNew() {
             >
               <FileText className="h-6 w-6 text-gray-600" />
               <span className="text-xs font-medium text-gray-600">점검 내역</span>
+            </button>
+            <button
+              onClick={() => {
+                if ((equipmentDocs.length === 0) && (workerDocs.length === 0)) {
+                  toast.info("확인 가능한 서류가 없습니다.");
+                  return;
+                }
+                setDocTab(equipmentDocs.length > 0 ? "equipment" : "worker");
+                setShowDocsDialog(true);
+              }}
+              className="flex flex-col items-center gap-1 px-6 py-2"
+            >
+              <BookOpen className="h-6 w-6 text-gray-600" />
+              <span className="text-xs font-medium text-gray-600">서류 보기</span>
             </button>
           </div>
         </div>
