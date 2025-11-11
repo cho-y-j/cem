@@ -1,6 +1,6 @@
 # 건설장비 및 인력 관리 시스템 (ERMS) - TODO 및 작업 가이드
 
-**마지막 업데이트**: 2025-11-11 (오후)
+차량 **마지막 업데이트**: 2025-11-11 (오후)
 **프로젝트**: Equipment and Resource Management System (ERMS)
 **Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY
 **현재 단계**: ✅ **시간 표시 및 UI/UX 개선 완료** → 🔄 **워커-차량 매칭 및 GPS 위치 추적 개선 준비**
@@ -39,6 +39,33 @@
 - ✅ 타임존 정보가 데이터베이스에 저장되어 데이터 무결성 보장
 
 **상태:** ✅ **완료 및 테스트 성공**
+
+---
+
+### ✅ Inspector 차량/운전자 서류 조회 및 UI 개선
+
+**배경:**
+- Inspector 모바일 페이지에서 차량 검색 시 배정 운전자 정보와 회사 정보까지 확인하고,
+- 점검 화면에서 장비/운전자 서류를 바로 열람하고 싶다는 요청이 있었음.
+
+**구현 내용:**
+- ✅ `server/db.ts`  
+  - `searchEquipmentByVehicleNumber`가 BP/Owner 회사 정보를 함께 반환하도록 업데이트  
+  - `getEquipmentInspectionContext` 추가: 장비, 배정 운전자, 서류, Owner 정보를 통합 조회  
+  - 누락된 관계 조인(`owner_company`)을 직접 조회하도록 수정해 404 오류 제거
+- ✅ `server/safety-inspection-router.ts`  
+  - `getEquipmentContext` tRPC 쿼리 추가
+- ✅ `client/src/pages/mobile/InspectorMain.tsx`  
+  - 검색 결과 카드에 운전자 + BP + Owner 뱃지 표시
+- ✅ `client/src/pages/mobile/SafetyInspectionNew.tsx`  
+  - 점검 화면에 배정 운전자 카드, 서류 목록 모달, 하단 네비게이션 `서류 보기` 버튼 추가  
+  - 장비/운전자 서류를 모달에서 직접 열람 가능 (파일은 원본 형식으로 새 탭에서 열림)
+
+**주의 사항:**
+- 브라우저에서 바로 보기 원하면 PDF/이미지 형식으로 업로드하는 것이 가장 안정적  
+  (워드 파일은 브라우저가 지원하지 않아 다운로드로 처리됨)
+
+**상태:** ✅ **완료 및 배포, 테스트 대기**
 
 ---
 
