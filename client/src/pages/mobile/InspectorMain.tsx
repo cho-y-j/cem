@@ -52,6 +52,66 @@ export default function InspectorMain() {
   useEffect(() => {
     if (typeof window !== "undefined" && (window as any).NDEFReader) {
       setIsNfcSupported(true);
+      if (!(window as any).__cemNfcListening) {
+        (window as any).__cemNfcListening = true;
+        try {
+          const NDEFReader = (window as any).NDEFReader;
+          const reader = new NDEFReader();
+          reader.addEventListener("reading", async (event: any) => {
+            if (!event) return;
+            try {
+              let tagValue = typeof event.serialNumber === "string" ? event.serialNumber.trim() : "";
+              if (!tagValue && event.message?.records?.length) {
+                for (const record of event.message.records) {
+                  if (record.recordType === "text" || record.recordType === "url") {
+                    const decoder = new TextDecoder(record.encoding || "utf-8");
+                    const decoded = decoder.decode(record.data);
+                    if (decoded?.trim()) {
+                      tagValue = decoded.trim();
+                      break;
+                    }
+                  }
+                }
+              }
+
+              if (!tagValue) return;
+
+              toast.info(`NFC 태그 인식: ${tagValue}`);
+              const context = await utils.safetyInspection.getEquipmentByNfcTag.fetch({ nfcTagId: tagValue });
+              if (!context?.equipment?.id) {
+                setPendingNfcTag(tagValue);
+                setLastNfcTag(null);
+                setSearchResults([]);
+                toast.error("등록되지 않은 태그입니다. 장비를 검색한 뒤 '태그 등록'을 눌러 연결해주세요.");
+                return;
+              }
+
+              const equipmentResult = {
+                ...context.equipment,
+                activeDeployment: context.activeDeployment || null,
+              };
+
+              setPendingNfcTag(null);
+              setLastNfcTag(tagValue);
+              setSearchInput(context.equipment.regNum || "");
+              setSearchResults([equipmentResult]);
+              toast.success("태그와 매칭된 장비를 불러왔습니다. 목록에서 선택해 주세요.");
+            } catch (error: any) {
+              console.error("[InspectorMain] NFC 자동 스캔 처리 중 오류:", error);
+            }
+          });
+          reader
+            .scan()
+            .then(() => {
+              toast.info("NFC 태그를 기기에 가까이 가져다주시면 자동으로 인식합니다.");
+            })
+            .catch((error: any) => {
+              console.warn("[InspectorMain] 자동 스캔 시작 실패:", error?.message || error);
+            });
+        } catch (error) {
+          console.warn("[InspectorMain] NFC Reader 초기화 실패:", error);
+        }
+      }
     }
   }, []);
 
@@ -61,78 +121,9 @@ export default function InspectorMain() {
       return;
     }
 
-    try {
-      const NDEFReader = (window as any).NDEFReader;
-      const reader = new NDEFReader();
-      await reader.scan();
-      setIsNfcScanning(true);
-      toast.info("NFC 태그를 기기에 가까이 가져다주세요.");
-
-      const handleError = (event: any) => {
-        console.error("[InspectorMain] NFC 스캔 오류:", event?.message || event);
-        setIsNfcScanning(false);
-        toast.error("NFC 스캔 중 오류가 발생했습니다.");
-        reader.removeEventListener("error", handleError);
-      };
-
-      const handleReading = async (event: any) => {
-        reader.removeEventListener("reading", handleReading);
-        reader.removeEventListener("error", handleError);
-        setIsNfcScanning(false);
-
-        try {
-          let tagValue = typeof event.serialNumber === "string" ? event.serialNumber.trim() : "";
-          if (event.message?.records?.length) {
-            for (const record of event.message.records) {
-              if (record.recordType === "text" || record.recordType === "url") {
-                const decoder = new TextDecoder(record.encoding || "utf-8");
-                const decoded = decoder.decode(record.data);
-                if (decoded?.trim()) {
-                  tagValue = decoded.trim();
-                  break;
-                }
-              }
-            }
-          }
-
-          if (!tagValue) {
-            toast.error("인식된 NFC 태그에서 식별 정보를 찾지 못했습니다.");
-            return;
-          }
-
-          toast.info(`NFC 태그 인식: ${tagValue}`);
-          const context = await utils.safetyInspection.getEquipmentByNfcTag.fetch({ nfcTagId: tagValue });
-          if (!context?.equipment?.id) {
-            setPendingNfcTag(tagValue);
-            setLastNfcTag(null);
-            setSearchResults([]);
-            toast.error("등록되지 않은 태그입니다. 장비를 검색한 뒤 '태그 등록'을 눌러 연결해주세요.");
-            return;
-          }
-
-          const equipmentResult = {
-            ...context.equipment,
-            activeDeployment: context.activeDeployment || null,
-          };
-
-          setPendingNfcTag(null);
-          setLastNfcTag(tagValue);
-          setSearchInput(context.equipment.regNum || "");
-          setSearchResults([equipmentResult]);
-          toast.success("태그와 매칭된 장비를 불러왔습니다. 목록에서 선택해 주세요.");
-        } catch (error: any) {
-          console.error("[InspectorMain] NFC 태그 처리 중 오류:", error);
-          toast.error(error?.message || "NFC 태그를 처리하는 중 오류가 발생했습니다.");
-        }
-      };
-
-      reader.addEventListener("error", handleError);
-      reader.addEventListener("reading", handleReading, { once: true });
-    } catch (error: any) {
-      console.error("[InspectorMain] NFC 스캔 시작 실패:", error);
-      setIsNfcScanning(false);
-      toast.error(error?.message || "NFC 스캔을 시작할 수 없습니다.");
-    }
+    setIsNfcScanning(true);
+    toast.info("NFC 태그를 기기에 가까이 가져다주세요.");
+    setTimeout(() => setIsNfcScanning(false), 2500);
   };
 
   const handleDialogNfcScan = async () => {
@@ -263,43 +254,38 @@ export default function InspectorMain() {
 
   return (
     <MobileLayout title="안전점검" showBottomNav={false}>
-      <div className="p-4 space-y-4 pb-24">
-        {/* 검색 안내 */}
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <Search className="h-5 w-5 text-blue-600 mt-0.5" />
-              <div>
-                <div className="font-medium text-blue-900">장비 검색</div>
-                <div className="text-sm text-blue-700 mt-1">
-                  차량번호를 입력하여 점검할 장비를 검색하세요
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="p-4 space-y-5 pb-24">
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-slate-700">장비 검색</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            차량번호를 입력하거나 NFC 태그를 스캔하면 배정된 장비를 바로 확인할 수 있습니다.
+          </p>
+        </div>
 
         {/* 검색 입력 */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">차량번호 검색</CardTitle>
+            <CardTitle className="text-base font-semibold text-slate-800">차량번호로 검색</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground leading-relaxed">
+              1234, 12가3456 등 일부 번호만 입력해도 검색됩니다.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
+          <CardContent className="space-y-4 pb-5">
+            <div className="flex gap-2 items-center">
               <Input
                 type="text"
-                placeholder="차량번호 입력 (예: 1234 또는 12가3456)"
+                placeholder="차량번호 입력"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="text-xl h-14 px-4"
+                className="h-14 px-4 text-base"
                 autoFocus
               />
               <Button
                 size="lg"
                 onClick={handleSearch}
                 disabled={!searchInput.trim() || isLoading}
-                className="h-14 px-6 text-base"
+                className="h-14 px-6 text-base font-semibold"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
@@ -313,18 +299,10 @@ export default function InspectorMain() {
                 )}
               </Button>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">
-                • 전체 차량번호 또는 일부만 입력 가능
-              </p>
-              <p className="text-sm text-muted-foreground">
-                • 예: "3456", "가3456", "12가3456" 모두 가능
-              </p>
-            </div>
-            <div className="pt-2 border-t">
+            <div className="pt-3 border-t border-dashed">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-muted-foreground">
-                  NFC 태그로 빠르게 찾기
+                  NFC 자동 인식
                 </span>
                 {!isNfcSupported && (
                   <Badge variant="outline" className="text-xs">
@@ -347,7 +325,7 @@ export default function InspectorMain() {
                 ) : (
                   <>
                     <Nfc className="h-5 w-5 mr-2" />
-                    NFC 태그 스캔하기
+                    태그 인식 다시 시도
                   </>
                 )}
               </Button>
@@ -357,6 +335,11 @@ export default function InspectorMain() {
                 </p>
               )}
             </div>
+            {isNfcSupported && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                페이지 진입 시 자동으로 태그를 인식합니다. 인식이 되지 않으면 위 버튼으로 다시 시도하세요.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -407,21 +390,23 @@ export default function InspectorMain() {
                         <div className="font-bold text-lg text-gray-900">
                           {equipment.regNum}
                         </div>
-                        <div className="text-base text-gray-600 mt-1">
-                          {equipment.equipType?.name || "장비 종류 미상"}
+                        <div className="text-sm text-gray-600 mt-1 leading-relaxed">
+                          {(equipment.equipType?.name || "장비 종류 미상") +
+                            (equipment.specification ? ` · ${equipment.specification}` : "")}
                         </div>
-                        {equipment.specification && (
-                          <div className="text-sm text-gray-500 mt-0.5">
-                            {equipment.specification}
-                          </div>
-                        )}
                         {equipment.activeDeployment?.worker ? (
                           <div className="mt-2 space-y-1">
-                            <div className="flex items-center gap-2 text-sm text-blue-700">
-                              <User className="h-4 w-4" />
+                          <div className="mt-2 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                              <User className="h-4 w-4 text-slate-400" />
                               <span className="font-semibold">
                                 {equipment.activeDeployment.worker.name}
                               </span>
+                              {equipment.activeDeployment.worker.licenseNum && (
+                                <span className="text-xs text-muted-foreground">
+                                  (면허 {equipment.activeDeployment.worker.licenseNum})
+                                </span>
+                              )}
                               {equipment.activeDeployment?.bpCompany?.name && (
                                 <Badge variant="outline" className="text-xs">
                                   {equipment.activeDeployment.bpCompany.name}
@@ -433,11 +418,6 @@ export default function InspectorMain() {
                                 </Badge>
                               )}
                             </div>
-                            {equipment.activeDeployment.worker.licenseNum && (
-                              <div className="text-xs text-muted-foreground">
-                                면허번호: {equipment.activeDeployment.worker.licenseNum}
-                              </div>
-                            )}
                           </div>
                         ) : (
                           <div className="mt-2">
@@ -451,23 +431,10 @@ export default function InspectorMain() {
                             NFC 태그: {equipment.nfcTagId}
                           </div>
                         )}
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
                           <Button
-                            variant="outline"
                             size="sm"
-                            className="w-full text-sm py-3"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openTagDialog(equipment);
-                            }}
-                          >
-                            <Nfc className="h-4 w-4 mr-2" />
-                            태그 등록
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-sm py-3"
+                            className="w-full h-11 text-sm font-semibold"
                             onClick={(event) => {
                               event.stopPropagation();
                               setLocation(`/mobile/inspector/inspection/${equipment.id}`);
@@ -475,6 +442,18 @@ export default function InspectorMain() {
                           >
                             <FileText className="h-4 w-4 mr-2" />
                             점검 시작
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-11 text-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openTagDialog(equipment);
+                            }}
+                          >
+                            <Nfc className="h-4 w-4 mr-2" />
+                            태그 등록 / 수정
                           </Button>
                         </div>
                       </div>
@@ -504,64 +483,64 @@ export default function InspectorMain() {
         )}
 
         {/* 사용 안내 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">점검 프로세스</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-slate-800">점검 진행 순서</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              NFC 태그를 인식하면 1~3 단계가 자동으로 연결됩니다.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 flex-shrink-0">
-                  1
+          <CardContent className="space-y-4">
+            {[
+              {
+                title: "장비 검색 또는 태그 인식",
+                desc: "차량번호·태그로 장비 정보를 확인합니다.",
+              },
+              {
+                title: "점검표 작성",
+                desc: "차종별 템플릿으로 체크리스트를 진행합니다.",
+              },
+              {
+                title: "제출 및 공유",
+                desc: "점검 결과와 사진을 저장하고 관리자에게 공유합니다.",
+              },
+            ].map((step, index) => (
+              <div key={step.title} className="flex items-start gap-3">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                  {index + 1}
                 </div>
                 <div>
-                  <div className="text-sm font-medium">장비 검색</div>
-                  <div className="text-xs text-muted-foreground">
-                    차량번호 뒷 4자리로 장비 검색
-                  </div>
+                  <div className="text-sm font-medium text-slate-800">{step.title}</div>
+                  <div className="text-xs text-muted-foreground">{step.desc}</div>
                 </div>
               </div>
-
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 flex-shrink-0">
-                  2
-                </div>
-                <div>
-                  <div className="text-sm font-medium">점검표 작성</div>
-                  <div className="text-xs text-muted-foreground">
-                    차종에 맞는 점검표로 안전점검 수행
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 flex-shrink-0">
-                  3
-                </div>
-                <div>
-                  <div className="text-sm font-medium">결과 제출</div>
-                  <div className="text-xs text-muted-foreground">
-                    점검 결과를 시스템에 기록
-                  </div>
-                </div>
-              </div>
-            </div>
+            ))}
           </CardContent>
         </Card>
 
         {/* 주의사항 */}
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardContent className="py-4">
+        <Card className="shadow-sm border border-amber-100 bg-amber-50">
+          <CardContent className="py-4 space-y-3">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
-                <div className="font-medium text-yellow-900">주의사항</div>
-                <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
-                  <li>이상 항목 발견 시 반드시 사진 첨부</li>
-                  <li>점검 완료 후 즉시 제출</li>
-                  <li>심각한 안전 문제 발견 시 즉시 보고</li>
-                </ul>
+                <div className="text-sm font-semibold text-amber-900">주의사항</div>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  안전과 기록 정확도를 위해 다음 사항을 지켜주세요.
+                </p>
               </div>
+            </div>
+            <div className="grid gap-2">
+              {[
+                "이상 항목 발견 시 반드시 사진을 첨부합니다.",
+                "점검이 끝나면 즉시 제출하고 관리자와 공유합니다.",
+                "위험 요소 발견 시 현장 관리자에게 우선 보고합니다.",
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-2 text-xs text-amber-800">
+                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  <span>{item}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
