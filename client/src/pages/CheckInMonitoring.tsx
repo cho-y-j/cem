@@ -89,18 +89,21 @@ export default function CheckInMonitoring() {
     // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
     try {
       // ISO 문자열로 명시적으로 파싱
-      const date = typeof dateStr === 'string' 
-        ? new Date(dateStr) 
-        : dateStr;
-      
-      // 디버깅: 원본 시간 확인
-      console.log('[formatTime] Input:', dateStr, 'UTC:', date.toISOString());
+      let date: Date;
+      if (typeof dateStr === 'string') {
+        // ISO 문자열인지 확인하고 파싱
+        date = new Date(dateStr);
+        if (isNaN(date.getTime())) {
+          console.error('[formatTime] Invalid date string:', dateStr);
+          return String(dateStr);
+        }
+      } else {
+        date = dateStr;
+      }
       
       // UTC 시간에서 직접 시간과 분 추출
       const utcHours = date.getUTCHours();
       const utcMinutes = date.getUTCMinutes();
-      
-      console.log('[formatTime] UTC:', utcHours, ':', utcMinutes);
       
       // 한국 시간으로 변환 (UTC + 9시간)
       let kstHours = utcHours + 9;
@@ -111,7 +114,13 @@ export default function CheckInMonitoring() {
       const hours = kstHours.toString().padStart(2, '0');
       const minutes = utcMinutes.toString().padStart(2, '0');
       
-      console.log('[formatTime] KST:', hours, ':', minutes);
+      // 디버깅: 변환 과정 확인
+      console.log('[formatTime]', {
+        input: dateStr,
+        utcISO: date.toISOString(),
+        utcTime: `${utcHours}:${utcMinutes}`,
+        kstTime: `${hours}:${minutes}`,
+      });
       
       return `${hours}:${minutes}`;
     } catch (error) {

@@ -170,14 +170,15 @@ export default function WorkerMain() {
       try {
         const date = new Date(todayCheckInStatus.checkIn.checkInTime);
         
-        // 디버깅: 원본 시간 확인
-        console.log('[WorkerMain] Input:', todayCheckInStatus.checkIn.checkInTime, 'UTC:', date.toISOString());
+        if (isNaN(date.getTime())) {
+          console.error('[WorkerMain] Invalid date:', todayCheckInStatus.checkIn.checkInTime);
+          setCheckInTimeDisplay('');
+          return;
+        }
         
         // UTC 시간에서 직접 시간과 분 추출
         const utcHours = date.getUTCHours();
         const utcMinutes = date.getUTCMinutes();
-        
-        console.log('[WorkerMain] UTC:', utcHours, ':', utcMinutes);
         
         // 한국 시간으로 변환 (UTC + 9시간)
         let kstHours = utcHours + 9;
@@ -189,7 +190,13 @@ export default function WorkerMain() {
         const minutes = utcMinutes.toString().padStart(2, '0');
         const timeStr = `${hours}:${minutes}`;
         
-        console.log('[WorkerMain] KST:', timeStr);
+        // 디버깅: 변환 과정 확인
+        console.log('[WorkerMain] Time conversion:', {
+          input: todayCheckInStatus.checkIn.checkInTime,
+          utcISO: date.toISOString(),
+          utcTime: `${utcHours}:${utcMinutes}`,
+          kstTime: timeStr,
+        });
         
         setCheckInTimeDisplay(timeStr);
       } catch (error) {
@@ -207,19 +214,31 @@ export default function WorkerMain() {
         : `작업 구역 밖에서 출근하셨습니다 (${data.distanceFromZone}m 떨어짐)`;
       toast.success(`출근이 완료되었습니다!\n${distanceMsg}`);
       
-      // 출근 상태 즉시 새로고침
+      // 출근 상태 즉시 새로고침 (여러 방법으로 강제 새로고침)
       try {
-        await refetchCheckIn();
-        // utils를 사용하여 캐시 무효화 및 강제 새로고침
+        // 1. 캐시 무효화
         await utils.checkIn.getTodayStatus.invalidate();
+        // 2. 강제 refetch
         await utils.checkIn.getTodayStatus.refetch();
+        // 3. refetchCheckIn도 호출
+        await refetchCheckIn();
+        // 4. 약간의 지연 후 한 번 더 refetch (UI 업데이트 보장)
+        setTimeout(async () => {
+          await utils.checkIn.getTodayStatus.refetch();
+        }, 500);
       } catch (error) {
         console.error('[WorkerMain] Error refetching check-in status:', error);
       }
     },
     onError: (error) => {
       console.error('[WorkerMain] Check-in error:', error);
-      toast.error("출근 체크 실패: " + error.message);
+      // 에러 메시지 정리 (deployment 관련 에러 메시지 개선)
+      let errorMessage = error.message || '알 수 없는 오류';
+      if (errorMessage.includes('deployment') || errorMessage.includes('투입')) {
+        errorMessage = errorMessage.replace(/deployment.*not.*defined/gi, '투입 정보를 찾을 수 없습니다');
+        errorMessage = errorMessage.replace(/deployment/gi, '투입');
+      }
+      toast.error("출근 체크 실패: " + errorMessage);
     },
   });
 

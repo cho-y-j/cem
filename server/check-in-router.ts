@@ -255,12 +255,12 @@ export const checkInRouter = router({
       console.log(`[CheckIn] Worker ${ctx.user.name} checked in at ${new Date().toISOString()}`);
 
       // 출근 시 위치를 location_logs에도 기록
-      if (deployment?.equipmentId) {
+      if (activeDeployment?.equipment_id) {
         try {
           const locationLogId = nanoid();
           await db.createLocationLog({
             id: locationLogId,
-            equipmentId: deployment.equipmentId,
+            equipmentId: activeDeployment.equipment_id,
             workerId: worker.id,
             latitude: input.lat.toString(),
             longitude: input.lng.toString(),
