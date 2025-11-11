@@ -68,6 +68,7 @@ export default function Equipment() {
     regNum: "",
     specification: "",
     status: "idle",
+    nfcTagId: "",
   });
   const [docFiles, setDocFiles] = useState<DocFile[]>([]);
   const [assignDriverDialogOpen, setAssignDriverDialogOpen] = useState(false);
@@ -135,17 +136,38 @@ export default function Equipment() {
   });
 
   const resetForm = () => {
-    setFormData({ equipTypeId: "", regNum: "", specification: "", status: "idle" });
+    setFormData({ equipTypeId: "", regNum: "", specification: "", status: "idle", nfcTagId: "" });
     setEditingId(null);
     setDocFiles([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const trimmedNfcTag = formData.nfcTagId.trim();
+    const normalizedNfcTag = trimmedNfcTag.length > 0 ? trimmedNfcTag : null;
+
+    if (normalizedNfcTag) {
+      const isTagDuplicate = equipmentList?.some(
+        (eq) => eq.nfcTagId === normalizedNfcTag && eq.id !== editingId
+      );
+
+      if (isTagDuplicate) {
+        toast.error(`NFC 태그 "${normalizedNfcTag}"는 이미 다른 장비에 등록되어 있습니다.`);
+        return;
+      }
+    }
     
     if (editingId) {
       // 수정 모드
-      updateMutation.mutate({ id: editingId, ...formData });
+      updateMutation.mutate({
+        id: editingId,
+        equipTypeId: formData.equipTypeId,
+        regNum: formData.regNum,
+        specification: formData.specification,
+        status: formData.status,
+        nfcTagId: normalizedNfcTag,
+      });
     } else {
       // 등록 모드
       // 등록 번호 중복 체크
@@ -169,7 +191,7 @@ export default function Equipment() {
         );
         return;
       }
-
+      
       // 만료일이 있는 서류의 만료일 체크
       const missingExpiryDocs = docFiles.filter(
         (doc) => doc.hasExpiry && doc.file && !doc.expiryDate
@@ -200,6 +222,7 @@ export default function Equipment() {
 
         createWithDocsMutation.mutate({
           ...formData,
+          nfcTagId: normalizedNfcTag ?? undefined,
           docs: docs.length > 0 ? docs : undefined,
         });
       } catch (error) {
@@ -216,6 +239,7 @@ export default function Equipment() {
       regNum: equipment.regNum,
       specification: equipment.specification || "",
       status: equipment.status,
+      nfcTagId: equipment.nfcTagId || "",
     });
     setIsDialogOpen(true);
   };
@@ -304,6 +328,7 @@ export default function Equipment() {
               <TableHeader>
                 <TableRow>
                   <TableHead>등록번호</TableHead>
+                  <TableHead>NFC 태그</TableHead>
                   <TableHead>장비 종류</TableHead>
                   <TableHead>배정 운전자</TableHead>
                   <TableHead>상태</TableHead>
@@ -315,6 +340,15 @@ export default function Equipment() {
                 {equipmentList.map((equipment) => (
                   <TableRow key={equipment.id}>
                     <TableCell className="font-medium">{equipment.regNum}</TableCell>
+                    <TableCell>
+                      {equipment.nfcTagId ? (
+                        <Badge variant="outline" className="text-xs">
+                          {equipment.nfcTagId}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">미등록</span>
+                      )}
+                    </TableCell>
                     <TableCell>{getEquipTypeName(equipment.equipTypeId)}</TableCell>
                     <TableCell>
                       {equipment.assignedWorkerId ? (
@@ -448,6 +482,20 @@ export default function Equipment() {
                     }
                     placeholder="예: 10톤급, 작업높이 20m, 버킷용량 0.5m³"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nfcTagId">NFC 태그</Label>
+                  <Input
+                    id="nfcTagId"
+                    value={formData.nfcTagId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nfcTagId: e.target.value })
+                    }
+                    placeholder="태그 ID (선택)"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    현장에서 부착한 태그 값이 있는 경우 입력해주세요. 공백이면 태그가 등록되지 않습니다.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">상태</Label>
@@ -708,6 +756,18 @@ function EquipmentDetailDialog({ open, onOpenChange, equipmentId }: EquipmentDet
                     {equipment.createdAt
                       ? format(new Date(equipment.createdAt), "PPP", { locale: ko })
                       : "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">NFC 태그</div>
+                  <div className="font-medium">
+                    {equipment.nfcTagId ? (
+                      <Badge variant="outline" className="text-xs">
+                        {equipment.nfcTagId}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">미등록</span>
+                    )}
                   </div>
                 </div>
                 {equipment.specification && (

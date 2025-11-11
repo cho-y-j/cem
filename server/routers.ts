@@ -434,11 +434,15 @@ export const appRouter = router({
           regNum: z.string(),
           currentBpId: z.string().optional(),
           status: z.string().default("idle"),
+          specification: z.string().optional(),
+          nfcTagId: z.string().trim().min(1).max(128).optional().nullable(),
         })
       )
       .mutation(async ({ input, ctx }) => {
         const id = nanoid();
-        await db.createEquipment({ id, ...input, ownerId: ctx.user.id });
+        const { nfcTagId, ...data } = input;
+        const normalizedTag = typeof nfcTagId === "string" && nfcTagId.trim().length > 0 ? nfcTagId.trim() : null;
+        await db.createEquipment({ id, ...data, nfcTagId: normalizedTag, ownerId: ctx.user.id });
         return { id };
       }),
 
@@ -450,11 +454,26 @@ export const appRouter = router({
           regNum: z.string().optional(),
           currentBpId: z.string().optional(),
           status: z.string().optional(),
+          specification: z.string().optional(),
+          nfcTagId: z.string().trim().min(1).max(128).optional().nullable(),
         })
       )
       .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        await db.updateEquipment(id, data);
+        const { id, nfcTagId, ...data } = input;
+
+        const hasUpdateFields = Object.keys(data).length > 0;
+        if (hasUpdateFields) {
+          await db.updateEquipment(id, data);
+        }
+
+        if (nfcTagId !== undefined) {
+          const normalizedTag =
+            typeof nfcTagId === "string" && nfcTagId.trim().length > 0
+              ? nfcTagId.trim()
+              : null;
+          await db.assignNfcTagToEquipment(id, normalizedTag);
+        }
+
         return { success: true };
       }),
 
@@ -513,6 +532,8 @@ export const appRouter = router({
           equipTypeId: z.string(),
           regNum: z.string(),
           status: z.string().default("idle"),
+          specification: z.string().optional(),
+          nfcTagId: z.string().trim().min(1).max(128).optional().nullable(),
           docs: z.array(
             z.object({
               docTypeId: z.string(),
@@ -528,10 +549,14 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const equipmentId = nanoid();
-        const { docs, ...equipmentData } = input;
+        const { docs, nfcTagId, ...equipmentData } = input;
+        const normalizedTag =
+          typeof nfcTagId === "string" && nfcTagId.trim().length > 0
+            ? nfcTagId.trim()
+            : null;
         
         // 장비 등록
-        await db.createEquipment({ id: equipmentId, ...equipmentData, ownerId: ctx.user.id });
+        await db.createEquipment({ id: equipmentId, ...equipmentData, nfcTagId: normalizedTag, ownerId: ctx.user.id });
         
         // 서류 업로드 및 등록
         if (docs && docs.length > 0) {
