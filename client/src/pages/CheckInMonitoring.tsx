@@ -87,52 +87,27 @@ export default function CheckInMonitoring() {
 
   const formatTime = (dateStr: string | Date) => {
     // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
+    // 브라우저의 toLocaleTimeString을 사용하여 자동으로 타임존 변환
     try {
-      // ISO 문자열로 명시적으로 파싱
-      let date: Date;
-      if (typeof dateStr === 'string') {
-        // ISO 문자열인지 확인하고 파싱
-        date = new Date(dateStr);
-        if (isNaN(date.getTime())) {
-          console.error('[formatTime] Invalid date string:', dateStr);
-          return String(dateStr);
-        }
-      } else {
-        date = dateStr;
-      }
+      const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
       
-      // UTC 시간에서 직접 시간과 분 추출
-      const utcHours = date.getUTCHours();
-      const utcMinutes = date.getUTCMinutes();
-      
-      // 한국 시간으로 변환 (UTC + 9시간)
-      let kstHours = utcHours + 9;
-      let kstDate = new Date(date);
-      kstDate.setUTCHours(utcHours + 9);
-      
-      // 날짜가 넘어가는 경우 처리
-      if (kstHours >= 24) {
-        kstHours = kstHours - 24;
-        kstDate.setUTCDate(kstDate.getUTCDate() + 1);
-      }
-      
-      const hours = kstHours.toString().padStart(2, '0');
-      const minutes = utcMinutes.toString().padStart(2, '0');
-      
-      return `${hours}:${minutes}`;
-    } catch (error) {
-      console.error('[CheckInMonitoring] formatTime error:', error, dateStr);
-      // 에러 발생 시 브라우저 로컬 시간 사용
-      try {
-        const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
-        return date.toLocaleTimeString("ko-KR", { 
-          hour: "2-digit", 
-          minute: "2-digit",
-          timeZone: "Asia/Seoul"
-        });
-      } catch {
+      if (isNaN(date.getTime())) {
+        console.error('[formatTime] Invalid date string:', dateStr);
         return String(dateStr);
       }
+      
+      // toLocaleTimeString을 사용하여 한국 시간대(Asia/Seoul)로 자동 변환
+      // 브라우저가 UTC 시간을 자동으로 KST로 변환해줌
+      return date.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Seoul',
+        hour12: false, // 24시간 형식 (14:11)
+      });
+    } catch (error) {
+      console.error('[CheckInMonitoring] formatTime error:', error, dateStr);
+      // 에러 발생 시 원본 문자열 반환
+      return String(dateStr);
     }
   };
 

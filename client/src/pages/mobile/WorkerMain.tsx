@@ -167,6 +167,7 @@ export default function WorkerMain() {
   useEffect(() => {
     if (isMounted && todayCheckInStatus?.checkIn?.checkInTime) {
       // UTC 시간을 한국 시간(KST, UTC+9)으로 변환
+      // 브라우저의 toLocaleTimeString을 사용하여 자동으로 타임존 변환
       try {
         const date = new Date(todayCheckInStatus.checkIn.checkInTime);
         
@@ -176,26 +177,13 @@ export default function WorkerMain() {
           return;
         }
         
-        // UTC 시간에서 직접 시간과 분 추출
-        const utcHours = date.getUTCHours();
-        const utcMinutes = date.getUTCMinutes();
-        
-        // 한국 시간으로 변환 (UTC + 9시간)
-        let kstHours = utcHours + 9;
-        if (kstHours >= 24) {
-          kstHours = kstHours - 24;
-        }
-        
-        const hours = kstHours.toString().padStart(2, '0');
-        const minutes = utcMinutes.toString().padStart(2, '0');
-        const timeStr = `${hours}:${minutes}`;
-        
-        // 디버깅: 변환 과정 확인
-        console.log('[WorkerMain] Time conversion:', {
-          input: todayCheckInStatus.checkIn.checkInTime,
-          utcISO: date.toISOString(),
-          utcTime: `${utcHours}:${utcMinutes}`,
-          kstTime: timeStr,
+        // toLocaleTimeString을 사용하여 한국 시간대(Asia/Seoul)로 자동 변환
+        // 브라우저가 UTC 시간을 자동으로 KST로 변환해줌
+        const timeStr = date.toLocaleTimeString('ko-KR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Seoul',
+          hour12: false, // 24시간 형식 (14:11)
         });
         
         setCheckInTimeDisplay(timeStr);
