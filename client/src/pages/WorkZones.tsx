@@ -269,40 +269,52 @@ export default function WorkZones() {
   // 그리기 모드 (점 찍기/중심점 이동 활성화)
   const [isDrawingMode, setIsDrawingMode] = useState(false);
 
-  // 작업 구역 목록 조회
-  const { data: workZones = [], refetch } = trpc.workZones.list.useQuery();
+  // 작업 구역 목록 조회 (활성 구역만)
+  const utils = trpc.useUtils();
+  const { data: workZones = [], refetch } = trpc.workZones.list.useQuery({
+    isActive: true,
+  });
 
   // 생성 뮤테이션
   const createMutation = trpc.workZones.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("작업 구역이 생성되었습니다");
-      refetch();
+      // 캐시 무효화 및 강제 새로고침
+      await utils.workZones.list.invalidate();
+      await refetch();
       closeDialog();
     },
     onError: (error) => {
+      console.error('[WorkZones] Create error:', error);
       toast.error(error.message || "작업 구역 생성에 실패했습니다");
     },
   });
 
   // 수정 뮤테이션
   const updateMutation = trpc.workZones.update.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("작업 구역이 수정되었습니다");
-      refetch();
+      // 캐시 무효화 및 강제 새로고침
+      await utils.workZones.list.invalidate();
+      await refetch();
       closeDialog();
     },
     onError: (error) => {
+      console.error('[WorkZones] Update error:', error);
       toast.error(error.message || "작업 구역 수정에 실패했습니다");
     },
   });
 
   // 삭제 뮤테이션
   const deleteMutation = trpc.workZones.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("작업 구역이 삭제되었습니다");
-      refetch();
+      // 캐시 무효화 및 강제 새로고침
+      await utils.workZones.list.invalidate();
+      await refetch();
     },
     onError: (error) => {
+      console.error('[WorkZones] Delete error:', error);
       toast.error(error.message || "작업 구역 삭제에 실패했습니다");
     },
   });
@@ -457,9 +469,16 @@ export default function WorkZones() {
 
     if (formData.zoneType === "circle") {
       // 원형 모드: 중심점과 반경만 전송
-      data.centerLat = formData.centerLat;
-      data.centerLng = formData.centerLng;
-      data.radiusMeters = formData.radiusMeters;
+      // 위도/경도가 유효한 숫자인지 확인
+      if (formData.centerLat != null && formData.centerLng != null && 
+          !isNaN(formData.centerLat) && !isNaN(formData.centerLng)) {
+        data.centerLat = formData.centerLat;
+        data.centerLng = formData.centerLng;
+        data.radiusMeters = formData.radiusMeters;
+      } else {
+        toast.error("유효한 중심점 좌표를 설정해주세요");
+        return;
+      }
       // 폴리곤 관련 데이터 제거
       delete data.polygonCoordinates;
     } else {
