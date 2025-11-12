@@ -730,7 +730,8 @@ export const appRouter = router({
           ...workerData,
           email,  // email 추가!
           pinCode: "0000",  // PIN 기본값
-          ownerId: ctx.user.id 
+          ownerId: ctx.user.id,
+          ownerCompanyId: ctx.user.companyId || null // Owner 회사 ID도 함께 저장
         });
         
         return { id, userId };

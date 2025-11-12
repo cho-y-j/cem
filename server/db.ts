@@ -142,19 +142,73 @@ export async function getUser(id: string): Promise<User | undefined> {
 }
 
 export async function getAllUsers(): Promise<User[]> {
-  const supabase = getSupabase();
-  if (!supabase) return [];
+  const supabase = getSupabaseAdmin(); // Admin 권한 필요 (Auth 조회용)
+  if (!supabase) {
+    console.warn("[Database] Supabase Admin not available, falling back to regular client");
+    const regularSupabase = getSupabase();
+    if (!regularSupabase) return [];
+    
+    const { data, error } = await regularSupabase
+      .from('users')
+      .select('*');
+    
+    if (error) {
+      console.error("[Database] Error getting users:", error);
+      return [];
+    }
+    
+    return toCamelCaseArray(data || []) as User[];
+  }
 
-  const { data, error } = await supabase
+  // users 테이블에서 사용자 조회
+  const { data: dbUsers, error: dbError } = await supabase
     .from('users')
     .select('*');
 
-  if (error) {
-    console.error("[Database] Error getting users:", error);
+  if (dbError) {
+    console.error("[Database] Error getting users from DB:", dbError);
     return [];
   }
 
-  return toCamelCaseArray(data || []) as User[];
+  // Supabase Auth에서 사용자 목록 조회 (동기화 확인용)
+  try {
+    const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+    
+    if (authError) {
+      console.warn("[Database] Could not list Auth users (non-critical):", authError.message);
+    } else if (authData?.users) {
+      // Auth에 있지만 DB에 없는 사용자 감지
+      const dbUserIds = new Set((dbUsers || []).map((u: any) => u.id));
+      const orphanedAuthUsers = authData.users.filter(
+        (authUser) => !dbUserIds.has(authUser.id)
+      );
+      
+      if (orphanedAuthUsers.length > 0) {
+        console.warn(
+          `[Database] Found ${orphanedAuthUsers.length} Auth users without DB records:`,
+          orphanedAuthUsers.map((u) => ({ id: u.id, email: u.email }))
+        );
+      }
+      
+      // DB에 있지만 Auth에 없는 사용자 감지
+      const authUserIds = new Set(authData.users.map((u) => u.id));
+      const orphanedDbUsers = (dbUsers || []).filter(
+        (dbUser: any) => !authUserIds.has(dbUser.id)
+      );
+      
+      if (orphanedDbUsers.length > 0) {
+        console.warn(
+          `[Database] Found ${orphanedDbUsers.length} DB users without Auth records:`,
+          orphanedDbUsers.map((u: any) => ({ id: u.id, email: u.email }))
+        );
+      }
+    }
+  } catch (error) {
+    // Auth 조회 실패는 치명적이지 않음 (로깅만)
+    console.warn("[Database] Auth sync check failed (non-critical):", error);
+  }
+
+  return toCamelCaseArray(dbUsers || []) as User[];
 }
 
 export async function updateUserRole(userId: string, role: string) {
@@ -927,10 +981,9 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
     .select('*')
     .order('created_at', { ascending: false });
 
-  // ownerCompanyId 필터는 workers 테이블에 owner_company_id 컬럼이 없으므로
-  // ownerId를 통해 users 테이블과 조인하여 필터링해야 함
-  // 현재는 ownerId 필터만 사용
-  // TODO: 향후 workers 테이블에 owner_company_id 컬럼 추가 또는 조인 방식으로 개선
+  if (ownerCompanyId) {
+    query = query.eq('owner_company_id', ownerCompanyId);
+  }
 
   if (allowedWorkerIds !== null) {
     query = query.in('id', Array.from(allowedWorkerIds));

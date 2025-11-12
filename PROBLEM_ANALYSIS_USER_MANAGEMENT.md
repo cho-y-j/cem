@@ -199,8 +199,41 @@ to automatically respond when row(s) are being deleted in the workers table.
 - `server/users-router.ts`: 사용자 삭제 로직 개선
 
 **남은 작업:**
-- `getAllUsers()` 함수 개선 (Supabase Auth와 동기화 확인)
-- 사용자 생성/수정 시 동기화 보장 (트랜잭션 또는 롤백 로직)
+- ✅ `getAllUsers()` 함수 개선 (Supabase Auth와 동기화 확인) - **완료**
+- ✅ 사용자 생성/수정 시 동기화 보장 (롤백 로직 이미 구현됨)
+
+---
+
+### ✅ Phase 4: 근본적인 스키마 및 제약 조건 개선 (완료)
+
+**구현 내용:**
+1. ✅ **Foreign Key 제약 조건 개선** (`drizzle/migrations-pg/0010_fix_foreign_key_constraints.sql`):
+   - `entry_request_items.paired_worker_id`에 `ON DELETE SET NULL` 추가
+   - `entry_request_items.paired_equipment_id`에도 동일하게 적용
+   - 데이터베이스 레벨에서 자동 처리
+
+2. ✅ **workers 테이블에 owner_company_id 컬럼 추가**:
+   - 스키마 업데이트 (`drizzle/schema.ts`)
+   - 마이그레이션 SQL 생성 (`drizzle/migrations-pg/0011_add_owner_company_id_to_workers.sql`)
+   - 기존 데이터 마이그레이션 (owner_id를 통해 users.company_id 가져오기)
+   - 인덱스 추가 (성능 향상)
+
+3. ✅ **Worker 생성 시 owner_company_id 저장** (`server/routers.ts:734`):
+   - Worker 생성 시 `ctx.user.companyId`도 함께 저장
+
+4. ✅ **getWorkersWithFilters 함수 복원** (`server/db.ts:930-932`):
+   - `owner_company_id` 필터 복원 (이제 컬럼이 존재함)
+
+5. ✅ **getAllUsers() 함수 개선** (`server/db.ts:144-212`):
+   - Supabase Auth와 users 테이블 동기화 확인
+   - 불일치 사용자 감지 및 경고 로그
+
+**수정 파일:**
+- `drizzle/schema.ts`: workers 테이블에 ownerCompanyId 추가
+- `drizzle/migrations-pg/0010_fix_foreign_key_constraints.sql`: Foreign Key 제약 조건 개선
+- `drizzle/migrations-pg/0011_add_owner_company_id_to_workers.sql`: owner_company_id 컬럼 추가
+- `server/db.ts`: getAllUsers, getWorkersWithFilters 개선
+- `server/routers.ts`: Worker 생성 시 ownerCompanyId 저장
 
 ---
 

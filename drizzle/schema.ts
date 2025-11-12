@@ -186,7 +186,8 @@ export const workers = pgTable("workers", {
   name: varchar("name", { length: 100 }).notNull(),
   licenseNum: varchar("license_num", { length: 100 }),
   licenseStatus: varchar("license_status", { length: 50 }),
-  ownerId: varchar("owner_id", { length: 64 }),
+  ownerId: varchar("owner_id", { length: 64 }), // Owner 사용자 ID
+  ownerCompanyId: varchar("owner_company_id", { length: 64 }), // Owner 회사 ID (필터링용)
   phone: varchar("phone", { length: 20 }),
   pinCode: varchar("pin_code", { length: 6 }),
   address: text("address"),
