@@ -161,7 +161,8 @@ export const equipment = pgTable("equipment", {
   equipTypeId: varchar("equip_type_id", { length: 64 }).notNull(),
   regNum: varchar("reg_num", { length: 100 }).notNull().unique(),
   specification: varchar("specification", { length: 200 }), // 장비 세부 규격
-  ownerId: varchar("owner_id", { length: 64 }),
+  ownerId: varchar("owner_id", { length: 64 }), // Owner 사용자 ID
+  ownerCompanyId: varchar("owner_company_id", { length: 64 }), // Owner 회사 ID (필터링용)
   currentBpId: varchar("current_bp_id", { length: 64 }),
   nfcTagId: varchar("nfc_tag_id", { length: 128 }).unique(),
   status: varchar("status", { length: 50 }).default("idle").notNull(),

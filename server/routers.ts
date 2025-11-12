@@ -465,7 +465,13 @@ export const appRouter = router({
         const id = nanoid();
         const { nfcTagId, ...data } = input;
         const normalizedTag = typeof nfcTagId === "string" && nfcTagId.trim().length > 0 ? nfcTagId.trim() : null;
-        await db.createEquipment({ id, ...data, nfcTagId: normalizedTag, ownerId: ctx.user.id });
+        await db.createEquipment({ 
+          id, 
+          ...data, 
+          nfcTagId: normalizedTag, 
+          ownerId: ctx.user.id,
+          ownerCompanyId: ctx.user.companyId || null // Owner 회사 ID도 함께 저장
+        });
         return { id };
       }),
 
@@ -579,7 +585,13 @@ export const appRouter = router({
             : null;
         
         // 장비 등록
-        await db.createEquipment({ id: equipmentId, ...equipmentData, nfcTagId: normalizedTag, ownerId: ctx.user.id });
+        await db.createEquipment({ 
+          id: equipmentId, 
+          ...equipmentData, 
+          nfcTagId: normalizedTag, 
+          ownerId: ctx.user.id,
+          ownerCompanyId: ctx.user.companyId || null // Owner 회사 ID도 함께 저장
+        });
         
         // 서류 업로드 및 등록
         if (docs && docs.length > 0) {

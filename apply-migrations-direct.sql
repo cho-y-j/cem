@@ -65,3 +65,23 @@ ON workers(owner_company_id);
 CREATE INDEX IF NOT EXISTS idx_workers_owner_id_company_id 
 ON workers(owner_id, owner_company_id);
 
+-- ============================================================
+-- Migration 0012: equipment 테이블에 owner_company_id 컬럼 추가
+-- ============================================================
+
+ALTER TABLE equipment
+ADD COLUMN IF NOT EXISTS owner_company_id VARCHAR(64);
+
+UPDATE equipment e
+SET owner_company_id = u.company_id
+FROM users u
+WHERE e.owner_id = u.id
+  AND e.owner_company_id IS NULL
+  AND u.company_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_equipment_owner_company_id 
+ON equipment(owner_company_id);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_owner_id_company_id 
+ON equipment(owner_id, owner_company_id);
+
