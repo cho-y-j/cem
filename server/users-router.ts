@@ -355,22 +355,39 @@ export const usersRouter = router({
         }
       }
 
-      // 4. Supabase Auth에서 삭제 (UUID인 경우만)
+      // 4. Supabase Auth에서 삭제 시도
+      // UUID가 아닌 경우에도 시도 (일부 레거시 사용자는 UUID가 아닐 수 있음)
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const isUUID = uuidRegex.test(input.id);
 
       if (isUUID) {
+        // UUID인 경우 Auth에서 삭제 시도
         const { error: authError } = await supabase.auth.admin.deleteUser(input.id);
         if (authError) {
-          console.error("[Users] Auth delete error:", authError);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `사용자 삭제에 실패했습니다: ${authError.message}`,
-          });
+          console.warn(`[Users] Auth delete failed (continuing with DB delete): ${authError.message}`);
+          // Auth 삭제 실패해도 DB 삭제는 계속 진행 (레거시 사용자일 수 있음)
+        } else {
+          console.log(`[Users] Successfully deleted from Auth`);
         }
-        console.log(`[Users] Successfully deleted from Auth`);
       } else {
-        console.log(`[Users] Skipping Auth delete (non-UUID user: ${input.id})`);
+        // UUID가 아닌 경우: 이메일로 사용자 찾기 시도
+        if (user?.email) {
+          try {
+            const { data: authUsers } = await supabase.auth.admin.listUsers();
+            const authUser = authUsers?.users?.find((u) => u.email === user.email);
+            if (authUser) {
+              const { error: authError } = await supabase.auth.admin.deleteUser(authUser.id);
+              if (authError) {
+                console.warn(`[Users] Auth delete failed for email ${user.email}: ${authError.message}`);
+              } else {
+                console.log(`[Users] Successfully deleted from Auth by email: ${user.email}`);
+              }
+            }
+          } catch (error) {
+            console.warn(`[Users] Could not find user in Auth by email: ${user.email}`, error);
+          }
+        }
+        console.log(`[Users] Non-UUID user, attempted Auth delete by email if available`);
       }
 
       // 5. users 테이블에서 삭제

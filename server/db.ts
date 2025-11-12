@@ -927,9 +927,10 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (ownerCompanyId) {
-    query = query.eq('owner_company_id', ownerCompanyId);
-  }
+  // ownerCompanyId 필터는 workers 테이블에 owner_company_id 컬럼이 없으므로
+  // ownerId를 통해 users 테이블과 조인하여 필터링해야 함
+  // 현재는 ownerId 필터만 사용
+  // TODO: 향후 workers 테이블에 owner_company_id 컬럼 추가 또는 조인 방식으로 개선
 
   if (allowedWorkerIds !== null) {
     query = query.in('id', Array.from(allowedWorkerIds));
@@ -1027,16 +1028,36 @@ export async function getWorkerByEmail(email: string): Promise<Worker | undefine
 
 export async function deleteWorker(id: string) {
   const supabase = getSupabase();
-  if (!supabase) return;
+  if (!supabase) {
+    throw new Error("Supabase not available");
+  }
 
-  const { error } = await supabase
+  // 1. 관련 entry_request_items에서 paired_worker_id를 NULL로 설정
+  const { error: entryItemsError } = await supabase
+    .from('entry_request_items')
+    .update({ paired_worker_id: null })
+    .eq('paired_worker_id', id);
+
+  if (entryItemsError) {
+    console.error("[Database] Error clearing entry_request_items references:", entryItemsError);
+    throw new Error(`관련 반입 요청 항목 정리 중 오류: ${entryItemsError.message}`);
+  }
+
+  // 2. 관련 deployments 확인 (선택적: deployment는 이력이므로 삭제하지 않음)
+  // deployment의 worker_id는 이력 보존을 위해 그대로 둠
+
+  // 3. workers 테이블에서 삭제
+  const { error: deleteError } = await supabase
     .from('workers')
     .delete()
     .eq('id', id);
 
-  if (error) {
-    console.error("[Database] Error deleting worker:", error);
+  if (deleteError) {
+    console.error("[Database] Error deleting worker:", deleteError);
+    throw new Error(`Worker 삭제 중 오류: ${deleteError.message}`);
   }
+
+  console.log(`[Database] Successfully deleted worker: ${id}`);
 }
 
 // ============================================================
