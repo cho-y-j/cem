@@ -137,8 +137,10 @@ export function EntryRequestDetail({
     onSuccess: () => {
       toast.success("반입 요청이 최종 승인되었습니다.");
       utils.entryRequestsV2.list.invalidate();
-      onClose();
+      // 다이얼로그는 닫지 않고 상태만 업데이트 (승인 완료 후에도 상세 보기 가능)
+      // onClose()를 호출하지 않음
       setComment("");
+      // state는 초기화하지 않음 (승인 완료 정보를 보여주기 위해)
     },
     onError: (error) => {
       toast.error("최종 승인 실패: " + error.message);
@@ -162,33 +164,36 @@ export function EntryRequestDetail({
 
   // 상세 데이터가 있으면 사용, 없으면 기본 request 사용
   const requestData = detailData || request;
+  
+  // request ID를 안정적으로 추출
+  const requestId = requestData?.id || request?.id;
 
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
+  // 다이얼로그가 열릴 때마다 초기화
   useEffect(() => {
-    if (!open || !requestData) return;
-    
-    // requestData의 ID를 기준으로 한 번만 실행되도록 체크
-    const requestId = requestData.id;
-    if (!requestId) return;
-    
-    if (requestData.entry_inspection_completed_at || requestData.entryInspectionCompletedAt) {
-      setEntryInspectionCompleted(true);
-    } else {
+    if (!open) {
+      // 다이얼로그가 닫히면 state 초기화
       setEntryInspectionCompleted(false);
-    }
-    
-    if (requestData.safety_training_completed_at || requestData.safetyTrainingCompletedAt) {
-      setSafetyTrainingCompleted(true);
-    } else {
       setSafetyTrainingCompleted(false);
+      setHealthCheckCompleted(false);
+      setEntryInspectionFile(null);
+      setSafetyTrainingFile(null);
+      setHealthCheckFile(null);
+      setComment("");
+      return;
     }
     
-    if (requestData.health_check_completed_at || requestData.healthCheckCompletedAt) {
-      setHealthCheckCompleted(true);
-    } else {
-      setHealthCheckCompleted(false);
-    }
-  }, [open, requestData?.id]);
+    if (!requestData || !requestId) return;
+    
+    // 완료된 정보가 있으면 체크박스 활성화
+    const hasEntryInspection = !!(requestData.entry_inspection_completed_at || requestData.entryInspectionCompletedAt);
+    const hasSafetyTraining = !!(requestData.safety_training_completed_at || requestData.safetyTrainingCompletedAt);
+    const hasHealthCheck = !!(requestData.health_check_completed_at || requestData.healthCheckCompletedAt);
+    
+    setEntryInspectionCompleted(hasEntryInspection);
+    setSafetyTrainingCompleted(hasSafetyTraining);
+    setHealthCheckCompleted(hasHealthCheck);
+  }, [open, requestId]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
