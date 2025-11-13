@@ -40,7 +40,8 @@ import {
   Eye,
   Building2,
   Download,
-  Loader2
+  Loader2,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -66,6 +67,8 @@ export function EntryRequestDetail({
   const [comment, setComment] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [dialogAction, setDialogAction] = useState<"reject" | "cancel">("reject");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // BP 승인용 state
   const [targetEpCompanyId, setTargetEpCompanyId] = useState("");
@@ -155,6 +158,30 @@ export function EntryRequestDetail({
     },
     onError: (error) => {
       toast.error("반려 실패: " + error.message);
+    },
+  });
+
+  // 취소 mutation (Owner/BP)
+  const cancelMutation = trpc.entryRequestsV2.cancel.useMutation({
+    onSuccess: () => {
+      toast.success("반입 요청이 취소되었습니다.");
+      utils.entryRequestsV2.list.invalidate();
+      onClose();
+      setRejectReason("");
+    },
+    onError: (error) => {
+      toast.error("취소 실패: " + error.message);
+    },
+  });
+
+  const deleteMutation = trpc.entryRequestsV2.delete.useMutation({
+    onSuccess: () => {
+      toast.success("반입 요청이 삭제되었습니다.");
+      utils.entryRequestsV2.list.invalidate();
+      onClose();
+    },
+    onError: (error) => {
+      toast.error("삭제 실패: " + error.message);
     },
   });
 
@@ -374,6 +401,26 @@ export function EntryRequestDetail({
       onReject?.();
     }
     setShowRejectDialog(false);
+  };
+
+  const handleCancel = () => {
+    if (!rejectReason.trim()) {
+      toast.error("취소 사유를 입력해주세요.");
+      return;
+    }
+
+    cancelMutation.mutate({
+      id: requestId!,
+      reason: rejectReason.trim(),
+    });
+    setShowRejectDialog(false);
+  };
+
+  const handleDelete = () => {
+    deleteMutation.mutate({
+      id: requestId!,
+    });
+    setShowDeleteDialog(false);
   };
 
   // 서류를 PDF로 변환하여 보기
@@ -750,15 +797,38 @@ export function EntryRequestDetail({
             )}
 
             {/* 장비 및 인력 목록 */}
-            <Tabs defaultValue="equipment" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="equipment">
-                  장비 ({requestData.items?.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").length || 0})
-                </TabsTrigger>
-                <TabsTrigger value="worker">
-                  인력 ({requestData.items?.filter((i: any) => i.itemType === "worker" || i.item_type === "worker").length || 0})
-                </TabsTrigger>
-              </TabsList>
+            {(() => {
+              const equipmentCount = requestData.items?.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").length || 0;
+              const workerCount = requestData.items?.filter((i: any) => i.itemType === "worker" || i.item_type === "worker").length || 0;
+              const hasEquipment = equipmentCount > 0;
+              const hasWorker = workerCount > 0;
+
+              // 인력만 있으면 worker 탭 자동 선택, 그 외는 equipment
+              const defaultTab = hasWorker && !hasEquipment ? "worker" : "equipment";
+
+              // 장비와 인력이 둘 다 있을 때만 탭 목록 표시
+              const showTabs = hasEquipment && hasWorker;
+
+              return (
+                <Tabs defaultValue={defaultTab} className="w-full">
+                  {showTabs && (
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="equipment">
+                        장비 ({equipmentCount})
+                      </TabsTrigger>
+                      <TabsTrigger value="worker">
+                        인력 ({workerCount})
+                      </TabsTrigger>
+                    </TabsList>
+                  )}
+
+                  {!showTabs && (
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold">
+                        {hasEquipment ? `장비 목록 (${equipmentCount})` : `인력 목록 (${workerCount})`}
+                      </h3>
+                    </div>
+                  )}
 
               <TabsContent value="equipment" className="space-y-3">
                 {requestData.items?.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").map((item: any) => (
@@ -905,7 +975,9 @@ export function EntryRequestDetail({
                   </Card>
                 ))}
               </TabsContent>
-            </Tabs>
+                </Tabs>
+              );
+            })()}
 
             {/* Owner 승인 (작업계획서 업로드) */}
             {userRole === "owner" && requestData.status === "bp_requested" && (
@@ -1150,6 +1222,20 @@ export function EntryRequestDetail({
                 <Download className="h-4 w-4 mr-1" />
                 {downloadPdfMutation.isPending ? "생성 중..." : "다운로드"}
               </Button>
+
+              {/* 삭제 버튼 (Admin만 표시 - 테스트 데이터 삭제용) */}
+              {userRole === "admin" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={deleteMutation.isPending}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  삭제
+                </Button>
+              )}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onClose}>
@@ -1162,7 +1248,10 @@ export function EntryRequestDetail({
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => setShowRejectDialog(true)}
+                    onClick={() => {
+                      setDialogAction("reject");
+                      setShowRejectDialog(true);
+                    }}
                     disabled={bpApproveMutation.isPending || isUploading}
                   >
                     <XCircle className="h-4 w-4 mr-1" />
@@ -1189,13 +1278,41 @@ export function EntryRequestDetail({
                 </>
               )}
 
+              {/* BP 승인 취소 버튼 (BP가 승인했지만 EP 승인 전) */}
+              {userRole === "bp" && (requestData.status === "bp_approved" || requestData.status === "bp_reviewing") && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    setDialogAction("cancel");
+                    setShowRejectDialog(true);
+                  }}
+                  disabled={cancelMutation.isPending}
+                >
+                  {cancelMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      취소 중...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 mr-1" />
+                      승인 취소
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* Owner 승인 버튼 */}
               {userRole === "owner" && requestData.status === "bp_requested" && (
                 <>
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => setShowRejectDialog(true)}
+                    onClick={() => {
+                      setDialogAction("reject");
+                      setShowRejectDialog(true);
+                    }}
                   >
                     <XCircle className="h-4 w-4 mr-1" />
                     반려
@@ -1213,7 +1330,10 @@ export function EntryRequestDetail({
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => setShowRejectDialog(true)}
+                    onClick={() => {
+                      setDialogAction("reject");
+                      setShowRejectDialog(true);
+                    }}
                   >
                     <XCircle className="h-4 w-4 mr-1" />
                     반려
@@ -1242,22 +1362,26 @@ export function EntryRequestDetail({
         title="서류 미리보기"
       />
 
-      {/* 반려 다이얼로그 */}
+      {/* 반려/취소 다이얼로그 */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>반입 요청 반려</DialogTitle>
+            <DialogTitle>
+              {dialogAction === "cancel" ? "반입 요청 취소" : "반입 요청 반려"}
+            </DialogTitle>
             <DialogDescription>
-              반려 사유를 입력해주세요.
+              {dialogAction === "cancel" ? "취소 사유를 입력해주세요." : "반려 사유를 입력해주세요."}
             </DialogDescription>
           </DialogHeader>
           <div>
-            <Label htmlFor="rejectReason">반려 사유</Label>
+            <Label htmlFor="rejectReason">
+              {dialogAction === "cancel" ? "취소 사유" : "반려 사유"}
+            </Label>
             <Textarea
               id="rejectReason"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="반려 사유를 입력하세요..."
+              placeholder={dialogAction === "cancel" ? "취소 사유를 입력하세요..." : "반려 사유를 입력하세요..."}
               rows={4}
             />
           </div>
@@ -1265,22 +1389,57 @@ export function EntryRequestDetail({
             <Button
               variant="outline"
               onClick={() => setShowRejectDialog(false)}
-              disabled={bpRejectMutation.isPending}
+              disabled={dialogAction === "cancel" ? cancelMutation.isPending : bpRejectMutation.isPending}
             >
-              취소
+              닫기
             </Button>
             <Button
               variant="destructive"
-              onClick={handleReject}
-              disabled={bpRejectMutation.isPending}
+              onClick={dialogAction === "cancel" ? handleCancel : handleReject}
+              disabled={dialogAction === "cancel" ? cancelMutation.isPending : bpRejectMutation.isPending}
             >
-              {bpRejectMutation.isPending ? (
+              {(dialogAction === "cancel" ? cancelMutation.isPending : bpRejectMutation.isPending) ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   처리 중...
                 </>
               ) : (
-                "반려 확정"
+                dialogAction === "cancel" ? "취소 확정" : "반려 확정"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>반입 요청 삭제</DialogTitle>
+            <DialogDescription>
+              이 반입 요청을 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={deleteMutation.isPending}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  삭제 중...
+                </>
+              ) : (
+                "삭제"
               )}
             </Button>
           </DialogFooter>

@@ -41,7 +41,13 @@
       "Bash(pnpm db:push:*)",
       "Bash(pnpm add:*)",
       "Bash(psql:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill /F /PID 7024)",
+      "Bash(taskkill:*)",
+      "Bash(git checkout:*)",
+      "Bash(temp_original.tsx)"
     ],
     "deny": [],
     "ask": []

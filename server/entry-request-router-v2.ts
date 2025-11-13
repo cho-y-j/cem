@@ -1296,5 +1296,76 @@ export const entryRequestsRouterV2 = router({
         hasWorkPlan: !!request.bp_work_plan_url,
       };
     }),
+
+  /**
+   * 반입 요청 삭제 (테스트 데이터 삭제용)
+   * - Admin 또는 요청 생성자만 삭제 가능
+   */
+  delete: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const supabase = db.getSupabase();
+      if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // 요청 정보 조회
+      const { data: request } = await supabase
+        .from('entry_requests')
+        .select('*')
+        .eq('id', input.id)
+        .single();
+
+      if (!request) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "반입 요청을 찾을 수 없습니다." });
+      }
+
+      // 권한 확인: Admin 또는 요청 생성자만 삭제 가능
+      const isAdmin = ctx.user.role?.toLowerCase() === 'admin';
+      const isOwner = request.owner_user_id === ctx.user.id;
+
+      if (!isAdmin && !isOwner) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "삭제 권한이 없습니다.",
+        });
+      }
+
+      console.log(`[EntryRequests] Delete attempt - User: ${ctx.user.name} (${ctx.user.role}), Request: ${input.id}, Status: ${request.status}`);
+
+      // 관련된 entry_request_items 먼저 삭제
+      const { error: itemsError } = await supabase
+        .from('entry_request_items')
+        .delete()
+        .eq('entry_request_id', input.id);
+
+      if (itemsError) {
+        console.error('[EntryRequests] Delete items error:', itemsError);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "항목 삭제 중 오류가 발생했습니다.",
+        });
+      }
+
+      // 반입 요청 삭제
+      const { error } = await supabase
+        .from('entry_requests')
+        .delete()
+        .eq('id', input.id);
+
+      if (error) {
+        console.error('[EntryRequests] Delete error:', error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "삭제 중 오류가 발생했습니다.",
+        });
+      }
+
+      console.log(`[EntryRequests] Deleted: ${input.id} by ${ctx.user.name}`);
+
+      return { success: true };
+    }),
 });
 

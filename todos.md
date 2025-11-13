@@ -9,31 +9,91 @@
 
 ## 🎉 오늘 완료한 작업 (2025-11-13)
 
-### 🔴 React 에러 #310 해결 시도 (진행 중 - 미해결)
+### ✅ React 에러 #310 완전 해결
 
 **문제:**
 - EP 상세보기에서 "승인 대기" 버튼 클릭 시 React 에러 #310 발생
 - 에러 메시지: "Minified React error #310" (무한 루프)
-- 상세보기 다이얼로그가 열리지 않아 승인 작업 불가
+- BP 별도 승인 기능 구현 후 발생한 Hook ordering 문제
 
-**시도한 해결 방법:**
-1. ✅ **useMemo 제거 시도**: `entryInspectionCompletedAtValue` 등을 useMemo로 안정화 시도 → 실패
-2. ✅ **useEffect dependency 최소화**: `detailData`와 `request` 객체를 dependency에서 제외 → 실패
-3. ✅ **useRef로 이전 값 추적**: `prevValuesRef`를 사용하여 실제 값 변경 시에만 state 업데이트 → 실패
-4. ✅ **useEffect 내부에서 직접 값 읽기**: dependency에서 객체 제거하고 내부에서 직접 읽기 → 실패
+**근본 원인:**
+- `if (!request) return null;` early return이 Hook 호출 중간에 위치 (line 163)
+- React Hooks의 Rules: 모든 Hook은 항상 같은 순서로 호출되어야 함
+- early return이 일부 Hook(epRejectMutation) 이후, 다른 Hook(useRef, useEffect) 이전에 있어서 문제 발생
 
-**현재 상태:**
-- ⚠️ **여전히 에러 발생**: 모든 시도에도 불구하고 React 에러 #310이 계속 발생
-- 🔍 **근본 원인 분석 필요**: `EntryRequestDetail.tsx` 컴포넌트의 다른 부분에서 무한 루프 발생 가능성
-- 💡 **추가 조사 필요**: 
-  - `detailData` 쿼리가 계속 재실행되는지 확인
-  - 다른 `useEffect`나 `useMemo`에서 무한 루프 발생 가능성
-  - 컴포넌트 전체 구조 재검토 필요
+**해결 방법:**
+- ✅ **Hook ordering 수정**: 모든 Hook 호출을 early return 이전으로 이동
+- ✅ early return을 line 228로 이동 (모든 Hook 호출 이후)
+- ✅ 서버 재시작으로 HMR 캐시 클리어
 
 **수정된 파일:**
-- `client/src/components/EntryRequestDetail.tsx` - 여러 번 수정 시도
+- `client/src/components/EntryRequestDetail.tsx:161-228` - Hook ordering 수정
 
-**상태:** 🔴 **미해결 - 추가 조사 필요**
+**상태:** ✅ **완료**
+
+---
+
+### ✅ EP 승인 자동 창 닫기 및 UI 개선
+
+**개선 사항:**
+1. ✅ **EP 승인 완료 시 자동 창 닫기**: `epApproveMutation.onSuccess`에서 `onClose()` 호출
+2. ✅ **장비/인력 탭 자동 선택**:
+   - 인력만 있으면 인력 탭 자동 선택
+   - 장비만 있거나 둘 다 있으면 장비 탭 선택
+   - 단일 타입일 경우 탭 UI 숨기고 제목만 표시
+3. ✅ **EP 승인 서류 미리보기 추가**:
+   - 반입 검사 확인서
+   - 안전교육 확인서
+   - 건강검진 확인서
+
+**수정된 파일:**
+- `client/src/components/EntryRequestDetail.tsx:137-141` - EP 승인 자동 닫기
+- `client/src/components/EntryRequestDetail.tsx:800-980` - 탭 자동 선택 IIFE
+- `client/src/components/EntryRequestDetail.tsx:649-750` - EP 서류 보기 섹션
+
+**상태:** ✅ **완료**
+
+---
+
+### ✅ BP 승인 취소 기능 추가
+
+**구현 내용:**
+- ✅ **cancelMutation 추가**: BP가 승인한 요청을 취소할 수 있는 기능
+- ✅ **취소 버튼 추가**: bp_approved, bp_reviewing 상태에서 표시
+- ✅ **취소 확인 다이얼로그**: 반려/취소 다이얼로그 통합 (dialogAction state로 구분)
+- ✅ **서버 엔드포인트 확인**: `entryRequestsV2.cancel` 이미 구현되어 있음
+
+**수정된 파일:**
+- `client/src/components/EntryRequestDetail.tsx:163-173` - cancelMutation 추가
+- `client/src/components/EntryRequestDetail.tsx:405-416` - handleCancel 함수
+- `client/src/components/EntryRequestDetail.tsx:1245-1267` - BP 취소 버튼
+- `client/src/components/EntryRequestDetail.tsx:1331-1412` - 통합 다이얼로그
+
+**알려진 이슈:**
+- ⚠️ DB enum에 "cancelled" 상태가 없어서 실행 시 에러 발생
+- 에러: `invalid input value for enum entry_request_status: "cancelled"`
+- 해결 필요: Supabase에서 enum에 "cancelled" 추가 필요
+
+**상태:** ✅ **구현 완료** (⚠️ DB 마이그레이션 필요)
+
+---
+
+### ✅ 테스트 데이터 삭제 기능 추가
+
+**구현 내용:**
+- ✅ **서버 delete 엔드포인트 추가**: Admin 또는 요청 생성자만 삭제 가능
+- ✅ **관련 items 자동 삭제**: entry_request_items도 함께 삭제 (CASCADE)
+- ✅ **삭제 버튼 추가**: Admin 전용, 상세 다이얼로그 하단 좌측
+- ✅ **삭제 확인 다이얼로그**: 실수 방지
+
+**수정된 파일:**
+- `server/entry-request-router-v2.ts:1300-1369` - delete mutation
+- `client/src/components/EntryRequestDetail.tsx:175-184` - deleteMutation
+- `client/src/components/EntryRequestDetail.tsx:418-423` - handleDelete
+- `client/src/components/EntryRequestDetail.tsx:1226-1238` - 삭제 버튼
+- `client/src/components/EntryRequestDetail.tsx:1414-1447` - 삭제 확인 다이얼로그
+
+**상태:** ✅ **완료**
 
 ---
 
@@ -516,7 +576,74 @@
 
 ---
 
-## 🐛 현재 발견된 문제 (2025-11-11)
+## 🐛 현재 발견된 문제 (2025-11-13)
+
+### 1. 🔴 장비 유도원(Guide Worker) 로그인 에러 (신규 - 긴급!)
+
+**증상:**
+- 장비 유도원으로 u1.com.com 계정으로 로그인 시 에러 발생
+- `http://localhost:3000/mobile/login`에서 로그인 성공 후 `/mobile/worker`로 리다이렉트
+- 다음 에러 발생:
+  ```
+  Query data cannot be undefined. Please make sure to return a value other than undefined from your query function.
+  Affected query key: [["mobile","worker","getMyAssignedEquipment"],{"type":"query"}]
+
+  Query data cannot be undefined. Please make sure to return a value other than undefined from your query function.
+  Affected query key: [["mobile","worker","getCurrentDeployment"],{"type":"query"}]
+  ```
+
+**근본 원인:**
+- `mobile.worker.getMyAssignedEquipment` 쿼리가 undefined 반환
+- `mobile.worker.getCurrentDeployment` 쿼리가 undefined 반환
+- 장비 유도원은 장비에 배정되지 않은 Worker이므로 기존 로직으로는 데이터 조회 불가
+
+**필요한 기능:**
+1. **장비 유도원 역할 지원**:
+   - 출근, 작업 시작, 작업 확인 기능은 기존 worker와 동일
+   - 장비점검(Owner 통보) 기능은 제거 (BP사에서 정보 조회)
+   - 작업확인서 필터에서 유도원 작업 일지 확인 가능
+
+2. **쿼리 수정 필요**:
+   - `getMyAssignedEquipment`: undefined 반환 시 에러 대신 null 반환
+   - `getCurrentDeployment`: 장비 없는 worker도 조회 가능하도록 수정
+   - 또는 장비 유도원용 별도 쿼리 추가
+
+**수정 필요 파일:**
+- `server/mobile-router.ts` - getMyAssignedEquipment, getCurrentDeployment 쿼리 수정
+- `client/src/pages/mobile/WorkerMain.tsx` - undefined 처리 로직 추가
+- `server/work-journal-router.ts` - 유도원 작업 일지 필터 추가
+
+**우선순위:** 🔴 **긴급** - 유도원 기능 사용 불가
+
+**상태:** ⚠️ **미해결 - 조사 필요**
+
+---
+
+### 2. 🟠 BP 취소 기능 DB enum 에러
+
+**증상:**
+- BP 승인 취소 버튼 클릭 시 다음 에러 발생:
+  ```
+  invalid input value for enum entry_request_status: "cancelled"
+  ```
+
+**근본 원인:**
+- PostgreSQL enum `entry_request_status`에 "cancelled" 값이 없음
+- 서버 코드에서 "cancelled" 상태로 업데이트 시도
+
+**해결 방법:**
+- Supabase SQL 에디터에서 enum에 "cancelled" 추가:
+  ```sql
+  ALTER TYPE entry_request_status ADD VALUE 'cancelled';
+  ```
+
+**우선순위:** 🟠 **중요** - BP 취소 기능 사용 불가
+
+**상태:** ⚠️ **해결 대기 - DB 마이그레이션 필요**
+
+---
+
+## 🐛 이전 발견된 문제 (2025-11-11)
 
 ### 1. 🟠 DashboardLayout 반응형 개선 필요
 
@@ -1249,10 +1376,14 @@ pnpm db:push          # 마이그레이션 생성 및 적용
 ---
 
 **마지막 업데이트**: 2025-11-13 (저녁)
-**다음 작업**: React 에러 #310 근본 원인 분석 및 해결
+**다음 작업**: 장비 유도원(Guide Worker) 기능 구현
 **Supabase MCP**: ✅ 연결됨 및 사용 가능
 **Render MCP**: ✅ 연결됨 및 사용 가능
 **오늘 작업 요약**:
-- 🔴 React 에러 #310 해결 시도 (여러 방법 시도했으나 여전히 발생 - 미해결)
-- ✅ Owner 투입 목록 표시 문제 해결 (데이터베이스 쿼리 에러 수정)
-- ✅ 반입 요청 UI/UX 개선 (상태 배지 색상, 필터 디자인 통일)
+- ✅ React 에러 #310 완전 해결 (Hook ordering 문제 수정)
+- ✅ EP 승인 자동 창 닫기 및 UI 개선 (탭 자동 선택, EP 서류 보기)
+- ✅ BP 승인 취소 기능 추가 (⚠️ DB enum 마이그레이션 필요)
+- ✅ 테스트 데이터 삭제 기능 추가 (Admin 전용)
+- ✅ Owner 투입 목록 표시 문제 해결
+- ✅ 반입 요청 UI/UX 개선
+- 🔴 장비 유도원 로그인 에러 발견 (다음 작업 필요)
