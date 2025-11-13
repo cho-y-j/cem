@@ -378,26 +378,27 @@ export default function Workers() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
-            <div className="w-full md:w-56">
-              <Label htmlFor="worker-search">검색</Label>
+          {/* 필터 UI - 한 줄 통일 디자인 */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">검색</Label>
               <Input
                 id="worker-search"
                 placeholder="이름, 면허번호, 이메일"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="mt-1"
+                className="h-9"
               />
             </div>
 
             {(role === "admin" || role === "bp" || role === "ep") && (
-              <div className="w-full md:w-56">
-                <Label>Owner 회사</Label>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-sm font-medium mb-1.5 block">Owner 회사</Label>
                 <Select
                   value={ownerCompanyFilter || "all"}
                   onValueChange={(value) => setOwnerCompanyFilter(value === "all" ? "" : value)}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
@@ -413,13 +414,13 @@ export default function Workers() {
             )}
 
             {(role === "admin" || role === "ep" || role === "owner") && (
-              <div className="w-full md:w-56">
-                <Label>BP 회사</Label>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-sm font-medium mb-1.5 block">BP 회사</Label>
                 <Select
                   value={bpCompanyFilter || "all"}
                   onValueChange={(value) => setBpCompanyFilter(value === "all" ? "" : value)}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
@@ -435,13 +436,13 @@ export default function Workers() {
             )}
 
             {role === "admin" && (
-              <div className="w-full md:w-56">
-                <Label>EP 회사</Label>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-sm font-medium mb-1.5 block">EP 회사</Label>
                 <Select
                   value={epCompanyFilter || "all"}
                   onValueChange={(value) => setEpCompanyFilter(value === "all" ? "" : value)}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
@@ -456,13 +457,13 @@ export default function Workers() {
               </div>
             )}
 
-            <div className="w-full md:w-56">
-              <Label>인력 유형</Label>
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">인력 유형</Label>
               <Select
                 value={workerTypeFilter || "all"}
                 onValueChange={(value) => setWorkerTypeFilter(value === "all" ? "" : value)}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>

@@ -361,21 +361,21 @@ export default function EntryRequestsNew() {
   // ============================================================
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: any }> = {
-      bp_draft: { label: "임시저장", variant: "secondary" },
-      owner_requested: { label: "승인 대기", variant: "secondary" },
-      bp_requested: { label: "BP 요청", variant: "default" },
-      bp_reviewing: { label: "BP 검토중", variant: "secondary" },
-      bp_approved: { label: "BP 승인", variant: "default" },
-      ep_reviewing: { label: "EP 검토중", variant: "secondary" },
-      owner_approved: { label: "Owner 승인", variant: "default" },
-      ep_approved: { label: "EP 최종 승인", variant: "default" },
-      cancelled: { label: "취소됨", variant: "destructive" },
-      rejected: { label: "반려", variant: "destructive" },
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      bp_draft: { label: "임시저장", className: "bg-gray-100 text-gray-700 border-gray-300" },
+      owner_requested: { label: "승인 대기", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
+      bp_requested: { label: "BP 요청", className: "bg-blue-100 text-blue-700 border-blue-300" },
+      bp_reviewing: { label: "BP 검토중", className: "bg-indigo-100 text-indigo-700 border-indigo-300" },
+      bp_approved: { label: "BP 승인", className: "bg-cyan-100 text-cyan-700 border-cyan-300" },
+      ep_reviewing: { label: "EP 검토중", className: "bg-purple-100 text-purple-700 border-purple-300" },
+      owner_approved: { label: "Owner 승인", className: "bg-teal-100 text-teal-700 border-teal-300" },
+      ep_approved: { label: "EP 최종 승인", className: "bg-green-100 text-green-700 border-green-300" },
+      cancelled: { label: "취소됨", className: "bg-slate-100 text-slate-700 border-slate-300" },
+      rejected: { label: "반려", className: "bg-red-100 text-red-700 border-red-300" },
     };
 
-    const config = statusConfig[status] || { label: status, variant: "secondary" };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = statusConfig[status] || { label: status, className: "bg-gray-100 text-gray-700 border-gray-300" };
+    return <Badge className={`${config.className} border`}>{config.label}</Badge>;
   };
 
   // ============================================================
@@ -494,13 +494,13 @@ export default function EntryRequestsNew() {
           <CardDescription>등록된 반입 요청을 확인하고 관리합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* 필터 UI */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label>상태 필터</Label>
+          {/* 필터 UI - 한 줄 통일 디자인 */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">상태</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue />
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체</SelectItem>
@@ -513,11 +513,11 @@ export default function EntryRequestsNew() {
               </Select>
             </div>
 
-            <div>
-              <Label>협력업체 필터</Label>
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">협력업체</Label>
               <Select value={bpCompanyFilter} onValueChange={setBpCompanyFilter}>
-                <SelectTrigger>
-                  <SelectValue />
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체</SelectItem>
@@ -530,12 +530,13 @@ export default function EntryRequestsNew() {
               </Select>
             </div>
 
-            <div>
-              <Label>검색</Label>
+            <div className="flex-1 min-w-[250px]">
+              <Label className="text-sm font-medium mb-1.5 block">검색</Label>
               <Input
                 placeholder="요청번호, 업체명, 요청자..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
+                className="h-9"
               />
             </div>
           </div>
@@ -562,10 +563,10 @@ export default function EntryRequestsNew() {
                     <TableCell>
                       <div className="flex gap-2">
                         {request.equipmentCount > 0 && (
-                          <Badge variant="secondary">장비 {request.equipmentCount}</Badge>
+                          <Badge className="bg-blue-100 text-blue-700 border border-blue-300">🚜 장비 {request.equipmentCount}</Badge>
                         )}
                         {request.workerCount > 0 && (
-                          <Badge variant="outline">인력 {request.workerCount}</Badge>
+                          <Badge className="bg-orange-100 text-orange-700 border border-orange-300">👷 인력 {request.workerCount}</Badge>
                         )}
                         {request.equipmentCount === 0 && request.workerCount === 0 && (
                           <Badge variant="secondary">없음</Badge>

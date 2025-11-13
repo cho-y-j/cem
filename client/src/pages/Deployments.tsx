@@ -446,16 +446,17 @@ export default function Deployments() {
           <CardTitle>필터</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
+          {/* 필터 UI - 한 줄 통일 디자인 */}
+          <div className="flex flex-wrap items-end gap-3">
             {(role === "admin" || role === "bp" || role === "ep") && (
-              <div className="w-full md:w-56">
-                <Label>Owner 회사</Label>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-sm font-medium mb-1.5 block">Owner 회사</Label>
                 <Select
                   value={ownerCompanyFilter || "all"}
                   onValueChange={(value) => setOwnerCompanyFilter(value === "all" ? "" : value)}
                   disabled={role === "owner"}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
@@ -471,14 +472,14 @@ export default function Deployments() {
             )}
 
             {(role === "admin" || role === "ep" || role === "owner") && (
-              <div className="w-full md:w-56">
-                <Label>BP 회사</Label>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-sm font-medium mb-1.5 block">BP 회사</Label>
                 <Select
                   value={bpCompanyFilter || "all"}
                   onValueChange={(value) => setBpCompanyFilter(value === "all" ? "" : value)}
                   disabled={role === "bp"}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
@@ -494,14 +495,14 @@ export default function Deployments() {
             )}
 
             {role === "admin" && (
-              <div className="w-full md:w-56">
-                <Label>EP 회사</Label>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-sm font-medium mb-1.5 block">EP 회사</Label>
                 <Select
                   value={epCompanyFilter || "all"}
                   onValueChange={(value) => setEpCompanyFilter(value === "all" ? "" : value)}
                   disabled={role === "ep"}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="h-9">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
@@ -516,13 +517,13 @@ export default function Deployments() {
               </div>
             )}
 
-            <div className="w-full md:w-56">
-              <Label>장비</Label>
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">장비</Label>
               <Select
                 value={equipmentFilter || "all"}
                 onValueChange={(value) => setEquipmentFilter(value === "all" ? "" : value)}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>
@@ -536,13 +537,13 @@ export default function Deployments() {
               </Select>
             </div>
 
-            <div className="w-full md:w-56">
-              <Label>운전자</Label>
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">운전자</Label>
               <Select
                 value={workerFilter || "all"}
                 onValueChange={(value) => setWorkerFilter(value === "all" ? "" : value)}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="전체" />
                 </SelectTrigger>
                 <SelectContent>
@@ -556,8 +557,8 @@ export default function Deployments() {
               </Select>
             </div>
 
-            <div className="w-full md:w-56">
-              <Label>상태</Label>
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">상태</Label>
               <Select
                 value={statusFilter}
                 onValueChange={setStatusFilter}
