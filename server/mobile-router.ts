@@ -104,14 +104,24 @@ export const mobileRouter = router({
         // 2. assigned_worker_id가 없으면, deployment에서 확인
         if (!equipment) {
           console.log('[Mobile] No equipment assigned via assigned_worker_id, checking deployment...');
-          const deployment = await db.getDeploymentByWorkerId(worker.id);
-          console.log('[Mobile] Deployment found:', deployment ? deployment.id : 'null');
+
+          // 2-1. 먼저 worker_id로 deployment 조회 (운전자)
+          let deployment = await db.getDeploymentByWorkerId(worker.id);
+          console.log('[Mobile] Deployment by worker_id:', deployment ? deployment.id : 'null');
+
+          // 2-2. worker_id로 없으면 guide_worker_id로 조회 (유도원)
+          if (!deployment) {
+            console.log('[Mobile] Checking deployment as guide_worker...');
+            deployment = await db.getDeploymentByGuideWorkerId(worker.id);
+            console.log('[Mobile] Deployment by guide_worker_id:', deployment ? deployment.id : 'null');
+          }
 
           if (deployment) {
             console.log('[Mobile] Deployment details:', {
               id: deployment.id,
               equipmentId: deployment.equipmentId,
               workerId: deployment.workerId,
+              guideWorkerId: deployment.guideWorkerId,
             });
 
             if (deployment.equipmentId) {
@@ -119,10 +129,10 @@ export const mobileRouter = router({
               equipment = await db.getEquipmentById(deployment.equipmentId);
               console.log('[Mobile] Equipment fetched:', equipment ? { id: equipment.id, regNum: equipment.regNum } : 'null');
             } else {
-              console.log('[Mobile] NOTE: Deployment has no equipmentId (유도원일 수 있음)');
+              console.log('[Mobile] NOTE: Deployment has no equipmentId');
             }
           } else {
-            console.log('[Mobile] No active deployment found for worker:', worker.id, '(유도원일 수 있음)');
+            console.log('[Mobile] No active deployment found for worker:', worker.id);
           }
         }
 
@@ -192,7 +202,14 @@ export const mobileRouter = router({
 
       // 2. assigned_worker_id가 없으면, deployment에서 확인
       if (!equipment) {
-        const deployment = await db.getDeploymentByWorkerId(worker.id);
+        // 2-1. 먼저 worker_id로 deployment 조회 (운전자)
+        let deployment = await db.getDeploymentByWorkerId(worker.id);
+
+        // 2-2. worker_id로 없으면 guide_worker_id로 조회 (유도원)
+        if (!deployment) {
+          deployment = await db.getDeploymentByGuideWorkerId(worker.id);
+        }
+
         if (deployment && deployment.equipmentId) {
           equipment = await db.getEquipmentById(deployment.equipmentId);
         }
@@ -239,8 +256,15 @@ export const mobileRouter = router({
         console.log('[Mobile] Found worker:', worker.id, worker.name);
 
         // worker_id로 활성 deployment 조회 (BP사, EP사 정보 포함)
-        const deployment = await db.getDeploymentByWorkerId(worker.id);
-        console.log('[Mobile] Deployment result:', deployment ? { id: deployment.id, status: deployment.status, equipmentId: deployment.equipmentId } : 'null (유도원일 수 있음)');
+        let deployment = await db.getDeploymentByWorkerId(worker.id);
+        console.log('[Mobile] Deployment by worker_id:', deployment ? deployment.id : 'null');
+
+        // worker_id로 없으면 guide_worker_id로 조회 (유도원)
+        if (!deployment) {
+          console.log('[Mobile] Checking deployment as guide_worker...');
+          deployment = await db.getDeploymentByGuideWorkerId(worker.id);
+          console.log('[Mobile] Deployment by guide_worker_id:', deployment ? deployment.id : 'null');
+        }
 
         if (deployment) {
           console.log('[Mobile] Deployment details:', {

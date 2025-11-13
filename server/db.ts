@@ -2779,6 +2779,63 @@ export async function getDeploymentByWorkerId(workerId: string): Promise<Deploym
 }
 
 /**
+ * 유도원(guide_worker_id)으로 투입 정보 조회
+ */
+export async function getDeploymentByGuideWorkerId(guideWorkerId: string): Promise<Deployment | undefined> {
+  const supabase = getSupabase();
+  if (!supabase) return undefined;
+
+  console.log("[Database] getDeploymentByGuideWorkerId called with guideWorkerId:", guideWorkerId);
+
+  const { data, error } = await supabase
+    .from('deployments')
+    .select(`
+      *,
+      worker:workers!deployments_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
+      guide_worker:workers!deployments_guide_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
+      inspector:workers!deployments_inspector_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
+      bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
+      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
+    `)
+    .eq('guide_worker_id', guideWorkerId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[Database] Error getting deployment for guide worker:", guideWorkerId, error);
+    return undefined;
+  }
+
+  if (!data) {
+    console.log("[Database] No active deployment found for guide worker:", guideWorkerId);
+    return undefined;
+  }
+
+  console.log("[Database] Found deployment:", data.id, "for guide worker:", guideWorkerId);
+  return toCamelCase(data) as Deployment;
+}
+
+/**
  * User ID로 투입 목록 조회 (Worker 로그인용)
  * users.id -> workers.user_id -> deployments.worker_id
  */
