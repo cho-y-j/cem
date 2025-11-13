@@ -308,7 +308,7 @@ export default function EntryRequestEpApprove() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* 반입 검사 (장비 항목이 있는 경우) */}
-            {request.items?.some((item: any) => item.itemType === 'equipment') && (
+            {request.items?.some((item: any) => (item.itemType === 'equipment' || item.item_type === 'equipment')) && (
               <div className="space-y-3 p-4 border rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -364,7 +364,7 @@ export default function EntryRequestEpApprove() {
             )}
 
             {/* 안전교육 및 건강검진 (인력 항목이 있는 경우) */}
-            {request.items?.some((item: any) => item.itemType === 'worker') && (
+            {request.items?.some((item: any) => (item.itemType === 'worker' || item.item_type === 'worker')) && (
               <>
                 <div className="space-y-3 p-4 border rounded-lg">
                   <div className="flex items-center space-x-2">

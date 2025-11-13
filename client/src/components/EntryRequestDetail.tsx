@@ -4,7 +4,7 @@
  * - Owner/EP 승인 기능
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -189,11 +189,8 @@ export function EntryRequestDetail({
       }
       onApprove?.();
     } else if (userRole === "ep") {
-      // EP 최종 승인
-      epApproveMutation.mutate({
-        id: requestData.id,
-        comment: comment.trim() || undefined,
-      });
+      // EP 최종 승인 (안전교육/건강검진 정보 포함)
+      handleEpApproveWithFiles();
     }
   };
 
@@ -776,13 +773,117 @@ export function EntryRequestDetail({
             )}
 
             {/* EP 최종 승인 */}
-            {userRole === "ep" && requestData.status === "bp_approved" && (
+            {userRole === "ep" && (requestData.status === "bp_approved" || requestData.status === "bp_requested") && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">EP 최종 승인</CardTitle>
                   <CardDescription>모든 서류를 확인하고 최종 승인합니다.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-6">
+                  {/* 반입 검사 (장비 항목이 있는 경우) */}
+                  {requestData.items?.some((item: any) => (item.itemType === 'equipment' || item.item_type === 'equipment')) && (
+                    <div className="space-y-3 p-4 border rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="entry-inspection-detail"
+                          checked={entryInspectionCompleted}
+                          onChange={(e) => setEntryInspectionCompleted(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="entry-inspection-detail" className="font-semibold">
+                          반입 검사 완료 (외부검사업체 직원 확인)
+                        </Label>
+                      </div>
+                      <div className="ml-6 space-y-2">
+                        <Label htmlFor="entry-inspection-file-detail" className="text-sm text-muted-foreground">
+                          반입 검사 확인서 첨부 (선택)
+                        </Label>
+                        <Input
+                          id="entry-inspection-file-detail"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => setEntryInspectionFile(e.target.files?.[0] || null)}
+                          className="flex-1"
+                        />
+                        {entryInspectionFile && (
+                          <p className="text-xs text-muted-foreground">
+                            ✓ {entryInspectionFile.name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 안전교육 및 건강검진 (인력 항목이 있는 경우) */}
+                  {requestData.items?.some((item: any) => (item.itemType === 'worker' || item.item_type === 'worker')) && (
+                    <>
+                      <div className="space-y-3 p-4 border rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="safety-training-detail"
+                            checked={safetyTrainingCompleted}
+                            onChange={(e) => setSafetyTrainingCompleted(e.target.checked)}
+                            className="h-4 w-4"
+                          />
+                          <Label htmlFor="safety-training-detail" className="font-semibold">
+                            안전교육 완료
+                          </Label>
+                        </div>
+                        <div className="ml-6 space-y-2">
+                          <Label htmlFor="safety-training-file-detail" className="text-sm text-muted-foreground">
+                            안전교육 서류 첨부 (선택)
+                          </Label>
+                          <Input
+                            id="safety-training-file-detail"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => setSafetyTrainingFile(e.target.files?.[0] || null)}
+                            className="flex-1"
+                          />
+                          {safetyTrainingFile && (
+                            <p className="text-xs text-muted-foreground">
+                              ✓ {safetyTrainingFile.name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 p-4 border rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="health-check-detail"
+                            checked={healthCheckCompleted}
+                            onChange={(e) => setHealthCheckCompleted(e.target.checked)}
+                            className="h-4 w-4"
+                          />
+                          <Label htmlFor="health-check-detail" className="font-semibold">
+                            배치전 건강검진 완료
+                          </Label>
+                        </div>
+                        <div className="ml-6 space-y-2">
+                          <Label htmlFor="health-check-file-detail" className="text-sm text-muted-foreground">
+                            건강검진 서류 첨부 (선택)
+                          </Label>
+                          <Input
+                            id="health-check-file-detail"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => setHealthCheckFile(e.target.files?.[0] || null)}
+                            className="flex-1"
+                          />
+                          {healthCheckFile && (
+                            <p className="text-xs text-muted-foreground">
+                              ✓ {healthCheckFile.name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   <div>
                     <Label htmlFor="epComment">코멘트 (선택)</Label>
                     <Textarea
@@ -875,7 +976,7 @@ export function EntryRequestDetail({
               )}
 
               {/* EP 최종 승인 버튼 */}
-              {userRole === "ep" && requestData.status === "bp_approved" && (
+              {userRole === "ep" && (requestData.status === "bp_approved" || requestData.status === "bp_requested") && (
                 <>
                   <Button
                     variant="destructive"

@@ -405,10 +405,10 @@ export default function EntryRequestsNew() {
 
   // 2. 정렬 (승인 대기 우선)
   const sortedRequests = [...filteredRequests].sort((a, b) => {
-    // EP 사용자: bp_approved, ep_reviewing 우선
+    // EP 사용자: bp_approved, ep_reviewing, bp_requested 우선
     if (user?.role === "ep") {
-      const aPriority = (a.status === "bp_approved" || a.status === "ep_reviewing") ? 1 : 0;
-      const bPriority = (b.status === "bp_approved" || b.status === "ep_reviewing") ? 1 : 0;
+      const aPriority = (a.status === "bp_approved" || a.status === "ep_reviewing" || a.status === "bp_requested") ? 1 : 0;
+      const bPriority = (b.status === "bp_approved" || b.status === "ep_reviewing" || b.status === "bp_requested") ? 1 : 0;
       if (aPriority !== bPriority) return bPriority - aPriority;
     }
     
@@ -427,14 +427,28 @@ export default function EntryRequestsNew() {
     }
     
     // 그 외: 요청일(created_at) 기준 최신순 (최근 것이 위로)
-    const aDate = new Date(a.created_at || a.requested_start_date || 0).getTime();
-    const bDate = new Date(b.created_at || b.requested_start_date || 0).getTime();
+    // 날짜 파싱 개선: ISO 문자열 또는 타임스탬프 모두 처리
+    const parseDate = (dateStr: any): number => {
+      if (!dateStr) return 0;
+      if (typeof dateStr === 'string') {
+        // ISO 형식 또는 다른 형식 처리
+        const parsed = new Date(dateStr);
+        return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+      }
+      if (dateStr instanceof Date) {
+        return dateStr.getTime();
+      }
+      return 0;
+    };
+    
+    const aDate = parseDate(a.created_at || a.createdAt || a.requested_start_date || a.requestedStartDate);
+    const bDate = parseDate(b.created_at || b.createdAt || b.requested_start_date || b.requestedStartDate);
     return bDate - aDate; // 내림차순 (최신이 위로)
   });
 
   // 승인 대기 개수
   const pendingCount = user?.role === "ep"
-    ? requests?.filter((r: any) => r.status === "bp_approved" || r.status === "ep_reviewing").length || 0
+    ? requests?.filter((r: any) => r.status === "bp_approved" || r.status === "ep_reviewing" || r.status === "bp_requested").length || 0
     : user?.role === "bp"
     ? requests?.filter((r: any) => r.status === "owner_requested").length || 0
     : user?.role === "owner"
@@ -609,14 +623,14 @@ export default function EntryRequestsNew() {
                         )}
 
                         {/* EP 승인 버튼 (승인 대기 상태) */}
-                        {user?.role === "ep" && (request.status === "bp_approved" || request.status === "ep_reviewing") && (
+                        {user?.role === "ep" && (request.status === "bp_approved" || request.status === "ep_reviewing" || request.status === "bp_requested") && (
                           <Button
                             size="sm"
                             variant="default"
                             className="bg-purple-600 hover:bg-purple-700"
                             onClick={() => {
-                              setSelectedRequestForDetail(request);
-                              setDetailDialogOpen(true);
+                              // EntryRequestEpApprove 페이지로 이동 (안전교육/건강검진 체크박스 포함)
+                              window.location.href = `/entry-requests/${request.id}/ep-approve`;
                             }}
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />

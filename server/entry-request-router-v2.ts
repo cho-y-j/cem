@@ -409,7 +409,9 @@ export const entryRequestsRouterV2 = router({
       // 워크플로우 결정
       const isBpRequest = userRole === 'bp';
       const bpCompanyId = isBpRequest ? ctx.user.companyId : input.targetBpCompanyId;
-      const initialStatus = isBpRequest ? 'bp_requested' : 'owner_requested';
+      // BP가 직접 올린 요청은 EP가 바로 승인할 수 있도록 bp_approved 상태로 시작
+      // (BP가 이미 검토 완료하고 EP에 전달하는 것으로 간주)
+      const initialStatus = isBpRequest ? 'bp_approved' : 'owner_requested';
 
       // 반입 요청 생성
       const requestData: any = {
