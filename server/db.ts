@@ -954,13 +954,14 @@ export type WorkerFilterOptions = {
   epCompanyId?: string;
   search?: string;
   ownerId?: string;
+  workerTypeId?: string; // 인력유형 필터
 };
 
 export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): Promise<Worker[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  const { ownerCompanyId, bpCompanyId, epCompanyId, search, ownerId } = filters;
+  const { ownerCompanyId, bpCompanyId, epCompanyId, search, ownerId, workerTypeId } = filters;
 
   let allowedWorkerIds: Set<string> | null = null;
 
@@ -1032,8 +1033,25 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
     }
   }
 
-  if (allowedWorkerIds !== null && allowedWorkerIds.size === 0) {
-    // ownerCompanyId로 필터링된 인력이 있으면 그것만 반환
+  // BP 필터링 로직 개선: bpCompanyId와 ownerCompanyId가 모두 있는 경우 OR로 결합
+  // - bpCompanyId: deployments를 통해 투입된 인력
+  // - ownerCompanyId: BP가 생성한 인력 (아직 투입되지 않은 유도원 포함)
+  if (bpCompanyId && ownerCompanyId) {
+    // 두 조건이 모두 있는 경우 OR로 결합
+    const deploymentWorkerIds = allowedWorkerIds ? Array.from(allowedWorkerIds) : [];
+    const createdWorkerIds = ownerCompanyWorkerIds || [];
+    
+    // 두 배열을 합쳐서 Set으로 변환 (중복 제거)
+    const allWorkerIds = [...new Set([...deploymentWorkerIds, ...createdWorkerIds])];
+    
+    if (allWorkerIds.length > 0) {
+      allowedWorkerIds = new Set(allWorkerIds);
+    } else {
+      // 둘 다 비어있으면 빈 배열 반환
+      return [];
+    }
+  } else if (allowedWorkerIds !== null && allowedWorkerIds.size === 0) {
+    // ownerCompanyId만 있는 경우
     if (ownerCompanyWorkerIds && ownerCompanyWorkerIds.length > 0) {
       allowedWorkerIds = new Set(ownerCompanyWorkerIds);
     } else {
@@ -1063,6 +1081,10 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
 
   if (ownerId) {
     query = query.eq('owner_id', ownerId);
+  }
+
+  if (workerTypeId) {
+    query = query.eq('worker_type_id', workerTypeId);
   }
 
   if (search?.trim()) {

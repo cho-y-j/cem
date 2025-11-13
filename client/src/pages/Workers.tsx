@@ -81,6 +81,7 @@ export default function Workers() {
   const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("");
   const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("");
   const [epCompanyFilter, setEpCompanyFilter] = useState<string>("");
+  const [workerTypeFilter, setWorkerTypeFilter] = useState<string>(""); // 인력유형 필터
   const [filtersInitialized, setFiltersInitialized] = useState(false);
 
   const utils = trpc.useUtils();
@@ -132,8 +133,12 @@ export default function Workers() {
       input.epCompanyId = epCompanyFilter;
     }
 
+    if (workerTypeFilter) {
+      input.workerTypeId = workerTypeFilter;
+    }
+
     return Object.keys(input).length > 0 ? input : undefined;
-  }, [searchTerm, ownerCompanyFilter, bpCompanyFilter, epCompanyFilter, role, user?.companyId]);
+  }, [searchTerm, ownerCompanyFilter, bpCompanyFilter, epCompanyFilter, workerTypeFilter, role, user?.companyId]);
 
   const { data: workersList, isLoading } = trpc.workers.list.useQuery(workerFilters);
   const { data: workerTypes } = trpc.workerTypes.list.useQuery();
@@ -450,6 +455,26 @@ export default function Workers() {
                 </Select>
               </div>
             )}
+
+            <div className="w-full md:w-56">
+              <Label>인력 유형</Label>
+              <Select
+                value={workerTypeFilter || "all"}
+                onValueChange={(value) => setWorkerTypeFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {workerTypes?.map((type: any) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
