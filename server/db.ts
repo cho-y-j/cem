@@ -2379,6 +2379,13 @@ export async function getDeploymentByWorkerId(workerId: string): Promise<Deploym
     .from('deployments')
     .select(`
       *,
+      worker:workers!deployments_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
       bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
       ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
     `)
@@ -2454,7 +2461,13 @@ export async function getDeploymentsByUserId(userId: string, filters?: {
         specification,
         equip_type:equip_types!equipment_equip_type_id_fkey(id, name, description)
       ),
-      worker:workers!deployments_worker_id_fkey(id, name, license_num),
+      worker:workers!deployments_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
       bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
       ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
     `)

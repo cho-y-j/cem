@@ -1253,20 +1253,29 @@ export default function WorkerMain() {
             )}
           </Button>
 
-          {/* 운전자 점검표 */}
-          <Button
-            size="lg"
-            variant="outline"
-            className="w-full h-16 text-base font-bold border-2 border-blue-400 hover:bg-blue-50 active:scale-95 transition-transform"
-            onClick={() => setLocation("/mobile/driver-inspection")}
-            disabled={!assignedEquipment}
-          >
-            <ClipboardCheck className="mr-2 h-6 w-6 text-blue-600" />
-            <div className="text-left flex-1">
-              <div>운전자 점검표</div>
-              <div className="text-xs text-gray-500 font-normal">일일/주간/월간 점검</div>
-            </div>
-          </Button>
+          {/* 운전자 점검표 (유도원은 숨김) */}
+          {(() => {
+            // 유도원인지 확인 (workerType.name이 "유도원"인 경우)
+            const isGuideWorker = currentDeployment?.worker?.workerType?.name === "유도원";
+            if (isGuideWorker) {
+              return null; // 유도원인 경우 버튼 숨김
+            }
+            return (
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full h-16 text-base font-bold border-2 border-blue-400 hover:bg-blue-50 active:scale-95 transition-transform"
+                onClick={() => setLocation("/mobile/driver-inspection")}
+                disabled={!assignedEquipment}
+              >
+                <ClipboardCheck className="mr-2 h-6 w-6 text-blue-600" />
+                <div className="text-left flex-1">
+                  <div>운전자 점검표</div>
+                  <div className="text-xs text-gray-500 font-normal">일일/주간/월간 점검</div>
+                </div>
+              </Button>
+            );
+          })()}
 
           {/* 생체 인증 설정 */}
           <Button
