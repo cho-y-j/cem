@@ -137,10 +137,8 @@ export function EntryRequestDetail({
     onSuccess: () => {
       toast.success("반입 요청이 최종 승인되었습니다.");
       utils.entryRequestsV2.list.invalidate();
-      // 다이얼로그는 닫지 않고 상태만 업데이트 (승인 완료 후에도 상세 보기 가능)
-      // onClose()를 호출하지 않음
+      onClose(); // 승인 완료 후 다이얼로그 닫기
       setComment("");
-      // state는 초기화하지 않음 (승인 완료 정보를 보여주기 위해)
     },
     onError: (error) => {
       toast.error("최종 승인 실패: " + error.message);
@@ -160,15 +158,22 @@ export function EntryRequestDetail({
     },
   });
 
-  if (!request) return null;
+  // 이전 값 추적을 위한 ref (무한 루프 방지)
+  const prevValuesRef = useRef<{
+    entryInspectionCompletedAt: string | null;
+    safetyTrainingCompletedAt: string | null;
+    healthCheckCompletedAt: string | null;
+  }>({
+    entryInspectionCompletedAt: null,
+    safetyTrainingCompletedAt: null,
+    healthCheckCompletedAt: null,
+  });
 
-  // 상세 데이터가 있으면 사용, 없으면 기본 request 사용
-  const requestData = detailData || request;
-  
   // request ID를 안정적으로 추출 (원시값만 사용)
   const requestId = request?.id || detailData?.id || null;
 
-  // Effect 1: 다이얼로그 열림/닫힘 처리 (state 초기화)
+  // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
+  // 다이얼로그가 열릴 때마다 초기화
   useEffect(() => {
     if (!open) {
       // 다이얼로그가 닫히면 state 초기화
@@ -179,39 +184,49 @@ export function EntryRequestDetail({
       setSafetyTrainingFile(null);
       setHealthCheckFile(null);
       setComment("");
+      // ref도 초기화
+      prevValuesRef.current = {
+        entryInspectionCompletedAt: null,
+        safetyTrainingCompletedAt: null,
+        healthCheckCompletedAt: null,
+      };
+      return;
     }
-  }, [open]); // open만 dependency로 사용하여 무한 루프 방지
+    
+    // requestId가 없으면 실행하지 않음
+    if (!requestId) return;
+    
+    // 로딩 중이면 대기
+    if (isLoading) return;
+    
+    // 현재 값 추출
+    const entryInspectionCompletedAt = detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt || null;
+    const safetyTrainingCompletedAt = detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt || null;
+    const healthCheckCompletedAt = detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt || null;
+    
+    // 이전 값과 비교하여 변경된 경우에만 state 업데이트 (무한 루프 방지)
+    if (prevValuesRef.current.entryInspectionCompletedAt !== entryInspectionCompletedAt) {
+      setEntryInspectionCompleted(!!entryInspectionCompletedAt);
+      prevValuesRef.current.entryInspectionCompletedAt = entryInspectionCompletedAt;
+    }
+    
+    if (prevValuesRef.current.safetyTrainingCompletedAt !== safetyTrainingCompletedAt) {
+      setSafetyTrainingCompleted(!!safetyTrainingCompletedAt);
+      prevValuesRef.current.safetyTrainingCompletedAt = safetyTrainingCompletedAt;
+    }
+    
+    if (prevValuesRef.current.healthCheckCompletedAt !== healthCheckCompletedAt) {
+      setHealthCheckCompleted(!!healthCheckCompletedAt);
+      prevValuesRef.current.healthCheckCompletedAt = healthCheckCompletedAt;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, requestId, isLoading]); // detailData와 request는 의도적으로 제외하여 무한 루프 방지
 
-  // Effect 2: 데이터 로딩 시 초기값 설정
-  useEffect(() => {
-    // 다이얼로그가 열려있고, requestId가 있고, 로딩이 완료된 경우에만 실행
-    if (!open || !requestId || isLoading) return;
+  // 모든 Hook 호출 후 early return
+  if (!request) return null;
 
-    // 현재 값 추출 (detailData 우선, 없으면 request 사용)
-    const entryInspectionCompletedAt =
-      detailData?.entry_inspection_completed_at ||
-      detailData?.entryInspectionCompletedAt ||
-      request?.entry_inspection_completed_at ||
-      request?.entryInspectionCompletedAt ||
-      null;
-    const safetyTrainingCompletedAt =
-      detailData?.safety_training_completed_at ||
-      detailData?.safetyTrainingCompletedAt ||
-      request?.safety_training_completed_at ||
-      request?.safetyTrainingCompletedAt ||
-      null;
-    const healthCheckCompletedAt =
-      detailData?.health_check_completed_at ||
-      detailData?.healthCheckCompletedAt ||
-      request?.health_check_completed_at ||
-      request?.healthCheckCompletedAt ||
-      null;
-
-    // 값이 있으면 체크박스 활성화 (한 번만 설정)
-    setEntryInspectionCompleted(!!entryInspectionCompletedAt);
-    setSafetyTrainingCompleted(!!safetyTrainingCompletedAt);
-    setHealthCheckCompleted(!!healthCheckCompletedAt);
-  }, [open, requestId, isLoading]); // 객체(detailData, request)를 제외하고 원시값만 dependency로 사용
+  // 상세 데이터가 있으면 사용, 없으면 기본 request 사용
+  const requestData = detailData || request;
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -624,6 +639,109 @@ export function EntryRequestDetail({
                       <div className="text-sm text-muted-foreground mb-1">BP 코멘트</div>
                       <div className="p-3 bg-muted rounded-md text-sm">
                         {requestData.bpComment || requestData.bp_comment}
+                      </div>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* EP 승인 서류 (EP 승인 후 첨부된 서류들) */}
+            {(requestData.entryInspectionFileUrl || requestData.entry_inspection_file_url ||
+              requestData.safetyTrainingFileUrl || requestData.safety_training_file_url ||
+              requestData.healthCheckFileUrl || requestData.health_check_file_url) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">EP 승인 서류</CardTitle>
+                  <CardDescription>
+                    EP 최종 승인 시 첨부된 서류입니다.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* 반입 검사 확인서 */}
+                  {(requestData.entryInspectionFileUrl || requestData.entry_inspection_file_url) && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-green-500" />
+                        <div>
+                          <div className="font-medium">반입 검사 확인서</div>
+                          <div className="text-sm text-muted-foreground">
+                            외부검사업체 직원 확인
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDocument(
+                          requestData.entryInspectionFileUrl || requestData.entry_inspection_file_url,
+                          "반입 검사 확인서"
+                        )}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        보기
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* 안전교육 서류 */}
+                  {(requestData.safetyTrainingFileUrl || requestData.safety_training_file_url) && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-orange-500" />
+                        <div>
+                          <div className="font-medium">안전교육 확인서</div>
+                          <div className="text-sm text-muted-foreground">
+                            안전교육 이수 증명
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDocument(
+                          requestData.safetyTrainingFileUrl || requestData.safety_training_file_url,
+                          "안전교육 확인서"
+                        )}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        보기
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* 건강검진 서류 */}
+                  {(requestData.healthCheckFileUrl || requestData.health_check_file_url) && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-purple-500" />
+                        <div>
+                          <div className="font-medium">배치전 건강검진 확인서</div>
+                          <div className="text-sm text-muted-foreground">
+                            건강검진 결과
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDocument(
+                          requestData.healthCheckFileUrl || requestData.health_check_file_url,
+                          "건강검진 확인서"
+                        )}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        보기
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* EP 코멘트 */}
+                  {requestData.epComment || requestData.ep_comment ? (
+                    <div className="mt-3">
+                      <div className="text-sm text-muted-foreground mb-1">EP 코멘트</div>
+                      <div className="p-3 bg-muted rounded-md text-sm">
+                        {requestData.epComment || requestData.ep_comment}
                       </div>
                     </div>
                   ) : null}
