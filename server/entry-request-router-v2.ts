@@ -275,12 +275,15 @@ export const entryRequestsRouterV2 = router({
   // ============================================================
 
   /**
-   * 반입 요청 생성 (Owner)
+   * 반입 요청 생성 (Owner 또는 BP)
+   * - Owner: Owner → BP → EP 워크플로우
+   * - BP: BP → EP 워크플로우 (유도원만 요청 가능)
    */
   create: protectedProcedure
     .input(
       z.object({
-        targetBpCompanyId: z.string().min(1, "BP 회사를 선택해주세요."),
+        targetBpCompanyId: z.string().optional(), // BP가 요청할 때는 선택사항
+        targetEpCompanyId: z.string().optional(), // BP가 요청할 때 EP 회사 선택
         purpose: z.string().min(1, "반입 목적을 입력해주세요."),
         requestedStartDate: z.string(),
         requestedEndDate: z.string(),
@@ -294,11 +297,22 @@ export const entryRequestsRouterV2 = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Owner 권한 확인
-      if (ctx.user.role !== 'owner' && ctx.user.role !== 'admin') {
+      const userRole = ctx.user.role?.toLowerCase();
+      
+      // Owner 또는 BP 권한 확인
+      if (userRole !== 'owner' && userRole !== 'bp' && userRole !== 'admin') {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "반입 요청 생성 권한이 없습니다.",
+        });
+      }
+
+      // BP가 요청할 때는 targetBpCompanyId가 없어도 됨 (자신의 회사)
+      // Owner가 요청할 때는 targetBpCompanyId 필수
+      if (userRole === 'owner' && !input.targetBpCompanyId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "BP 회사를 선택해주세요.",
         });
       }
 
@@ -308,24 +322,40 @@ export const entryRequestsRouterV2 = router({
       const requestId = `request-${nanoid()}`;
       const requestNumber = `REQ-${Date.now()}`;
 
+      // 워크플로우 결정
+      const isBpRequest = userRole === 'bp';
+      const bpCompanyId = isBpRequest ? ctx.user.companyId : input.targetBpCompanyId;
+      const initialStatus = isBpRequest ? 'bp_requested' : 'owner_requested';
+
       // 반입 요청 생성
+      const requestData: any = {
+        id: requestId,
+        request_number: requestNumber,
+        bp_company_id: bpCompanyId,
+        bp_user_id: ctx.user.id,
+        purpose: input.purpose,
+        requested_start_date: input.requestedStartDate,
+        requested_end_date: input.requestedEndDate,
+        status: initialStatus,
+        created_at: new Date().toISOString(),
+      };
+
+      // Owner가 요청한 경우
+      if (!isBpRequest) {
+        requestData.owner_company_id = ctx.user.companyId;
+        requestData.owner_user_id = ctx.user.id;
+        requestData.owner_requested_at = new Date().toISOString();
+        requestData.target_bp_company_id = input.targetBpCompanyId;
+      } else {
+        // BP가 요청한 경우 EP 회사 선택
+        if (input.targetEpCompanyId) {
+          requestData.target_ep_company_id = input.targetEpCompanyId;
+        }
+      }
+
       const { error: requestError } = await supabase
         .from('entry_requests')
-        .insert({
-          id: requestId,
-          request_number: requestNumber,
-          owner_company_id: ctx.user.companyId,
-          owner_user_id: ctx.user.id,
-          owner_requested_at: new Date().toISOString(),
-          target_bp_company_id: input.targetBpCompanyId,
-          // 레거시 컬럼도 채워줌 (NOT NULL 제약 때문에)
-          bp_company_id: input.targetBpCompanyId,
-          purpose: input.purpose,
-          requested_start_date: input.requestedStartDate,
-          requested_end_date: input.requestedEndDate,
-          status: 'owner_requested',
-          created_at: new Date().toISOString(),
-        });
+        .insert(requestData);
 
       if (requestError) {
         console.error('[EntryRequests] Create error:', requestError);
