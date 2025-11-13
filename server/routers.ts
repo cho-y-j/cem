@@ -659,7 +659,14 @@ export const appRouter = router({
         const filters: db.WorkerFilterOptions = { ...(input || {}) };
 
         if (role === "bp" && ctx.user.companyId) {
+          // BP는 자신의 회사에 투입된 인력 + 자신이 생성한 인력 모두 조회
+          // bpCompanyId: deployments를 통해 필터링 (투입된 인력)
+          // ownerCompanyId: 자신이 생성한 인력 (아직 투입되지 않은 유도원 포함)
           filters.bpCompanyId = filters.bpCompanyId || ctx.user.companyId;
+          // BP가 생성한 인력도 함께 조회 (ownerCompanyId로 필터링)
+          if (!filters.ownerCompanyId) {
+            filters.ownerCompanyId = ctx.user.companyId;
+          }
         } else if (role === "ep" && ctx.user.companyId) {
           filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
         } else if (role === "owner") {
@@ -894,7 +901,8 @@ export const appRouter = router({
           ...workerData,
           email,  // email 추가!
           pinCode: "0000",  // PIN 기본값
-          ownerId: ctx.user.id 
+          ownerId: ctx.user.id,
+          ownerCompanyId: ctx.user.companyId || null // Owner 회사 ID도 함께 저장
         });
         
         // 서류 업로드 및 등록

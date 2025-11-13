@@ -264,8 +264,10 @@ export const entryRequestsRouterV2 = router({
 
       console.log('[EntryRequestsV2] Enriched items ready with documents');
 
+      // toCamelCase 적용하여 반환
+      const { toCamelCase } = await import('./db-utils');
       return {
-        ...request,
+        ...toCamelCase(request),
         items: enrichedItems,
       };
     }),

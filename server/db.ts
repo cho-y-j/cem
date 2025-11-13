@@ -1016,8 +1016,35 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
     }
   }
 
+  // ownerCompanyId와 bpCompanyId/epCompanyId가 모두 있는 경우:
+  // - ownerCompanyId: BP가 생성한 인력 (아직 투입되지 않은 유도원 포함)
+  // - bpCompanyId/epCompanyId: deployments를 통해 필터링된 인력 (투입된 인력)
+  // 두 조건을 OR로 결합하여 모두 조회
+  let ownerCompanyWorkerIds: string[] | null = null;
+  if (ownerCompanyId) {
+    const { data: ownerWorkers } = await supabase
+      .from('workers')
+      .select('id')
+      .eq('owner_company_id', ownerCompanyId);
+    
+    if (ownerWorkers) {
+      ownerCompanyWorkerIds = ownerWorkers.map((w: any) => w.id);
+    }
+  }
+
   if (allowedWorkerIds !== null && allowedWorkerIds.size === 0) {
-    return [];
+    // ownerCompanyId로 필터링된 인력이 있으면 그것만 반환
+    if (ownerCompanyWorkerIds && ownerCompanyWorkerIds.length > 0) {
+      allowedWorkerIds = new Set(ownerCompanyWorkerIds);
+    } else {
+      return [];
+    }
+  } else if (allowedWorkerIds !== null && ownerCompanyWorkerIds) {
+    // 두 조건을 OR로 결합
+    const combinedIds = new Set([...Array.from(allowedWorkerIds), ...ownerCompanyWorkerIds]);
+    allowedWorkerIds = combinedIds;
+  } else if (ownerCompanyWorkerIds) {
+    allowedWorkerIds = new Set(ownerCompanyWorkerIds);
   }
 
   let query = supabase
@@ -1025,7 +1052,8 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (ownerCompanyId) {
+  // ownerCompanyId만 있고 bpCompanyId/epCompanyId가 없는 경우
+  if (ownerCompanyId && !bpCompanyId && !epCompanyId) {
     query = query.eq('owner_company_id', ownerCompanyId);
   }
 
