@@ -2332,7 +2332,23 @@ export async function getDeployments(filters?: {
 
   let query = supabase
     .from('deployments')
-    .select('*')
+    .select(`
+      *,
+      guide_worker:workers!deployments_guide_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
+      inspector:workers!deployments_inspector_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      )
+    `)
     .order('created_at', { ascending: false });
 
   if (filters?.ownerId) query = query.eq('owner_id', filters.ownerId);
@@ -2380,6 +2396,20 @@ export async function getDeploymentByWorkerId(workerId: string): Promise<Deploym
     .select(`
       *,
       worker:workers!deployments_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
+      guide_worker:workers!deployments_guide_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
+      inspector:workers!deployments_inspector_id_fkey(
         id,
         name,
         license_num,

@@ -42,10 +42,18 @@ import { ko } from "date-fns/locale";
  */
 export default function Deployments() {
   const { user } = useAuth();
+  const role = user?.role?.toLowerCase();
+  const isBp = role === 'bp';
+  const isEp = role === 'ep';
+  const isOwner = role === 'owner';
+  const isAdmin = role === 'admin';
+  
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isExtendOpen, setIsExtendOpen] = useState(false);
   const [isChangeWorkerOpen, setIsChangeWorkerOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isGuideWorkerOpen, setIsGuideWorkerOpen] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -74,6 +82,14 @@ export default function Deployments() {
     reason: "",
   });
 
+  const [guideWorkerFormData, setGuideWorkerFormData] = useState({
+    guideWorkerId: "",
+  });
+
+  const [inspectorFormData, setInspectorFormData] = useState({
+    inspectorId: "",
+  });
+
   const utils = trpc.useUtils();
 
   // 데이터 조회
@@ -85,6 +101,16 @@ export default function Deployments() {
   const { data: equipment } = trpc.equipment.list.useQuery();
   const { data: workers } = trpc.workers.list.useQuery();
   const { data: bpCompanies } = trpc.companies.list.useQuery({ companyType: 'bp' });
+  
+  // 유도원 목록 조회 (BP만, 유도원 인력 유형)
+  const { data: workerTypes } = trpc.workerTypes.list.useQuery();
+  const guideWorkerTypeId = workerTypes?.find((wt: any) => wt.name === "유도원")?.id;
+  const guideWorkers = workers?.filter((w: any) => w.workerTypeId === guideWorkerTypeId) || [];
+  
+  // Inspector 목록 조회 (EP만)
+  const { data: inspectors } = trpc.deployments.listInspectors.useQuery(undefined, {
+    enabled: isEp || isAdmin,
+  });
 
   // Entry Request 승인 완료된 것만 필터링 (먼저 정의)
   const approvedEntryRequests = entryRequests?.filter(
@@ -183,6 +209,26 @@ export default function Deployments() {
     onError: (error) => toast.error("투입 종료 실패: " + error.message),
   });
 
+  const addGuideWorkerMutation = trpc.deployments.addGuideWorker.useMutation({
+    onSuccess: () => {
+      toast.success("유도원이 추가/교체되었습니다.");
+      utils.deployments.list.invalidate();
+      setIsGuideWorkerOpen(false);
+      setGuideWorkerFormData({ guideWorkerId: "" });
+    },
+    onError: (error) => toast.error("유도원 추가 실패: " + error.message),
+  });
+
+  const assignInspectorMutation = trpc.deployments.assignInspector.useMutation({
+    onSuccess: () => {
+      toast.success("안전점검원이 지정되었습니다.");
+      utils.deployments.list.invalidate();
+      setIsInspectorOpen(false);
+      setInspectorFormData({ inspectorId: "" });
+    },
+    onError: (error) => toast.error("안전점검원 지정 실패: " + error.message),
+  });
+
   // 폼 리셋
   const resetCreateForm = () => {
     setCreateFormData({
@@ -259,6 +305,30 @@ export default function Deployments() {
     completeMutation.mutate({
       deploymentId: deployment.id,
       actualEndDate: new Date(),
+    });
+  };
+
+  // 유도원 추가/교체
+  const handleAddGuideWorker = () => {
+    if (!selectedDeployment || !guideWorkerFormData.guideWorkerId) {
+      toast.error("유도원을 선택해주세요.");
+      return;
+    }
+    addGuideWorkerMutation.mutate({
+      deploymentId: selectedDeployment.id,
+      guideWorkerId: guideWorkerFormData.guideWorkerId,
+    });
+  };
+
+  // 안전점검원 지정
+  const handleAssignInspector = () => {
+    if (!selectedDeployment || !inspectorFormData.inspectorId) {
+      toast.error("안전점검원을 선택해주세요.");
+      return;
+    }
+    assignInspectorMutation.mutate({
+      deploymentId: selectedDeployment.id,
+      inspectorId: inspectorFormData.inspectorId,
     });
   };
 
@@ -352,7 +422,31 @@ export default function Deployments() {
                                 {worker?.workerType?.typeName}
                               </span>
                             </TableCell>
-                            <TableCell>{bpCompany?.name || "-"}</TableCell>
+                            <TableCell>
+                              {bpCompany?.name || "-"}
+                              {/* 유도원 정보 표시 */}
+                              {deployment.guideWorkerId && (() => {
+                                const guideWorker = workers?.find((w: any) => w.id === deployment.guideWorkerId);
+                                return guideWorker ? (
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      유도원: {guideWorker.name}
+                                    </Badge>
+                                  </div>
+                                ) : null;
+                              })()}
+                              {/* Inspector 정보 표시 */}
+                              {deployment.inspectorId && (() => {
+                                const inspector = inspectors?.find((i: any) => i.id === deployment.inspectorId);
+                                return inspector ? (
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className="text-xs bg-blue-50">
+                                      안전점검원: {inspector.name}
+                                    </Badge>
+                                  </div>
+                                ) : null;
+                              })()}
+                            </TableCell>
                             <TableCell>
                               {format(new Date(deployment.startDate), "yyyy-MM-dd", {
                                 locale: ko,
@@ -412,6 +506,40 @@ export default function Deployments() {
                                       <UserCheck className="h-3 w-3 mr-1" />
                                       운전자 교체
                                     </Button>
+                                    {/* BP: 유도원 추가/교체 */}
+                                    {isBp && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedDeployment(deployment);
+                                          setGuideWorkerFormData({
+                                            guideWorkerId: deployment.guideWorkerId || "",
+                                          });
+                                          setIsGuideWorkerOpen(true);
+                                        }}
+                                      >
+                                        <UserCheck className="h-3 w-3 mr-1" />
+                                        유도원 {deployment.guideWorkerId ? "교체" : "추가"}
+                                      </Button>
+                                    )}
+                                    {/* EP: 안전점검원 지정 */}
+                                    {isEp && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedDeployment(deployment);
+                                          setInspectorFormData({
+                                            inspectorId: deployment.inspectorId || "",
+                                          });
+                                          setIsInspectorOpen(true);
+                                        }}
+                                      >
+                                        <UserCheck className="h-3 w-3 mr-1" />
+                                        안전점검원 {deployment.inspectorId ? "변경" : "지정"}
+                                      </Button>
+                                    )}
                                     <Button
                                       size="sm"
                                       variant="default"
@@ -1044,6 +1172,124 @@ export default function Deployments() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
               닫기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 유도원 추가/교체 다이얼로그 (BP 전용) */}
+      <Dialog open={isGuideWorkerOpen} onOpenChange={setIsGuideWorkerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>유도원 {selectedDeployment?.guideWorkerId ? "교체" : "추가"}</DialogTitle>
+            <DialogDescription>
+              투입에 유도원을 추가하거나 교체합니다
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="guideWorkerId">유도원 선택</Label>
+              <Select
+                value={guideWorkerFormData.guideWorkerId}
+                onValueChange={(value) =>
+                  setGuideWorkerFormData({ ...guideWorkerFormData, guideWorkerId: value })
+                }
+              >
+                <SelectTrigger id="guideWorkerId">
+                  <SelectValue placeholder="유도원 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {guideWorkers.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      유도원이 없습니다. 인력 관리에서 유도원을 먼저 생성해주세요.
+                    </SelectItem>
+                  ) : (
+                    guideWorkers.map((worker: any) => (
+                      <SelectItem key={worker.id} value={worker.id}>
+                        {worker.name} {worker.licenseNum && `(${worker.licenseNum})`}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {guideWorkers.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  유도원을 먼저 인력 관리에서 생성해주세요.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsGuideWorkerOpen(false)}>
+              취소
+            </Button>
+            <Button
+              onClick={handleAddGuideWorker}
+              disabled={!guideWorkerFormData.guideWorkerId || addGuideWorkerMutation.isPending}
+            >
+              {addGuideWorkerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {selectedDeployment?.guideWorkerId ? "교체" : "추가"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 안전점검원 지정 다이얼로그 (EP 전용) */}
+      <Dialog open={isInspectorOpen} onOpenChange={setIsInspectorOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>안전점검원 {selectedDeployment?.inspectorId ? "변경" : "지정"}</DialogTitle>
+            <DialogDescription>
+              투입에 안전점검원을 지정합니다
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="inspectorId">안전점검원 선택</Label>
+              <Select
+                value={inspectorFormData.inspectorId}
+                onValueChange={(value) =>
+                  setInspectorFormData({ ...inspectorFormData, inspectorId: value })
+                }
+              >
+                <SelectTrigger id="inspectorId">
+                  <SelectValue placeholder="안전점검원 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {inspectors && inspectors.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      안전점검원이 없습니다. 인력 관리에서 안전점검원을 먼저 생성해주세요.
+                    </SelectItem>
+                  ) : (
+                    inspectors?.map((inspector: any) => (
+                      <SelectItem key={inspector.id} value={inspector.id}>
+                        {inspector.name} {inspector.licenseNum && `(${inspector.licenseNum})`}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {inspectors && inspectors.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  안전점검원을 먼저 인력 관리에서 생성해주세요.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInspectorOpen(false)}>
+              취소
+            </Button>
+            <Button
+              onClick={handleAssignInspector}
+              disabled={!inspectorFormData.inspectorId || assignInspectorMutation.isPending}
+            >
+              {assignInspectorMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {selectedDeployment?.inspectorId ? "변경" : "지정"}
             </Button>
           </DialogFooter>
         </DialogContent>
