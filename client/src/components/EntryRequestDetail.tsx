@@ -4,7 +4,7 @@
  * - Owner/EP 승인 기능
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -168,9 +168,19 @@ export function EntryRequestDetail({
   // request ID를 안정적으로 추출 (원시값만 사용)
   const requestId = request?.id || detailData?.id || null;
 
+  // 이전 값 추적을 위한 ref (무한 루프 방지)
+  const prevValuesRef = useRef<{
+    entryInspectionCompletedAt: string | null;
+    safetyTrainingCompletedAt: string | null;
+    healthCheckCompletedAt: string | null;
+  }>({
+    entryInspectionCompletedAt: null,
+    safetyTrainingCompletedAt: null,
+    healthCheckCompletedAt: null,
+  });
+
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
   // 다이얼로그가 열릴 때마다 초기화
-  // 중요: useEffect 내부에서 직접 값을 읽어서 무한 루프 방지
   useEffect(() => {
     if (!open) {
       // 다이얼로그가 닫히면 state 초기화
@@ -181,6 +191,12 @@ export function EntryRequestDetail({
       setSafetyTrainingFile(null);
       setHealthCheckFile(null);
       setComment("");
+      // ref도 초기화
+      prevValuesRef.current = {
+        entryInspectionCompletedAt: null,
+        safetyTrainingCompletedAt: null,
+        healthCheckCompletedAt: null,
+      };
       return;
     }
     
@@ -190,17 +206,27 @@ export function EntryRequestDetail({
     // 로딩 중이면 대기
     if (isLoading) return;
     
-    // useEffect 내부에서 직접 값을 읽어서 사용 (무한 루프 방지)
-    // detailData나 request 객체 참조가 변경되어도 실제 값만 비교
+    // 현재 값 추출
     const entryInspectionCompletedAt = detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt || null;
     const safetyTrainingCompletedAt = detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt || null;
     const healthCheckCompletedAt = detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt || null;
     
-    // 완료된 정보가 있으면 체크박스 활성화
-    setEntryInspectionCompleted(!!entryInspectionCompletedAt);
-    setSafetyTrainingCompleted(!!safetyTrainingCompletedAt);
-    setHealthCheckCompleted(!!healthCheckCompletedAt);
-  }, [open, requestId, isLoading]); // detailData와 request는 dependency에서 제외
+    // 이전 값과 비교하여 변경된 경우에만 state 업데이트 (무한 루프 방지)
+    if (prevValuesRef.current.entryInspectionCompletedAt !== entryInspectionCompletedAt) {
+      setEntryInspectionCompleted(!!entryInspectionCompletedAt);
+      prevValuesRef.current.entryInspectionCompletedAt = entryInspectionCompletedAt;
+    }
+    
+    if (prevValuesRef.current.safetyTrainingCompletedAt !== safetyTrainingCompletedAt) {
+      setSafetyTrainingCompleted(!!safetyTrainingCompletedAt);
+      prevValuesRef.current.safetyTrainingCompletedAt = safetyTrainingCompletedAt;
+    }
+    
+    if (prevValuesRef.current.healthCheckCompletedAt !== healthCheckCompletedAt) {
+      setHealthCheckCompleted(!!healthCheckCompletedAt);
+      prevValuesRef.current.healthCheckCompletedAt = healthCheckCompletedAt;
+    }
+  }, [open, requestId, isLoading, detailData, request]); // detailData와 request를 dependency에 포함하되, ref로 비교하여 무한 루프 방지
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
