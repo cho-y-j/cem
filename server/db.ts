@@ -2620,6 +2620,8 @@ export async function getDeployments(filters?: {
   const supabase = getSupabase();
   if (!supabase) return [];
 
+  console.log("[Database] getDeployments called with filters:", filters);
+
   let query = supabase
     .from('deployments')
     .select(`
@@ -2641,7 +2643,10 @@ export async function getDeployments(filters?: {
     `)
     .order('created_at', { ascending: false });
 
-  if (filters?.ownerId) query = query.eq('owner_id', filters.ownerId);
+  if (filters?.ownerId) {
+    console.log("[Database] Filtering by owner_id:", filters.ownerId);
+    query = query.eq('owner_id', filters.ownerId);
+  }
   if (filters?.bpCompanyId) query = query.eq('bp_company_id', filters.bpCompanyId);
   if (filters?.epCompanyId) query = query.eq('ep_company_id', filters.epCompanyId);
   if (filters?.equipmentId) query = query.eq('equipment_id', filters.equipmentId);
@@ -2653,6 +2658,16 @@ export async function getDeployments(filters?: {
   if (error) {
     console.error("[Database] Error getting deployments:", error);
     return [];
+  }
+
+  console.log("[Database] getDeployments found", data?.length || 0, "deployments");
+  if (filters?.ownerId && (!data || data.length === 0)) {
+    // 디버깅: owner_id로 필터링했는데 결과가 없으면 전체 deployment 확인
+    const { data: allDeployments } = await supabase
+      .from('deployments')
+      .select('id, owner_id')
+      .limit(10);
+    console.log("[Database] Sample deployments (first 10):", allDeployments);
   }
 
   return toCamelCaseArray(data || []) as Deployment[];

@@ -131,15 +131,17 @@ export default function Deployments() {
     setFiltersInitialized(true);
   }, [user, role, filtersInitialized]);
 
-  // 필터 옵션 생성
+  // 필터 옵션 생성 (Owner는 필터 없이도 모든 투입 이력 조회)
   const deploymentFilters = useMemo(() => {
     const input: Record<string, string> = {};
     
-    if (role === "owner" && user?.id) {
-      input.ownerId = user.id;
-    } else {
+    // Owner는 자동으로 필터링되므로 input에 추가하지 않음 (서버에서 자동 처리)
+    // 다른 역할만 필터 추가
+    if (role !== "owner") {
       if (ownerCompanyFilter) {
-        input.ownerId = ownerCompanyFilter; // 실제로는 ownerId가 아니라 ownerCompanyId로 필터링해야 할 수도 있음
+        // Admin/BP/EP가 Owner 회사 필터를 선택한 경우
+        // ownerCompanyFilter는 company ID이므로, 해당 company의 owner user ID를 찾아야 함
+        // 하지만 일단은 빈 필터로 두고 서버에서 처리하도록 함
       }
     }
 
@@ -167,7 +169,8 @@ export default function Deployments() {
       input.status = statusFilter;
     }
 
-    return Object.keys(input).length > 0 ? input : undefined;
+    // Owner인 경우 빈 객체를 반환하여 서버에서 자동 필터링하도록 함
+    return input;
   }, [ownerCompanyFilter, bpCompanyFilter, epCompanyFilter, equipmentFilter, workerFilter, statusFilter, role, user?.id, user?.companyId]);
 
   // 데이터 조회

@@ -165,10 +165,8 @@ export function EntryRequestDetail({
   // 상세 데이터가 있으면 사용, 없으면 기본 request 사용
   const requestData = detailData || request;
   
-  // request ID를 안정적으로 추출 (useMemo로 안정화)
-  const requestId = useMemo(() => {
-    return request?.id || detailData?.id || null;
-  }, [request?.id, detailData?.id]);
+  // request ID를 안정적으로 추출 (원시값만 사용)
+  const requestId = request?.id || detailData?.id || null;
 
   // 완료된 검사/교육 정보를 안정적으로 추출 (원시값만 dependency로 사용)
   const entryInspectionCompletedAt = detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt;
