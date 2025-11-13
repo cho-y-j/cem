@@ -142,8 +142,15 @@ export default function Workers() {
     { enabled: !!formData.workerTypeId }
   );
 
-  // 인력 유형 변경 시 필수 서류 목록 초기화
+  // 선택된 인력유형의 licenseRequired 확인
+  const selectedWorkerType = workerTypes?.find((type) => type.id === formData.workerTypeId);
+  const isLicenseRequired = selectedWorkerType?.licenseRequired || false;
+
+  // 인력 유형 변경 시 필수 서류 목록 및 면허 검증 상태 초기화
   useEffect(() => {
+    // 인력유형이 변경되면 면허 검증 상태 초기화
+    setLicenseVerified(false);
+    
     if (workerDocs && workerDocs.length > 0) {
       setDocFiles(
         workerDocs.map((doc) => ({
@@ -218,8 +225,8 @@ export default function Workers() {
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...formData });
     } else {
-      // 면허 인증 체크
-      if (!licenseVerified && formData.licenseNum) {
+      // 면허 인증 체크 (licenseRequired가 true인 경우에만)
+      if (isLicenseRequired && !licenseVerified && formData.licenseNum) {
         toast.error("면허 인증을 완료해주세요.");
         return;
       }
@@ -568,8 +575,8 @@ export default function Workers() {
                     required
                   />
                 </div>
-                {/* 면허증 OCR 및 인증 컴포넌트 */}
-                {!editingId && (
+                {/* 면허증 OCR 및 인증 컴포넌트 (licenseRequired가 true인 경우에만 표시) */}
+                {!editingId && isLicenseRequired && (
                   <LicenseUploadWithOCR
                     onOCRComplete={(info: LicenseInfo) => {
                       // OCR 결과로 폼 자동 채우기
@@ -605,6 +612,24 @@ export default function Workers() {
                     }}
                     isMobile={false} // Admin/Owner는 데스크톱
                   />
+                )}
+                
+                {/* licenseRequired가 false인 경우 면허번호 입력 필드 (선택사항) */}
+                {!editingId && !isLicenseRequired && (
+                  <div className="space-y-2">
+                    <Label htmlFor="licenseNum">면허번호 (선택사항)</Label>
+                    <Input
+                      id="licenseNum"
+                      value={formData.licenseNum}
+                      onChange={(e) =>
+                        setFormData({ ...formData, licenseNum: e.target.value })
+                      }
+                      placeholder="예: 12-34-567890"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      해당 인력유형은 면허 인증이 필수가 아닙니다.
+                    </p>
+                  </div>
                 )}
                 
                 {/* 수정 모드: 면허번호만 표시 */}

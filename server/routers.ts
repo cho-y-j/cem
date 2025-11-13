@@ -259,6 +259,7 @@ export const appRouter = router({
         z.object({
           name: z.string(),
           description: z.string().optional(),
+          licenseRequired: z.boolean().default(false).optional(), // 면허 인증 필수 여부
           requiredDocs: z.array(z.object({
             docName: z.string(),
             isMandatory: z.boolean(),
@@ -291,6 +292,7 @@ export const appRouter = router({
           id: z.string(),
           name: z.string().optional(),
           description: z.string().optional(),
+          licenseRequired: z.boolean().optional(), // 면허 인증 필수 여부
           requiredDocs: z.array(z.object({
             docName: z.string(),
             isMandatory: z.boolean(),
@@ -942,58 +944,68 @@ export const appRouter = router({
               
               // ============================================================
               // 운전면허증 자동 검증 (RIMS API)
+              // 인력유형의 licenseRequired가 true인 경우에만 검증 수행
               // ============================================================
               const isLicenseDoc = doc.docName.includes('운전면허') || doc.docName.includes('면허증');
               if (isLicenseDoc && input.licenseNum) {
-                console.log(`[Worker] Starting license verification for ${input.name}...`);
-                
-                try {
-                  const { verifyDriverLicense } = await import('./_core/rims-api');
+                // 인력유형 정보 조회하여 licenseRequired 확인
+                const supabase = db.getSupabase();
+                if (supabase) {
+                  const { data: workerType } = await supabase
+                    .from('worker_types')
+                    .select('license_required')
+                    .eq('id', input.workerTypeId)
+                    .single();
                   
-                  // 면허번호는 12자리여야 함 (예: 221212121212)
-                  const licenseNo = input.licenseNum.replace(/[^0-9]/g, ''); // 숫자만 추출
-                  
-                  if (licenseNo.length === 12) {
-                    // RIMS API 호출
-                    const result = await verifyDriverLicense(
-                      licenseNo,
-                      input.name,
-                      '12' // 기본값: 1종 보통 (추후 개선 시 선택 가능하게)
-                    );
+                  // licenseRequired가 true인 경우에만 면허 검증 수행
+                  if (workerType?.license_required) {
+                    console.log(`[Worker] Starting license verification for ${input.name}... (licenseRequired: true)`);
                     
-                    // 검증 결과 업데이트
-                    const supabase = db.getSupabase();
-                    if (supabase) {
+                    try {
+                      const { verifyDriverLicense } = await import('./_core/rims-api');
+                      
+                      // 면허번호는 12자리여야 함 (예: 221212121212)
+                      const licenseNo = input.licenseNum.replace(/[^0-9]/g, ''); // 숫자만 추출
+                      
+                      if (licenseNo.length === 12) {
+                        // RIMS API 호출
+                        const result = await verifyDriverLicense(
+                          licenseNo,
+                          input.name,
+                          '12' // 기본값: 1종 보통 (추후 개선 시 선택 가능하게)
+                        );
+                        
+                        // 검증 결과 업데이트
+                        await supabase
+                          .from('docs_compliance')
+                          .update({
+                            verified: result.isValid,
+                            verified_at: new Date().toISOString(),
+                            verification_result: result as any,
+                            verification_result_code: result.resultCode,
+                            verification_error: null,
+                          })
+                          .eq('id', docId);
+                        
+                        console.log(`[Worker] License verification completed: ${result.isValid ? 'VALID' : 'INVALID'} (${result.resultCode})`);
+                      } else {
+                        console.warn(`[Worker] Invalid license number length: ${licenseNo.length} (expected 12)`);
+                      }
+                    } catch (verifyError: any) {
+                      console.error('[Worker] License verification failed:', verifyError.message);
+                      
+                      // 검증 실패 기록
                       await supabase
                         .from('docs_compliance')
                         .update({
-                          verified: result.isValid,
+                          verified: false,
                           verified_at: new Date().toISOString(),
-                          verification_result: result as any,
-                          verification_result_code: result.resultCode,
-                          verification_error: null,
+                          verification_error: verifyError.message,
                         })
                         .eq('id', docId);
-                      
-                      console.log(`[Worker] License verification completed: ${result.isValid ? 'VALID' : 'INVALID'} (${result.resultCode})`);
                     }
                   } else {
-                    console.warn(`[Worker] Invalid license number length: ${licenseNo.length} (expected 12)`);
-                  }
-                } catch (verifyError: any) {
-                  console.error('[Worker] License verification failed:', verifyError.message);
-                  
-                  // 검증 실패 기록
-                  const supabase = db.getSupabase();
-                  if (supabase) {
-                    await supabase
-                      .from('docs_compliance')
-                      .update({
-                        verified: false,
-                        verified_at: new Date().toISOString(),
-                        verification_error: verifyError.message,
-                      })
-                      .eq('id', docId);
+                    console.log(`[Worker] License verification skipped for ${input.name} (licenseRequired: false)`);
                   }
                 }
               }

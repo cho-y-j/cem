@@ -108,6 +108,7 @@ export const workerTypes = pgTable("worker_types", {
   id: varchar("id", { length: 64 }).primaryKey(),
   name: varchar("name", { length: 100 }).notNull().unique(),
   description: text("description"),
+  licenseRequired: boolean("license_required").default(false).notNull(), // 면허 인증 필수 여부
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

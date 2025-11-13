@@ -124,6 +124,13 @@ ADD COLUMN IF NOT EXISTS health_check_file_url VARCHAR(500);
 ALTER TABLE deployments
 ADD COLUMN IF NOT EXISTS inspector_id VARCHAR(64);
 
-CREATE INDEX IF NOT EXISTS idx_deployments_inspector_id 
+CREATE INDEX IF NOT EXISTS idx_deployments_inspector_id
 ON deployments(inspector_id);
+
+-- ============================================================
+-- Migration 0016: worker_types 테이블에 license_required 컬럼 추가
+-- ============================================================
+
+ALTER TABLE worker_types
+ADD COLUMN IF NOT EXISTS license_required BOOLEAN DEFAULT false NOT NULL;
 

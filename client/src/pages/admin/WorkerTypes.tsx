@@ -23,6 +23,7 @@ export default function AdminWorkerTypes() {
   const [formData, setFormData] = useState({ 
     name: "", 
     description: "",
+    licenseRequired: false, // 면허 인증 필수 여부
   });
   const [requiredDocs, setRequiredDocs] = useState<RequiredDoc[]>([]);
   const [newDocName, setNewDocName] = useState("");
@@ -59,7 +60,7 @@ export default function AdminWorkerTypes() {
   });
 
   const resetForm = () => { 
-    setFormData({ name: "", description: "" }); 
+    setFormData({ name: "", description: "", licenseRequired: false }); 
     setRequiredDocs([]);
     setNewDocName("");
     setEditingId(null); 
@@ -85,7 +86,8 @@ export default function AdminWorkerTypes() {
     setEditingId(type.id);
     setFormData({ 
       name: type.name, 
-      description: type.description || "" 
+      description: type.description || "",
+      licenseRequired: type.licenseRequired || false
     });
     
     // 기존 필수 서류 불러오기
@@ -158,6 +160,7 @@ export default function AdminWorkerTypes() {
                 <TableRow>
                   <TableHead>이름</TableHead>
                   <TableHead>설명</TableHead>
+                  <TableHead>면허 필수</TableHead>
                   <TableHead>필수 서류</TableHead>
                   <TableHead className="text-right">작업</TableHead>
                 </TableRow>
@@ -167,6 +170,13 @@ export default function AdminWorkerTypes() {
                   <TableRow key={type.id}>
                     <TableCell className="font-medium">{type.name}</TableCell>
                     <TableCell>{type.description || "-"}</TableCell>
+                    <TableCell>
+                      {type.licenseRequired ? (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">필수</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />
@@ -235,6 +245,21 @@ export default function AdminWorkerTypes() {
                     rows={2}
                   />
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="licenseRequired"
+                    checked={formData.licenseRequired}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, licenseRequired: checked === true })
+                    }
+                  />
+                  <Label htmlFor="licenseRequired" className="text-sm font-normal cursor-pointer">
+                    면허 인증 필수
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  💡 체크 시 해당 인력유형은 운전면허 자동 인증이 필수입니다. (예: 운전자)
+                </p>
               </div>
 
               {/* 필수 서류 */}
