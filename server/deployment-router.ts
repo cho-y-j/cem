@@ -337,6 +337,29 @@ export const deploymentRouter = router({
     }
 
     // EP가 고용한 Inspector 목록 조회
+    let userIds: string[] | null = null;
+
+    // EP 역할인 경우 자신의 회사 Inspector만 필터링
+    if (ctx.user.role === 'ep' && ctx.user.companyId) {
+      // 1. EP 회사의 users 조회
+      const { data: epUsers, error: usersError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('company_id', ctx.user.companyId);
+
+      if (usersError) {
+        console.error('[Deployment] Error getting EP users:', usersError);
+        return [];
+      }
+
+      if (!epUsers || epUsers.length === 0) {
+        return [];
+      }
+
+      userIds = epUsers.map((u: any) => u.id);
+    }
+
+    // 2. Inspector 인력 조회
     let query = supabase
       .from('workers')
       .select(`
@@ -345,10 +368,9 @@ export const deploymentRouter = router({
       `)
       .eq('worker_type_id', inspectorType.id);
 
-    // EP 역할인 경우 자신의 회사 인력만
-    if (ctx.user.role === 'ep' && ctx.user.companyId) {
-      // EP가 고용한 인력은 deployments를 통해 확인
-      // 일단 전체 Inspector를 반환 (나중에 EP 필터링 개선)
+    // EP 역할인 경우 해당 회사의 user_id만 필터링
+    if (userIds && userIds.length > 0) {
+      query = query.in('user_id', userIds);
     }
 
     const { data, error } = await query;

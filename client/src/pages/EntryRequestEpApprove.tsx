@@ -5,7 +5,7 @@
  * - 최종 승인 또는 반려
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,21 @@ export default function EntryRequestEpApprove() {
     { id: id! },
     { enabled: !!id }
   );
+
+  // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
+  useEffect(() => {
+    if (request) {
+      if (request.entry_inspection_completed_at) {
+        setEntryInspectionCompleted(true);
+      }
+      if (request.safety_training_completed_at) {
+        setSafetyTrainingCompleted(true);
+      }
+      if (request.health_check_completed_at) {
+        setHealthCheckCompleted(true);
+      }
+    }
+  }, [request]);
 
   // 승인 mutation
   const approveMutation = trpc.entryRequestsV2.epApprove.useMutation({
@@ -305,6 +320,27 @@ export default function EntryRequestEpApprove() {
                     반입 검사 완료 (외부검사업체 직원 확인)
                   </Label>
                 </div>
+                {/* 이미 완료된 경우 정보 표시 */}
+                {request.entry_inspection_completed_at && (
+                  <div className="ml-6 mb-2 p-2 bg-green-50 rounded text-sm">
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>완료일: {new Date(request.entry_inspection_completed_at).toLocaleDateString('ko-KR')}</span>
+                    </div>
+                    {request.entry_inspection_file_url && (
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(request.entry_inspection_file_url, '_blank')}
+                        >
+                          <FileText className="h-3 w-3 mr-2" />
+                          반입 검사 확인서 보기
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="ml-6 space-y-2">
                   <Label htmlFor="entry-inspection-file" className="text-sm text-muted-foreground">
                     반입 검사 확인서 첨부 (선택)
@@ -341,6 +377,27 @@ export default function EntryRequestEpApprove() {
                       안전교육 완료
                     </Label>
                   </div>
+                  {/* 이미 완료된 경우 정보 표시 */}
+                  {request.safety_training_completed_at && (
+                    <div className="ml-6 mb-2 p-2 bg-green-50 rounded text-sm">
+                      <div className="flex items-center gap-2 text-green-700">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>완료일: {new Date(request.safety_training_completed_at).toLocaleDateString('ko-KR')}</span>
+                      </div>
+                      {request.safety_training_file_url && (
+                        <div className="mt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(request.safety_training_file_url, '_blank')}
+                          >
+                            <FileText className="h-3 w-3 mr-2" />
+                            안전교육 서류 보기
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="ml-6 space-y-2">
                     <Label htmlFor="safety-training-file" className="text-sm text-muted-foreground">
                       안전교육 서류 첨부 (선택)
@@ -373,6 +430,27 @@ export default function EntryRequestEpApprove() {
                       배치전 건강검진 완료
                     </Label>
                   </div>
+                  {/* 이미 완료된 경우 정보 표시 */}
+                  {request.health_check_completed_at && (
+                    <div className="ml-6 mb-2 p-2 bg-green-50 rounded text-sm">
+                      <div className="flex items-center gap-2 text-green-700">
+                        <CheckCircle className="h-4 w-4" />
+                        <span>완료일: {new Date(request.health_check_completed_at).toLocaleDateString('ko-KR')}</span>
+                      </div>
+                      {request.health_check_file_url && (
+                        <div className="mt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(request.health_check_file_url, '_blank')}
+                          >
+                            <FileText className="h-3 w-3 mr-2" />
+                            건강검진 서류 보기
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="ml-6 space-y-2">
                     <Label htmlFor="health-check-file" className="text-sm text-muted-foreground">
                       건강검진 서류 첨부 (선택)
