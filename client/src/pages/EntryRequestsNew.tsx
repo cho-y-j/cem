@@ -107,8 +107,12 @@ export default function EntryRequestsNew() {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
+  const role = user?.role?.toLowerCase();
+  const isBp = role === 'bp';
+  
   const [formData, setFormData] = useState({
     targetBpCompanyId: "",
+    targetEpCompanyId: "", // BP가 EP 회사 선택
     purpose: "",
     requestedStartDate: "",
     requestedEndDate: "",
@@ -118,7 +122,8 @@ export default function EntryRequestsNew() {
   const { data: requests, isLoading } = trpc.entryRequestsV2.list.useQuery();
   const { data: equipment } = trpc.equipment.list.useQuery();
   const { data: workers } = trpc.workers.list.useQuery();
-  const { data: bpCompanies } = trpc.companies.listByType.useQuery({ companyType: "bp" });
+  const { data: bpCompanies } = trpc.companies.listByType.useQuery({ companyType: "bp" }, { enabled: !isBp });
+  const { data: epCompanies } = trpc.companies.listByType.useQuery({ companyType: "ep" }, { enabled: isBp });
 
   // BP사 목록 (필터용)
   const uniqueBpCompanies = [...new Set(requests?.map((r: any) => r.bpCompanyName).filter(Boolean))];
@@ -214,6 +219,7 @@ export default function EntryRequestsNew() {
   const resetForm = () => {
     setFormData({
       targetBpCompanyId: "",
+      targetEpCompanyId: "",
       purpose: "",
       requestedStartDate: "",
       requestedEndDate: "",
@@ -257,8 +263,13 @@ export default function EntryRequestsNew() {
   };
 
   const handleSubmit = () => {
-    if (!formData.targetBpCompanyId) {
+    // Owner는 BP 회사 선택 필수, BP는 EP 회사 선택 필수
+    if (!isBp && !formData.targetBpCompanyId) {
       toast.error("BP 회사를 선택해주세요.");
+      return;
+    }
+    if (isBp && !formData.targetEpCompanyId) {
+      toast.error("EP 회사를 선택해주세요.");
       return;
     }
 
@@ -304,7 +315,8 @@ export default function EntryRequestsNew() {
     }
 
     createMutation.mutate({
-      targetBpCompanyId: formData.targetBpCompanyId,
+      targetBpCompanyId: isBp ? undefined : formData.targetBpCompanyId,
+      targetEpCompanyId: isBp ? formData.targetEpCompanyId : undefined,
       purpose: formData.purpose,
       requestedStartDate: formData.requestedStartDate,
       requestedEndDate: formData.requestedEndDate,
@@ -414,8 +426,10 @@ export default function EntryRequestsNew() {
       if (aPriority !== bPriority) return bPriority - aPriority;
     }
     
-    // 그 외: 최신순
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    // 그 외: 요청일(created_at) 기준 최신순 (최근 것이 위로)
+    const aDate = new Date(a.created_at || a.requested_start_date || 0).getTime();
+    const bDate = new Date(b.created_at || b.requested_start_date || 0).getTime();
+    return bDate - aDate; // 내림차순 (최신이 위로)
   });
 
   // 승인 대기 개수
@@ -894,26 +908,50 @@ export default function EntryRequestsNew() {
 
             {/* 반입 정보 입력 */}
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="targetBpCompanyId">BP 회사 선택 *</Label>
-                <Select
-                  value={formData.targetBpCompanyId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, targetBpCompanyId: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="BP 회사를 선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bpCompanies?.map((company: any) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Owner는 BP 회사 선택, BP는 EP 회사 선택 */}
+              {!isBp ? (
+                <div>
+                  <Label htmlFor="targetBpCompanyId">BP 회사 선택 *</Label>
+                  <Select
+                    value={formData.targetBpCompanyId}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, targetBpCompanyId: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="BP 회사를 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bpCompanies?.map((company: any) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div>
+                  <Label htmlFor="targetEpCompanyId">EP 회사 선택 *</Label>
+                  <Select
+                    value={formData.targetEpCompanyId}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, targetEpCompanyId: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="EP 회사를 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {epCompanies?.map((company: any) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="purpose">투입 목적</Label>

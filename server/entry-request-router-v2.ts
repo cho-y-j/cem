@@ -97,13 +97,14 @@ export const entryRequestsRouterV2 = router({
             ownerName = ownerUser?.name || ownerUser?.email || 'Unknown';
           }
 
-          // BP 회사명
+          // BP 회사명 (target_bp_company_id 또는 bp_company_id에서 조회)
           let bpCompanyName = '-';
-          if (request.target_bp_company_id) {
+          const bpCompanyId = request.target_bp_company_id || request.bp_company_id;
+          if (bpCompanyId) {
             const { data: bpCompany } = await supabase
               .from('companies')
               .select('name')
-              .eq('id', request.target_bp_company_id)
+              .eq('id', bpCompanyId)
               .single();
             bpCompanyName = bpCompany?.name || '-';
           }
@@ -176,16 +177,17 @@ export const entryRequestsRouterV2 = router({
           ownerName = ownerUser?.name || ownerUser?.email || 'Unknown';
         }
 
-        // BP 회사명
-        let bpCompanyName = '-';
-        if (request.target_bp_company_id) {
-          const { data: bpCompany } = await supabase
-            .from('companies')
-            .select('name')
-            .eq('id', request.target_bp_company_id)
-            .single();
-          bpCompanyName = bpCompany?.name || '-';
-        }
+          // BP 회사명 (target_bp_company_id 또는 bp_company_id에서 조회)
+          let bpCompanyName = '-';
+          const bpCompanyId = request.target_bp_company_id || request.bp_company_id;
+          if (bpCompanyId) {
+            const { data: bpCompany } = await supabase
+              .from('companies')
+              .select('name')
+              .eq('id', bpCompanyId)
+              .single();
+            bpCompanyName = bpCompany?.name || '-';
+          }
 
         // 아이템 전체 조회 (투입 관리에서 item_id가 필요함)
         const { data: items } = await supabase
