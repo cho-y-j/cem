@@ -170,6 +170,19 @@ export function EntryRequestDetail({
     return request?.id || detailData?.id || null;
   }, [request?.id, detailData?.id]);
 
+  // 완료된 검사/교육 정보를 안정적으로 추출 (useMemo로 안정화)
+  const completedInfo = useMemo(() => {
+    if (!open || isLoading) return null;
+    const currentData = detailData || request;
+    if (!currentData) return null;
+    
+    return {
+      hasEntryInspection: !!(currentData.entry_inspection_completed_at || currentData.entryInspectionCompletedAt),
+      hasSafetyTraining: !!(currentData.safety_training_completed_at || currentData.safetyTrainingCompletedAt),
+      hasHealthCheck: !!(currentData.health_check_completed_at || currentData.healthCheckCompletedAt),
+    };
+  }, [open, isLoading, detailData?.entry_inspection_completed_at, detailData?.entryInspectionCompletedAt, detailData?.safety_training_completed_at, detailData?.safetyTrainingCompletedAt, detailData?.health_check_completed_at, detailData?.healthCheckCompletedAt, request?.entry_inspection_completed_at, request?.entryInspectionCompletedAt, request?.safety_training_completed_at, request?.safetyTrainingCompletedAt, request?.health_check_completed_at, request?.healthCheckCompletedAt]);
+
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
   // 다이얼로그가 열릴 때마다 초기화
   useEffect(() => {
@@ -188,21 +201,20 @@ export function EntryRequestDetail({
     // requestId가 없으면 실행하지 않음
     if (!requestId) return;
     
-    // requestData가 로딩 중이면 대기
+    // 로딩 중이면 대기
     if (isLoading) return;
     
     // 완료된 정보가 있으면 체크박스 활성화
-    const currentData = detailData || request;
-    if (!currentData) return;
-    
-    const hasEntryInspection = !!(currentData.entry_inspection_completed_at || currentData.entryInspectionCompletedAt);
-    const hasSafetyTraining = !!(currentData.safety_training_completed_at || currentData.safetyTrainingCompletedAt);
-    const hasHealthCheck = !!(currentData.health_check_completed_at || currentData.healthCheckCompletedAt);
-    
-    setEntryInspectionCompleted(hasEntryInspection);
-    setSafetyTrainingCompleted(hasSafetyTraining);
-    setHealthCheckCompleted(hasHealthCheck);
-  }, [open, requestId, isLoading, detailData, request]);
+    if (completedInfo) {
+      setEntryInspectionCompleted(completedInfo.hasEntryInspection);
+      setSafetyTrainingCompleted(completedInfo.hasSafetyTraining);
+      setHealthCheckCompleted(completedInfo.hasHealthCheck);
+    } else {
+      setEntryInspectionCompleted(false);
+      setSafetyTrainingCompleted(false);
+      setHealthCheckCompleted(false);
+    }
+  }, [open, requestId, isLoading, completedInfo]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
