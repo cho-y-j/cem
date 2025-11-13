@@ -256,8 +256,13 @@ export function EntryRequestDetail({
     }
     
     // 체크박스나 파일 없이도 승인 가능 (모두 선택사항)
+    if (!requestId) {
+      toast.error("요청 ID를 찾을 수 없습니다.");
+      return;
+    }
+    
     epApproveMutation.mutate({
-      id: requestData.id,
+      id: requestId,
       comment: comment.trim() || undefined,
       entryInspectionCompleted: entryInspectionCompleted || false,
       entryInspectionFile: entryInspectionFileData,
@@ -322,13 +327,13 @@ export function EntryRequestDetail({
     if (userRole === "bp") {
       // BP 반려
       bpRejectMutation.mutate({
-        id: requestData.id,
+        id: requestId!,
         reason: rejectReason.trim(),
       });
     } else if (userRole === "ep") {
       // EP 반려
       epRejectMutation.mutate({
-        id: requestData.id,
+        id: requestId!,
         reason: rejectReason.trim(),
       });
     } else {
@@ -413,7 +418,7 @@ export function EntryRequestDetail({
 
   // 전체 서류를 PDF로 다운로드
   const handleDownloadAllPdf = async () => {
-    if (!requestData.id) {
+    if (!requestId) {
       toast.error("반입 요청 ID가 없습니다.");
       return;
     }
@@ -422,7 +427,7 @@ export function EntryRequestDetail({
       toast.loading("PDF 생성 중... 잠시만 기다려주세요.");
 
       const result = await downloadPdfMutation.mutateAsync({
-        entryRequestId: requestData.id,
+        entryRequestId: requestId,
       });
 
       if (result.success && result.pdfBase64) {
