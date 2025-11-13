@@ -974,12 +974,13 @@ const handleOpenDocs = () => {
                 docs = guideWorkerDocs || [];
               }
               return docs.length === 0 && (
-              <Card>
-                <CardContent className="p-6 text-center text-muted-foreground">
-                  서류가 없습니다.
-                </CardContent>
-              </Card>
-            )}
+                <Card>
+                  <CardContent className="p-6 text-center text-muted-foreground">
+                    서류가 없습니다.
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>
