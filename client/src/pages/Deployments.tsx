@@ -563,7 +563,7 @@ export default function Deployments() {
                 value={statusFilter}
                 onValueChange={setStatusFilter}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
