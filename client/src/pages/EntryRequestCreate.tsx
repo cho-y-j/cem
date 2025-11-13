@@ -408,7 +408,7 @@ export default function EntryRequestCreate() {
                 요청 중...
               </>
             ) : (
-              "반입 요청 제출"
+              isBp ? "등록요청 제출" : "반입 요청 제출"
             )}
           </Button>
         </div>
