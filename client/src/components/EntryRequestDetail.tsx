@@ -216,18 +216,19 @@ export function EntryRequestDetail({
     }
   };
 
-  // EP 승인용 파일 변환
+  // EP 승인용 파일 변환 (필수 아님 - 선택사항)
   const handleEpApproveWithFiles = async () => {
     let entryInspectionFileData: string | undefined;
     let safetyTrainingFileData: string | undefined;
     let healthCheckFileData: string | undefined;
     
+    // 파일이 있으면 업로드, 없어도 승인 가능
     if (entryInspectionFile) {
       try {
         entryInspectionFileData = await fileToBase64(entryInspectionFile);
       } catch (error) {
-        toast.error("반입 검사 확인서 업로드에 실패했습니다.");
-        return;
+        console.error("반입 검사 확인서 업로드 실패:", error);
+        // 파일 업로드 실패해도 승인은 진행 (선택사항이므로)
       }
     }
     
@@ -235,8 +236,8 @@ export function EntryRequestDetail({
       try {
         safetyTrainingFileData = await fileToBase64(safetyTrainingFile);
       } catch (error) {
-        toast.error("안전교육 서류 업로드에 실패했습니다.");
-        return;
+        console.error("안전교육 서류 업로드 실패:", error);
+        // 파일 업로드 실패해도 승인은 진행 (선택사항이므로)
       }
     }
     
@@ -244,19 +245,20 @@ export function EntryRequestDetail({
       try {
         healthCheckFileData = await fileToBase64(healthCheckFile);
       } catch (error) {
-        toast.error("건강검진 서류 업로드에 실패했습니다.");
-        return;
+        console.error("건강검진 서류 업로드 실패:", error);
+        // 파일 업로드 실패해도 승인은 진행 (선택사항이므로)
       }
     }
     
+    // 체크박스나 파일 없이도 승인 가능 (모두 선택사항)
     epApproveMutation.mutate({
       id: requestData.id,
       comment: comment.trim() || undefined,
-      entryInspectionCompleted: entryInspectionCompleted,
+      entryInspectionCompleted: entryInspectionCompleted || false,
       entryInspectionFile: entryInspectionFileData,
-      safetyTrainingCompleted: safetyTrainingCompleted,
+      safetyTrainingCompleted: safetyTrainingCompleted || false,
       safetyTrainingFile: safetyTrainingFileData,
-      healthCheckCompleted: healthCheckCompleted,
+      healthCheckCompleted: healthCheckCompleted || false,
       healthCheckFile: healthCheckFileData,
     });
   };
