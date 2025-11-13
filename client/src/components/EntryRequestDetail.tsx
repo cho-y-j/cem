@@ -168,21 +168,9 @@ export function EntryRequestDetail({
   // request ID를 안정적으로 추출 (원시값만 사용)
   const requestId = request?.id || detailData?.id || null;
 
-  // 완료된 검사/교육 정보를 원시값으로 추출 (useMemo로 안정화)
-  const entryInspectionCompletedAtValue = useMemo(() => {
-    return detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt || null;
-  }, [detailData?.entry_inspection_completed_at, request?.entry_inspection_completed_at, detailData?.entryInspectionCompletedAt, request?.entryInspectionCompletedAt]);
-  
-  const safetyTrainingCompletedAtValue = useMemo(() => {
-    return detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt || null;
-  }, [detailData?.safety_training_completed_at, request?.safety_training_completed_at, detailData?.safetyTrainingCompletedAt, request?.safetyTrainingCompletedAt]);
-  
-  const healthCheckCompletedAtValue = useMemo(() => {
-    return detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt || null;
-  }, [detailData?.health_check_completed_at, request?.health_check_completed_at, detailData?.healthCheckCompletedAt, request?.healthCheckCompletedAt]);
-
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
   // 다이얼로그가 열릴 때마다 초기화
+  // 중요: useEffect 내부에서 직접 값을 읽어서 무한 루프 방지
   useEffect(() => {
     if (!open) {
       // 다이얼로그가 닫히면 state 초기화
@@ -202,11 +190,17 @@ export function EntryRequestDetail({
     // 로딩 중이면 대기
     if (isLoading) return;
     
-    // 완료된 정보가 있으면 체크박스 활성화 (원시값 사용)
-    setEntryInspectionCompleted(!!entryInspectionCompletedAtValue);
-    setSafetyTrainingCompleted(!!safetyTrainingCompletedAtValue);
-    setHealthCheckCompleted(!!healthCheckCompletedAtValue);
-  }, [open, requestId, isLoading, entryInspectionCompletedAtValue, safetyTrainingCompletedAtValue, healthCheckCompletedAtValue]);
+    // useEffect 내부에서 직접 값을 읽어서 사용 (무한 루프 방지)
+    // detailData나 request 객체 참조가 변경되어도 실제 값만 비교
+    const entryInspectionCompletedAt = detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt || null;
+    const safetyTrainingCompletedAt = detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt || null;
+    const healthCheckCompletedAt = detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt || null;
+    
+    // 완료된 정보가 있으면 체크박스 활성화
+    setEntryInspectionCompleted(!!entryInspectionCompletedAt);
+    setSafetyTrainingCompleted(!!safetyTrainingCompletedAt);
+    setHealthCheckCompleted(!!healthCheckCompletedAt);
+  }, [open, requestId, isLoading]); // detailData와 request는 dependency에서 제외
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
