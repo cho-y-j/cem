@@ -301,7 +301,7 @@ export function EntryRequestDetail({
       const base64Data = await fileToBase64(bpWorkPlanFile);
 
       bpApproveMutation.mutate({
-        id: requestData.id,
+        id: requestId!,
         targetEpCompanyId,
         workPlanFile: {
           name: bpWorkPlanFile.name,
@@ -377,7 +377,7 @@ export function EntryRequestDetail({
 
   // 전체 서류를 브라우저에서 보기
   const handleViewAllPdf = async () => {
-    if (!requestData.id) {
+    if (!requestId) {
       toast.error("반입 요청 ID가 없습니다.");
       return;
     }
@@ -386,7 +386,7 @@ export function EntryRequestDetail({
       toast.loading("PDF 생성 중... 잠시만 기다려주세요.");
 
       const result = await downloadPdfMutation.mutateAsync({
-        entryRequestId: requestData.id,
+        entryRequestId: requestId,
       });
 
       if (result.success && result.pdfBase64) {
