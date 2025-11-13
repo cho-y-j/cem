@@ -7,7 +7,88 @@
 
 ---
 
-## 🎉 오늘 완료한 작업 (2025-01-XX)
+## 🎉 오늘 완료한 작업 (2025-11-13)
+
+### 🔴 React 에러 #310 해결 시도 (진행 중 - 미해결)
+
+**문제:**
+- EP 상세보기에서 "승인 대기" 버튼 클릭 시 React 에러 #310 발생
+- 에러 메시지: "Minified React error #310" (무한 루프)
+- 상세보기 다이얼로그가 열리지 않아 승인 작업 불가
+
+**시도한 해결 방법:**
+1. ✅ **useMemo 제거 시도**: `entryInspectionCompletedAtValue` 등을 useMemo로 안정화 시도 → 실패
+2. ✅ **useEffect dependency 최소화**: `detailData`와 `request` 객체를 dependency에서 제외 → 실패
+3. ✅ **useRef로 이전 값 추적**: `prevValuesRef`를 사용하여 실제 값 변경 시에만 state 업데이트 → 실패
+4. ✅ **useEffect 내부에서 직접 값 읽기**: dependency에서 객체 제거하고 내부에서 직접 읽기 → 실패
+
+**현재 상태:**
+- ⚠️ **여전히 에러 발생**: 모든 시도에도 불구하고 React 에러 #310이 계속 발생
+- 🔍 **근본 원인 분석 필요**: `EntryRequestDetail.tsx` 컴포넌트의 다른 부분에서 무한 루프 발생 가능성
+- 💡 **추가 조사 필요**: 
+  - `detailData` 쿼리가 계속 재실행되는지 확인
+  - 다른 `useEffect`나 `useMemo`에서 무한 루프 발생 가능성
+  - 컴포넌트 전체 구조 재검토 필요
+
+**수정된 파일:**
+- `client/src/components/EntryRequestDetail.tsx` - 여러 번 수정 시도
+
+**상태:** 🔴 **미해결 - 추가 조사 필요**
+
+---
+
+### ✅ Owner 투입 목록 표시 문제 해결
+
+**문제:**
+- Owner 대시보드에서 투입 관리 메뉴 클릭 시 기존 투입 이력이 표시되지 않음
+- 데이터베이스 쿼리 에러 발생: `deployments_guide_worker_id_fkey` 외래 키를 찾을 수 없음
+
+**근본 원인:**
+- Supabase 쿼리에서 `guide_worker`와 `inspector`를 join할 때 외래 키 관계를 찾지 못함
+- 스키마 캐시 문제 또는 외래 키 제약 조건 누락 가능성
+
+**해결 방법:**
+- ✅ `getDeployments` 함수에서 외래 키 join 제거
+- ✅ 기본 `deployments` 테이블만 조회한 후, `guide_worker`와 `inspector` 정보를 별도로 조회하여 병합
+- ✅ `useMemo`로 Owner 필터를 안정적인 빈 객체로 반환하여 쿼리 재실행 방지
+
+**수정된 파일:**
+- `server/db.ts` - `getDeployments` 함수 수정 (외래 키 join 제거, 별도 조회로 변경)
+- `client/src/pages/Deployments.tsx` - Owner 필터 로직 개선
+
+**결과:**
+- ✅ 데이터베이스 쿼리 에러 해결
+- ✅ Owner 투입 목록이 정상적으로 표시됨 (서버 로그 확인 완료)
+
+**상태:** ✅ **완료**
+
+---
+
+### ✅ 반입 요청 UI/UX 개선
+
+**개선 사항:**
+1. ✅ **상태 배지 색상 구분**: 각 반입 요청 상태별로 다른 색상 적용 (승인 대기, BP 승인, EP 승인 등)
+2. ✅ **장비/인력 배지 색상 구분**: 장비는 파란색, 인력은 주황색으로 구분
+3. ✅ **필터 디자인 통일**: 모든 대시보드 페이지의 필터를 한 줄로 통일된 디자인으로 변경
+   - `EntryRequestsNew.tsx`
+   - `Equipment.tsx`
+   - `Workers.tsx`
+   - `Deployments.tsx`
+   - `SafetyInspectionReview.tsx`
+
+**수정된 파일:**
+- `client/src/pages/EntryRequestsNew.tsx` - 상태 배지 및 필터 UI 개선
+- `client/src/components/EntryRequestDetail.tsx` - 상태 배지 색상 개선
+- `client/src/pages/Equipment.tsx` - 필터 디자인 통일
+- `client/src/pages/Workers.tsx` - 필터 디자인 통일
+- `client/src/pages/Deployments.tsx` - 필터 디자인 통일
+- `client/src/pages/SafetyInspectionReview.tsx` - 필터 디자인 통일
+
+**상태:** ✅ **완료**
+
+---
+
+## 🎉 이전 완료한 작업 (2025-01-XX)
 
 ### ✅ 사용자 관리 시스템 근본 문제 해결
 
@@ -1167,10 +1248,11 @@ pnpm db:push          # 마이그레이션 생성 및 적용
 
 ---
 
-**마지막 업데이트**: 2025-11-11 (오후)
-**다음 작업**: 워커-차량 매칭 및 GPS 위치 추적 시스템 개선
+**마지막 업데이트**: 2025-11-13 (저녁)
+**다음 작업**: React 에러 #310 근본 원인 분석 및 해결
 **Supabase MCP**: ✅ 연결됨 및 사용 가능
 **Render MCP**: ✅ 연결됨 및 사용 가능
 **오늘 작업 요약**:
-- ✅ 출근 시간 표시 문제 완전 해결 (timestamptz 적용)
-- ✅ WorkZones 페이지 레이아웃 문제 완전 해결 (DashboardLayout 이중 사용 제거)
+- 🔴 React 에러 #310 해결 시도 (여러 방법 시도했으나 여전히 발생 - 미해결)
+- ✅ Owner 투입 목록 표시 문제 해결 (데이터베이스 쿼리 에러 수정)
+- ✅ 반입 요청 UI/UX 개선 (상태 배지 색상, 필터 디자인 통일)
