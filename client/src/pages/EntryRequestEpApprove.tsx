@@ -12,8 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, XCircle, Download, FileText } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Download, FileText, Upload } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +35,28 @@ export default function EntryRequestEpApprove() {
 
   const [comment, setComment] = useState("");
   const [rejectReason, setRejectReason] = useState("");
+  
+  // 반입 검사/안전교육/건강검진 정보 (전체 요청에 대해)
+  const [entryInspectionCompleted, setEntryInspectionCompleted] = useState(false);
+  const [entryInspectionFile, setEntryInspectionFile] = useState<File | null>(null);
+  const [safetyTrainingCompleted, setSafetyTrainingCompleted] = useState(false);
+  const [safetyTrainingFile, setSafetyTrainingFile] = useState<File | null>(null);
+  const [healthCheckCompleted, setHealthCheckCompleted] = useState(false);
+  const [healthCheckFile, setHealthCheckFile] = useState<File | null>(null);
+  
+  // 파일을 base64로 변환하는 헬퍼 함수
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   // 요청 상세 조회 (V2 - 장비/인력 정보 포함)
   const { data: request, isLoading } = trpc.entryRequestsV2.getById.useQuery(
@@ -62,10 +86,48 @@ export default function EntryRequestEpApprove() {
     },
   });
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
+    // 파일을 base64로 변환
+    let entryInspectionFileData: string | undefined;
+    let safetyTrainingFileData: string | undefined;
+    let healthCheckFileData: string | undefined;
+    
+    if (entryInspectionFile) {
+      try {
+        entryInspectionFileData = await fileToBase64(entryInspectionFile);
+      } catch (error) {
+        toast.error("반입 검사 확인서 업로드에 실패했습니다.");
+        return;
+      }
+    }
+    
+    if (safetyTrainingFile) {
+      try {
+        safetyTrainingFileData = await fileToBase64(safetyTrainingFile);
+      } catch (error) {
+        toast.error("안전교육 서류 업로드에 실패했습니다.");
+        return;
+      }
+    }
+    
+    if (healthCheckFile) {
+      try {
+        healthCheckFileData = await fileToBase64(healthCheckFile);
+      } catch (error) {
+        toast.error("건강검진 서류 업로드에 실패했습니다.");
+        return;
+      }
+    }
+    
     approveMutation.mutate({
       id: id!,
       comment,
+      entryInspectionCompleted: entryInspectionCompleted,
+      entryInspectionFile: entryInspectionFileData,
+      safetyTrainingCompleted: safetyTrainingCompleted,
+      safetyTrainingFile: safetyTrainingFileData,
+      healthCheckCompleted: healthCheckCompleted,
+      healthCheckFile: healthCheckFileData,
     });
   };
 
@@ -221,6 +283,118 @@ export default function EntryRequestEpApprove() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* EP가 수행하는 검사 및 교육 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>검사 및 교육 완료 확인</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* 반입 검사 (장비 항목이 있는 경우) */}
+            {request.items?.some((item: any) => item.itemType === 'equipment') && (
+              <div className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="entry-inspection"
+                    checked={entryInspectionCompleted}
+                    onCheckedChange={(checked) => setEntryInspectionCompleted(checked === true)}
+                  />
+                  <Label htmlFor="entry-inspection" className="font-semibold">
+                    반입 검사 완료 (외부검사업체 직원 확인)
+                  </Label>
+                </div>
+                <div className="ml-6 space-y-2">
+                  <Label htmlFor="entry-inspection-file" className="text-sm text-muted-foreground">
+                    반입 검사 확인서 첨부 (선택)
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="entry-inspection-file"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => setEntryInspectionFile(e.target.files?.[0] || null)}
+                      className="flex-1"
+                    />
+                    {entryInspectionFile && (
+                      <p className="text-xs text-muted-foreground">
+                        ✓ {entryInspectionFile.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 안전교육 및 건강검진 (인력 항목이 있는 경우) */}
+            {request.items?.some((item: any) => item.itemType === 'worker') && (
+              <>
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="safety-training"
+                      checked={safetyTrainingCompleted}
+                      onCheckedChange={(checked) => setSafetyTrainingCompleted(checked === true)}
+                    />
+                    <Label htmlFor="safety-training" className="font-semibold">
+                      안전교육 완료
+                    </Label>
+                  </div>
+                  <div className="ml-6 space-y-2">
+                    <Label htmlFor="safety-training-file" className="text-sm text-muted-foreground">
+                      안전교육 서류 첨부 (선택)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="safety-training-file"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => setSafetyTrainingFile(e.target.files?.[0] || null)}
+                        className="flex-1"
+                      />
+                      {safetyTrainingFile && (
+                        <p className="text-xs text-muted-foreground">
+                          ✓ {safetyTrainingFile.name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="health-check"
+                      checked={healthCheckCompleted}
+                      onCheckedChange={(checked) => setHealthCheckCompleted(checked === true)}
+                    />
+                    <Label htmlFor="health-check" className="font-semibold">
+                      배치전 건강검진 완료
+                    </Label>
+                  </div>
+                  <div className="ml-6 space-y-2">
+                    <Label htmlFor="health-check-file" className="text-sm text-muted-foreground">
+                      건강검진 서류 첨부 (선택)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="health-check-file"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => setHealthCheckFile(e.target.files?.[0] || null)}
+                        className="flex-1"
+                      />
+                      {healthCheckFile && (
+                        <p className="text-xs text-muted-foreground">
+                          ✓ {healthCheckFile.name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

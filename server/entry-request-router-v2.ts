@@ -598,6 +598,12 @@ export const entryRequestsRouterV2 = router({
       z.object({
         id: z.string(),
         comment: z.string().optional(),
+        entryInspectionCompleted: z.boolean().optional(),
+        entryInspectionFile: z.string().optional(), // base64 encoded file
+        safetyTrainingCompleted: z.boolean().optional(),
+        safetyTrainingFile: z.string().optional(), // base64 encoded file
+        healthCheckCompleted: z.boolean().optional(),
+        healthCheckFile: z.string().optional(), // base64 encoded file
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -630,16 +636,86 @@ export const entryRequestsRouterV2 = router({
         });
       }
 
-      // EP 최종 승인
+      // 파일 업로드 처리
+      let entryInspectionFileUrl: string | undefined;
+      let safetyTrainingFileUrl: string | undefined;
+      let healthCheckFileUrl: string | undefined;
+
+      if (input.entryInspectionFile) {
+        try {
+          const buffer = Buffer.from(input.entryInspectionFile, 'base64');
+          const filePath = `entry-requests/${input.id}/entry-inspection-${Date.now()}.pdf`;
+          const { url } = await storagePut(filePath, buffer, 'application/pdf');
+          entryInspectionFileUrl = url;
+          console.log(`[EntryRequests] Entry inspection file uploaded: ${filePath}`);
+        } catch (error) {
+          console.error('[EntryRequests] Entry inspection file upload error:', error);
+          // 파일 업로드 실패해도 승인은 진행
+        }
+      }
+
+      if (input.safetyTrainingFile) {
+        try {
+          const buffer = Buffer.from(input.safetyTrainingFile, 'base64');
+          const filePath = `entry-requests/${input.id}/safety-training-${Date.now()}.pdf`;
+          const { url } = await storagePut(filePath, buffer, 'application/pdf');
+          safetyTrainingFileUrl = url;
+          console.log(`[EntryRequests] Safety training file uploaded: ${filePath}`);
+        } catch (error) {
+          console.error('[EntryRequests] Safety training file upload error:', error);
+          // 파일 업로드 실패해도 승인은 진행
+        }
+      }
+
+      if (input.healthCheckFile) {
+        try {
+          const buffer = Buffer.from(input.healthCheckFile, 'base64');
+          const filePath = `entry-requests/${input.id}/health-check-${Date.now()}.pdf`;
+          const { url } = await storagePut(filePath, buffer, 'application/pdf');
+          healthCheckFileUrl = url;
+          console.log(`[EntryRequests] Health check file uploaded: ${filePath}`);
+        } catch (error) {
+          console.error('[EntryRequests] Health check file upload error:', error);
+          // 파일 업로드 실패해도 승인은 진행
+        }
+      }
+
+      // EP 최종 승인 (검사 및 교육 정보 포함)
+      const updateData: any = {
+        status: 'ep_approved',
+        ep_approved_user_id: ctx.user.id,
+        ep_approved_at: new Date().toISOString(),
+        ep_comment: input.comment,
+        updated_at: new Date().toISOString(),
+      };
+
+      // 반입 검사 정보
+      if (input.entryInspectionCompleted) {
+        updateData.entry_inspection_completed_at = new Date().toISOString();
+        if (entryInspectionFileUrl) {
+          updateData.entry_inspection_file_url = entryInspectionFileUrl;
+        }
+      }
+
+      // 안전교육 정보
+      if (input.safetyTrainingCompleted) {
+        updateData.safety_training_completed_at = new Date().toISOString();
+        if (safetyTrainingFileUrl) {
+          updateData.safety_training_file_url = safetyTrainingFileUrl;
+        }
+      }
+
+      // 건강검진 정보
+      if (input.healthCheckCompleted) {
+        updateData.health_check_completed_at = new Date().toISOString();
+        if (healthCheckFileUrl) {
+          updateData.health_check_file_url = healthCheckFileUrl;
+        }
+      }
+
       const { error } = await supabase
         .from('entry_requests')
-        .update({
-          status: 'ep_approved',
-          ep_approved_user_id: ctx.user.id,
-          ep_approved_at: new Date().toISOString(),
-          ep_comment: input.comment,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', input.id);
 
       if (error) {
