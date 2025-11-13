@@ -1265,20 +1265,55 @@ export async function getDocsComplianceForEp(epCompanyId: string): Promise<DocsC
   const workerIds = deployments.map((d: any) => d.worker_id).filter(Boolean);
 
   // 해당 장비/인력의 서류 조회
-  let query = supabase
-    .from('docs_compliance')
-    .select('*');
-
   if (equipmentIds.length > 0 && workerIds.length > 0) {
-    query = query.or(`target_type.eq.equipment,and(target_id.in.(${equipmentIds.join(',')})),target_type.eq.worker,and(target_id.in.(${workerIds.join(',')}))`);
+    // 장비와 인력 모두 있는 경우: 두 타입 모두 조회
+    const { data: equipDocs, error: equipError } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'equipment')
+      .in('target_id', equipmentIds);
+    
+    const { data: workerDocs, error: workerError } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'worker')
+      .in('target_id', workerIds);
+    
+    if (equipError || workerError) {
+      console.error("[Database] Error getting docs compliance for EP:", equipError || workerError);
+      return [];
+    }
+    
+    return toCamelCaseArray([...(equipDocs || []), ...(workerDocs || [])]) as DocsCompliance[];
   } else if (equipmentIds.length > 0) {
-    query = query.eq('target_type', 'equipment').in('target_id', equipmentIds);
+    const { data, error } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'equipment')
+      .in('target_id', equipmentIds);
+    
+    if (error) {
+      console.error("[Database] Error getting docs compliance for EP:", error);
+      return [];
+    }
+    
+    return toCamelCaseArray(data || []) as DocsCompliance[];
   } else if (workerIds.length > 0) {
-    query = query.eq('target_type', 'worker').in('target_id', workerIds);
+    const { data, error } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'worker')
+      .in('target_id', workerIds);
+    
+    if (error) {
+      console.error("[Database] Error getting docs compliance for EP:", error);
+      return [];
+    }
+    
+    return toCamelCaseArray(data || []) as DocsCompliance[];
   } else {
     return [];
   }
-
 }
 
 /**
