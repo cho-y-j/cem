@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -65,9 +65,25 @@ export default function Documents() {
   });
 
   const utils = trpc.useUtils();
+  const role = user?.role?.toLowerCase();
+  
+  // 역할별 필터링된 데이터 조회
   const { data: documents, isLoading } = trpc.docsCompliance.list.useQuery();
-  const { data: equipment } = trpc.equipment.list.useQuery();
-  const { data: workers } = trpc.workers.list.useQuery();
+  
+  // Equipment와 Workers도 역할별 필터링 적용
+  const equipmentFilters = useMemo(() => {
+    if (role === 'ep' && user?.companyId) {
+      return { epCompanyId: user.companyId };
+    } else if (role === 'bp' && user?.companyId) {
+      return { bpCompanyId: user.companyId };
+    } else if (role === 'owner' && user?.companyId) {
+      return { ownerCompanyId: user.companyId };
+    }
+    return undefined;
+  }, [role, user?.companyId]);
+  
+  const { data: equipment } = trpc.equipment.list.useQuery(equipmentFilters);
+  const { data: workers } = trpc.workers.list.useQuery(equipmentFilters);
 
   const createMutation = trpc.docsCompliance.create.useMutation({
     onSuccess: () => {

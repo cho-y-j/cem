@@ -48,8 +48,10 @@ export const entryRequestsRouterV2 = router({
       console.log('[EntryRequestsV2] Filtering by owner_user_id:', user.id);
       query = query.eq('owner_user_id', user.id);
     } else if (user.role === 'bp') {
-      console.log('[EntryRequestsV2] Filtering by target_bp_company_id:', user.companyId);
-      query = query.eq('target_bp_company_id', user.companyId);
+      console.log('[EntryRequestsV2] Filtering BP requests - bp_company_id:', user.companyId, 'bp_user_id:', user.id);
+      // BP는 자신의 회사에 대한 요청 또는 자신이 생성한 요청 모두 조회
+      // target_bp_company_id (Owner가 BP에게 보낸 요청) 또는 bp_company_id + bp_user_id (BP가 직접 생성한 요청)
+      query = query.or(`target_bp_company_id.eq.${user.companyId},and(bp_company_id.eq.${user.companyId},bp_user_id.eq.${user.id})`);
     } else if (user.role === 'ep') {
       console.log('[EntryRequestsV2] 🔍 EP User:', user.name);
       console.log('[EntryRequestsV2] 🔍 EP companyId:', user.companyId);

@@ -1026,6 +1026,19 @@ export const appRouter = router({
 
   docsCompliance: router({
     list: protectedProcedure.query(async ({ ctx }) => {
+      // 역할별 필터링 적용
+      const role = ctx.user.role?.toLowerCase();
+      if (role === 'ep' && ctx.user.companyId) {
+        // EP는 자신의 회사에 투입된 장비/인력의 서류만 조회
+        return await db.getDocsComplianceForEp(ctx.user.companyId);
+      } else if (role === 'bp' && ctx.user.companyId) {
+        // BP는 자신의 회사에 투입된 장비/인력의 서류만 조회
+        return await db.getDocsComplianceForBp(ctx.user.companyId);
+      } else if (role === 'owner' && ctx.user.companyId) {
+        // Owner는 자신의 회사 장비/인력의 서류만 조회
+        return await db.getDocsComplianceForOwner(ctx.user.companyId, ctx.user.id);
+      }
+      // Admin은 모든 서류 조회
       return await db.getAllDocsCompliance();
     }),
     listByTarget: protectedProcedure

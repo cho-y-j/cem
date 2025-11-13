@@ -1238,6 +1238,210 @@ export async function getAllDocsCompliance(): Promise<DocsCompliance[]> {
   return toCamelCaseArray(data || []) as DocsCompliance[];
 }
 
+/**
+ * EP 회사에 투입된 장비/인력의 서류만 조회
+ */
+export async function getDocsComplianceForEp(epCompanyId: string): Promise<DocsCompliance[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  // EP 회사에 투입된 deployment 조회
+  const { data: deployments, error: depError } = await supabase
+    .from('deployments')
+    .select('equipment_id, worker_id')
+    .eq('ep_company_id', epCompanyId)
+    .in('status', ['active', 'extended']);
+
+  if (depError) {
+    console.error("[Database] Error getting deployments for EP docs:", depError);
+    return [];
+  }
+
+  if (!deployments || deployments.length === 0) {
+    return [];
+  }
+
+  const equipmentIds = deployments.map((d: any) => d.equipment_id).filter(Boolean);
+  const workerIds = deployments.map((d: any) => d.worker_id).filter(Boolean);
+
+  // 해당 장비/인력의 서류 조회
+  let query = supabase
+    .from('docs_compliance')
+    .select('*');
+
+  if (equipmentIds.length > 0 && workerIds.length > 0) {
+    query = query.or(`target_type.eq.equipment,and(target_id.in.(${equipmentIds.join(',')})),target_type.eq.worker,and(target_id.in.(${workerIds.join(',')}))`);
+  } else if (equipmentIds.length > 0) {
+    query = query.eq('target_type', 'equipment').in('target_id', equipmentIds);
+  } else if (workerIds.length > 0) {
+    query = query.eq('target_type', 'worker').in('target_id', workerIds);
+  } else {
+    return [];
+  }
+
+}
+
+/**
+ * BP 회사에 투입된 장비/인력의 서류만 조회
+ */
+export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsCompliance[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  // BP 회사에 투입된 deployment 조회
+  const { data: deployments, error: depError } = await supabase
+    .from('deployments')
+    .select('equipment_id, worker_id')
+    .eq('bp_company_id', bpCompanyId)
+    .in('status', ['active', 'extended']);
+
+  if (depError) {
+    console.error("[Database] Error getting deployments for BP docs:", depError);
+    return [];
+  }
+
+  if (!deployments || deployments.length === 0) {
+    return [];
+  }
+
+  const equipmentIds = deployments.map((d: any) => d.equipment_id).filter(Boolean);
+  const workerIds = deployments.map((d: any) => d.worker_id).filter(Boolean);
+
+  // 해당 장비/인력의 서류 조회
+  if (equipmentIds.length > 0 && workerIds.length > 0) {
+    // 장비와 인력 모두 있는 경우: 두 타입 모두 조회
+    const { data: equipDocs, error: equipError } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'equipment')
+      .in('target_id', equipmentIds);
+    
+    const { data: workerDocs, error: workerError } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'worker')
+      .in('target_id', workerIds);
+    
+    if (equipError || workerError) {
+      console.error("[Database] Error getting docs compliance for BP:", equipError || workerError);
+      return [];
+    }
+    
+    return toCamelCaseArray([...(equipDocs || []), ...(workerDocs || [])]) as DocsCompliance[];
+  } else if (equipmentIds.length > 0) {
+    const { data, error } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'equipment')
+      .in('target_id', equipmentIds);
+    
+    if (error) {
+      console.error("[Database] Error getting docs compliance for BP:", error);
+      return [];
+    }
+    
+    return toCamelCaseArray(data || []) as DocsCompliance[];
+  } else if (workerIds.length > 0) {
+    const { data, error } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'worker')
+      .in('target_id', workerIds);
+    
+    if (error) {
+      console.error("[Database] Error getting docs compliance for BP:", error);
+      return [];
+    }
+    
+    return toCamelCaseArray(data || []) as DocsCompliance[];
+  } else {
+    return [];
+  }
+}
+
+/**
+ * Owner 회사의 장비/인력 서류 조회
+ */
+export async function getDocsComplianceForOwner(ownerCompanyId: string, ownerId: string): Promise<DocsCompliance[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  // Owner 회사의 장비 ID 조회
+  const { data: equipment, error: equipError } = await supabase
+    .from('equipment')
+    .select('id')
+    .eq('owner_company_id', ownerCompanyId);
+
+  // Owner 회사의 인력 ID 조회
+  const { data: workers, error: workerError } = await supabase
+    .from('workers')
+    .select('id')
+    .eq('owner_company_id', ownerCompanyId);
+
+  if (equipError || workerError) {
+    console.error("[Database] Error getting equipment/workers for Owner docs:", equipError || workerError);
+    return [];
+  }
+
+  const equipmentIds = equipment?.map((e: any) => e.id) || [];
+  const workerIds = workers?.map((w: any) => w.id) || [];
+
+  if (equipmentIds.length === 0 && workerIds.length === 0) {
+    return [];
+  }
+
+  // 해당 장비/인력의 서류 조회
+  if (equipmentIds.length > 0 && workerIds.length > 0) {
+    // 장비와 인력 모두 있는 경우: 두 타입 모두 조회
+    const { data: equipDocs, error: equipError } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'equipment')
+      .in('target_id', equipmentIds);
+    
+    const { data: workerDocs, error: workerError } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'worker')
+      .in('target_id', workerIds);
+    
+    if (equipError || workerError) {
+      console.error("[Database] Error getting docs compliance for Owner:", equipError || workerError);
+      return [];
+    }
+    
+    return toCamelCaseArray([...(equipDocs || []), ...(workerDocs || [])]) as DocsCompliance[];
+  } else if (equipmentIds.length > 0) {
+    const { data, error } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'equipment')
+      .in('target_id', equipmentIds);
+    
+    if (error) {
+      console.error("[Database] Error getting docs compliance for Owner:", error);
+      return [];
+    }
+    
+    return toCamelCaseArray(data || []) as DocsCompliance[];
+  } else if (workerIds.length > 0) {
+    const { data, error } = await supabase
+      .from('docs_compliance')
+      .select('*')
+      .eq('target_type', 'worker')
+      .in('target_id', workerIds);
+    
+    if (error) {
+      console.error("[Database] Error getting docs compliance for Owner:", error);
+      return [];
+    }
+    
+    return toCamelCaseArray(data || []) as DocsCompliance[];
+  } else {
+    return [];
+  }
+}
+
 export async function getDocsComplianceById(id: string): Promise<DocsCompliance | undefined> {
   const supabase = getSupabase();
   if (!supabase) return undefined;
