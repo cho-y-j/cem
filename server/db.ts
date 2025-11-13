@@ -670,23 +670,45 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
     .select('*')
     .order('created_at', { ascending: false });
 
+  // Owner 필터링
   if (ownerCompanyId) {
     query = query.eq('owner_company_id', ownerCompanyId);
-  }
-
-  if (bpCompanyId) {
-    query = query.eq('current_bp_id', bpCompanyId);
   }
 
   if (ownerId) {
     query = query.eq('owner_id', ownerId);
   }
 
-  if (search?.trim()) {
-    const keyword = `%${search.trim()}%`;
-    query = query.or(`reg_num.ilike.${keyword},nfc_tag_id.ilike.${keyword},specification.ilike.${keyword}`);
+  // BP 필터링: EP가 BP 필터를 선택한 경우 deployments를 통해 필터링
+  // EP가 아닌 경우 (BP 자신이 조회하는 경우)는 current_bp_id로 직접 필터링
+  let equipmentIdsFromBp: string[] | null = null;
+  if (bpCompanyId) {
+    // EP가 BP 필터를 선택한 경우: deployments를 통해 필터링
+    if (epCompanyId) {
+      const { data: bpDeployments, error: bpError } = await supabase
+        .from('deployments')
+        .select('equipment_id, status, bp_company_id')
+        .eq('bp_company_id', bpCompanyId);
+
+      if (bpError) {
+        console.error("[Database] Error getting deployments for BP filter:", bpError);
+      } else if (bpDeployments) {
+        const allowedStatuses = new Set(['active', 'extended']);
+        equipmentIdsFromBp = bpDeployments
+          .filter((dep: any) => dep?.equipment_id)
+          .filter((dep: any) => !dep.status || allowedStatuses.has(dep.status))
+          .map((dep: any) => dep.equipment_id as string);
+        if (equipmentIdsFromBp.length === 0) {
+          return [];
+        }
+      }
+    } else {
+      // BP 자신이 조회하는 경우: current_bp_id로 직접 필터링
+      query = query.eq('current_bp_id', bpCompanyId);
+    }
   }
 
+  // EP 필터링: deployments를 통해 필터링
   let equipmentIdsFromEp: string[] | null = null;
   if (epCompanyId) {
     const { data: epDeployments, error: epError } = await supabase
@@ -705,8 +727,30 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
       if (equipmentIdsFromEp.length === 0) {
         return [];
       }
-      query = query.in('id', Array.from(new Set(equipmentIdsFromEp)));
     }
+  }
+
+  // EP와 BP 필터가 모두 있는 경우 교집합 계산
+  let allowedEquipmentIds: string[] | null = null;
+  if (equipmentIdsFromEp && equipmentIdsFromBp) {
+    const epSet = new Set(equipmentIdsFromEp);
+    const bpSet = new Set(equipmentIdsFromBp);
+    allowedEquipmentIds = Array.from(new Set(
+      equipmentIdsFromEp.filter(id => bpSet.has(id))
+    ));
+    if (allowedEquipmentIds.length === 0) {
+      return [];
+    }
+    query = query.in('id', allowedEquipmentIds);
+  } else if (equipmentIdsFromEp) {
+    query = query.in('id', Array.from(new Set(equipmentIdsFromEp)));
+  } else if (equipmentIdsFromBp) {
+    query = query.in('id', Array.from(new Set(equipmentIdsFromBp)));
+  }
+
+  if (search?.trim()) {
+    const keyword = `%${search.trim()}%`;
+    query = query.or(`reg_num.ilike.${keyword},nfc_tag_id.ilike.${keyword},specification.ilike.${keyword}`);
   }
 
   const { data, error } = await query;
