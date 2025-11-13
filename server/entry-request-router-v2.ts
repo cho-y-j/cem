@@ -51,7 +51,85 @@ export const entryRequestsRouterV2 = router({
       console.log('[EntryRequestsV2] Filtering BP requests - bp_company_id:', user.companyId, 'bp_user_id:', user.id);
       // BP는 자신의 회사에 대한 요청 또는 자신이 생성한 요청 모두 조회
       // target_bp_company_id (Owner가 BP에게 보낸 요청) 또는 bp_company_id + bp_user_id (BP가 직접 생성한 요청)
-      query = query.or(`target_bp_company_id.eq.${user.companyId},and(bp_company_id.eq.${user.companyId},bp_user_id.eq.${user.id})`);
+      // Supabase의 .or()는 복잡한 조건을 지원하지 않으므로 두 번 조회 후 합치기
+      const { data: targetBpRequests } = await supabase
+        .from('entry_requests')
+        .select('*')
+        .eq('target_bp_company_id', user.companyId);
+      
+      const { data: bpCreatedRequests } = await supabase
+        .from('entry_requests')
+        .select('*')
+        .eq('bp_company_id', user.companyId)
+        .eq('bp_user_id', user.id);
+      
+      // 두 결과를 합치고 중복 제거
+      const allRequests = [...(targetBpRequests || []), ...(bpCreatedRequests || [])];
+      const uniqueRequests = Array.from(new Map(allRequests.map((r: any) => [r.id, r])).values());
+      
+      // 이후 로직을 위해 data를 설정하고 error는 null로
+      const { error } = { error: null };
+      const data = uniqueRequests;
+      
+      if (error) {
+        console.error('[EntryRequestsV2] List error:', error);
+        return [];
+      }
+      
+      if (!data || data.length === 0) {
+        console.log('[EntryRequestsV2] ⚠️ No requests found for BP user:', user.role);
+        return [];
+      }
+      
+      console.log(`[EntryRequestsV2] Found ${data.length} requests for BP`);
+      
+      // 각 요청에 대한 추가 정보 조회 (기존 로직 재사용)
+      const enrichedData = await Promise.all(
+        data.map(async (request: any) => {
+          // 요청자 정보
+          let ownerName = 'Unknown';
+          if (request.owner_user_id) {
+            const { data: ownerUser } = await supabase
+              .from('users')
+              .select('name, email')
+              .eq('id', request.owner_user_id)
+              .single();
+            ownerName = ownerUser?.name || ownerUser?.email || 'Unknown';
+          }
+
+          // BP 회사명
+          let bpCompanyName = '-';
+          if (request.target_bp_company_id) {
+            const { data: bpCompany } = await supabase
+              .from('companies')
+              .select('name')
+              .eq('id', request.target_bp_company_id)
+              .single();
+            bpCompanyName = bpCompany?.name || '-';
+          }
+
+          // 아이템 전체 조회
+          const { data: items } = await supabase
+            .from('entry_request_items')
+            .select('item_type, item_id')
+            .eq('entry_request_id', request.id);
+
+          const equipmentCount = items?.filter((i: any) => i.item_type === 'equipment').length || 0;
+          const workerCount = items?.filter((i: any) => i.item_type === 'worker').length || 0;
+
+          return {
+            ...request,
+            ownerName,
+            bpCompanyName,
+            equipmentCount,
+            workerCount,
+            items: items || [],
+          };
+        })
+      );
+
+      console.log('[EntryRequestsV2] Enriched data ready for BP');
+      return enrichedData;
     } else if (user.role === 'ep') {
       console.log('[EntryRequestsV2] 🔍 EP User:', user.name);
       console.log('[EntryRequestsV2] 🔍 EP companyId:', user.companyId);
