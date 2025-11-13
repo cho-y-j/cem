@@ -51,74 +51,87 @@ export const mobileRouter = router({
      * 2. deployment에서 현재 활성 투입의 equipment 확인
      */
     getMyAssignedEquipment: protectedProcedure.query(async ({ ctx }) => {
-      console.log('[Mobile] getMyAssignedEquipment called for user:', ctx.user.id, ctx.user.name, ctx.user.email);
+      try {
+        console.log('[Mobile] getMyAssignedEquipment called for user:', ctx.user.id, ctx.user.name, ctx.user.email);
 
-      // users 테이블의 Worker가 로그인한 경우
-      // 1. PIN으로 workers 테이블의 레코드를 찾거나
-      // 2. Email로 workers 테이블의 레코드를 찾아야 함
-      const userPin = ctx.user.pin;
-      const userEmail = ctx.user.email;
+        // users 테이블의 Worker가 로그인한 경우
+        // 1. PIN으로 workers 테이블의 레코드를 찾거나
+        // 2. Email로 workers 테이블의 레코드를 찾아야 함
+        const userPin = ctx.user.pin;
+        const userEmail = ctx.user.email;
 
-      let worker: any = null;
+        let worker: any = null;
 
-      // 먼저 PIN으로 찾기
-      if (userPin) {
-        console.log('[Mobile] Looking for worker with PIN:', userPin);
-        worker = await db.getWorkerByPinCode(userPin);
-        if (worker) {
-          console.log('[Mobile] Found worker by PIN:', worker.id, worker.name);
-        }
-      }
-
-      // PIN으로 못 찾으면 Email로 찾기
-      if (!worker && userEmail) {
-        console.log('[Mobile] PIN not found or no match, trying with email:', userEmail);
-        worker = await db.getWorkerByEmail(userEmail);
-        if (worker) {
-          console.log('[Mobile] Found worker by email:', worker.id, worker.name);
-        } else {
-          console.log(`[Mobile] No worker found with email: ${userEmail}`);
-        }
-      }
-
-      if (!worker) {
-        console.log('[Mobile] No worker found with PIN or email');
-        return null;
-      }
-
-      console.log('[Mobile] Final worker:', worker.id, worker.name);
-
-      // 1. equipment.assigned_worker_id로 배정된 장비 조회
-      let equipment = await db.getEquipmentByAssignedWorker(worker.id);
-      console.log('[Mobile] Equipment from assigned_worker_id:', equipment ? equipment.id : 'null');
-      
-      // 2. assigned_worker_id가 없으면, deployment에서 확인
-      if (!equipment) {
-        console.log('[Mobile] No equipment assigned via assigned_worker_id, checking deployment...');
-        const deployment = await db.getDeploymentByWorkerId(worker.id);
-        console.log('[Mobile] Deployment found:', deployment ? deployment.id : 'null');
-        
-        if (deployment) {
-          console.log('[Mobile] Deployment details:', {
-            id: deployment.id,
-            equipmentId: deployment.equipmentId,
-            workerId: deployment.workerId,
-          });
-          
-          if (deployment.equipmentId) {
-            console.log('[Mobile] Fetching equipment by ID:', deployment.equipmentId);
-            equipment = await db.getEquipmentById(deployment.equipmentId);
-            console.log('[Mobile] Equipment fetched:', equipment ? { id: equipment.id, regNum: equipment.regNum } : 'null');
-          } else {
-            console.log('[Mobile] WARNING: Deployment has no equipmentId!');
+        // 먼저 PIN으로 찾기
+        if (userPin) {
+          console.log('[Mobile] Looking for worker with PIN:', userPin);
+          try {
+            worker = await db.getWorkerByPinCode(userPin);
+            if (worker) {
+              console.log('[Mobile] Found worker by PIN:', worker.id, worker.name);
+            }
+          } catch (error) {
+            console.error('[Mobile] Error getting worker by PIN:', error);
           }
-        } else {
-          console.log('[Mobile] No active deployment found for worker:', worker.id);
         }
+
+        // PIN으로 못 찾으면 Email로 찾기
+        if (!worker && userEmail) {
+          console.log('[Mobile] PIN not found or no match, trying with email:', userEmail);
+          try {
+            worker = await db.getWorkerByEmail(userEmail);
+            if (worker) {
+              console.log('[Mobile] Found worker by email:', worker.id, worker.name);
+            } else {
+              console.log(`[Mobile] No worker found with email: ${userEmail}`);
+            }
+          } catch (error) {
+            console.error('[Mobile] Error getting worker by email:', error);
+          }
+        }
+
+        if (!worker) {
+          console.log('[Mobile] No worker found with PIN or email - returning null (유도원일 수 있음)');
+          return null;
+        }
+
+        console.log('[Mobile] Final worker:', worker.id, worker.name);
+
+        // 1. equipment.assigned_worker_id로 배정된 장비 조회
+        let equipment = await db.getEquipmentByAssignedWorker(worker.id);
+        console.log('[Mobile] Equipment from assigned_worker_id:', equipment ? equipment.id : 'null');
+
+        // 2. assigned_worker_id가 없으면, deployment에서 확인
+        if (!equipment) {
+          console.log('[Mobile] No equipment assigned via assigned_worker_id, checking deployment...');
+          const deployment = await db.getDeploymentByWorkerId(worker.id);
+          console.log('[Mobile] Deployment found:', deployment ? deployment.id : 'null');
+
+          if (deployment) {
+            console.log('[Mobile] Deployment details:', {
+              id: deployment.id,
+              equipmentId: deployment.equipmentId,
+              workerId: deployment.workerId,
+            });
+
+            if (deployment.equipmentId) {
+              console.log('[Mobile] Fetching equipment by ID:', deployment.equipmentId);
+              equipment = await db.getEquipmentById(deployment.equipmentId);
+              console.log('[Mobile] Equipment fetched:', equipment ? { id: equipment.id, regNum: equipment.regNum } : 'null');
+            } else {
+              console.log('[Mobile] NOTE: Deployment has no equipmentId (유도원일 수 있음)');
+            }
+          } else {
+            console.log('[Mobile] No active deployment found for worker:', worker.id, '(유도원일 수 있음)');
+          }
+        }
+
+        console.log('[Mobile] Final equipment result:', equipment ? { id: equipment.id, regNum: equipment.regNum } : 'null');
+        return equipment || null; // 명시적으로 null 반환
+      } catch (error) {
+        console.error('[Mobile] getMyAssignedEquipment error:', error);
+        return null; // 에러 발생 시에도 null 반환 (undefined 방지)
       }
-      
-      console.log('[Mobile] Final equipment result:', equipment ? { id: equipment.id, regNum: equipment.regNum } : 'null');
-      return equipment;
     }),
 
     /**
@@ -192,45 +205,58 @@ export const mobileRouter = router({
      * 현재 투입 정보 조회 (BP사 정보 포함)
      */
     getCurrentDeployment: protectedProcedure.query(async ({ ctx }) => {
-      console.log('[Mobile] getCurrentDeployment called for user:', ctx.user.id, ctx.user.name, ctx.user.email, 'PIN:', ctx.user.pin);
+      try {
+        console.log('[Mobile] getCurrentDeployment called for user:', ctx.user.id, ctx.user.name, ctx.user.email, 'PIN:', ctx.user.pin);
 
-      const userPin = ctx.user.pin;
-      const userEmail = ctx.user.email;
+        const userPin = ctx.user.pin;
+        const userEmail = ctx.user.email;
 
-      let worker: any = null;
+        let worker: any = null;
 
-      // 먼저 PIN으로 찾기
-      if (userPin) {
-        worker = await db.getWorkerByPinCode(userPin);
+        // 먼저 PIN으로 찾기
+        if (userPin) {
+          try {
+            worker = await db.getWorkerByPinCode(userPin);
+          } catch (error) {
+            console.error('[Mobile] Error getting worker by PIN:', error);
+          }
+        }
+
+        // PIN으로 못 찾으면 Email로 찾기
+        if (!worker && userEmail) {
+          try {
+            worker = await db.getWorkerByEmail(userEmail);
+          } catch (error) {
+            console.error('[Mobile] Error getting worker by email:', error);
+          }
+        }
+
+        if (!worker) {
+          console.log('[Mobile] No worker found with PIN or email - returning null (유도원일 수 있음)');
+          return null;
+        }
+
+        console.log('[Mobile] Found worker:', worker.id, worker.name);
+
+        // worker_id로 활성 deployment 조회 (BP사, EP사 정보 포함)
+        const deployment = await db.getDeploymentByWorkerId(worker.id);
+        console.log('[Mobile] Deployment result:', deployment ? { id: deployment.id, status: deployment.status, equipmentId: deployment.equipmentId } : 'null (유도원일 수 있음)');
+
+        if (deployment) {
+          console.log('[Mobile] Deployment details:', {
+            id: deployment.id,
+            workerId: deployment.workerId,
+            equipmentId: deployment.equipmentId,
+            bpCompany: deployment.bpCompany?.name,
+            epCompany: deployment.epCompany?.name,
+          });
+        }
+
+        return deployment || null; // 명시적으로 null 반환
+      } catch (error) {
+        console.error('[Mobile] getCurrentDeployment error:', error);
+        return null; // 에러 발생 시에도 null 반환 (undefined 방지)
       }
-
-      // PIN으로 못 찾으면 Email로 찾기
-      if (!worker && userEmail) {
-        worker = await db.getWorkerByEmail(userEmail);
-      }
-
-      if (!worker) {
-        console.log('[Mobile] No worker found with PIN or email');
-        return null;
-      }
-
-      console.log('[Mobile] Found worker:', worker.id, worker.name);
-
-      // worker_id로 활성 deployment 조회 (BP사, EP사 정보 포함)
-      const deployment = await db.getDeploymentByWorkerId(worker.id);
-      console.log('[Mobile] Deployment result:', deployment ? { id: deployment.id, status: deployment.status, equipmentId: deployment.equipmentId } : 'null');
-
-      if (deployment) {
-        console.log('[Mobile] Deployment details:', {
-          id: deployment.id,
-          workerId: deployment.workerId,
-          equipmentId: deployment.equipmentId,
-          bpCompany: deployment.bpCompany?.name,
-          epCompany: deployment.epCompany?.name,
-        });
-      }
-
-      return deployment;
     }),
 
     /**

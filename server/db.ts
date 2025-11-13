@@ -1122,29 +1122,31 @@ export async function getWorkerByPinCode(pinCode: string): Promise<Worker | unde
 
   console.log("[Database] getWorkerByPinCode called with PIN:", pinCode);
 
+  // PIN 중복 가능성이 있으므로 limit(1)로 첫 번째 결과만 가져오기
   const { data, error } = await supabase
     .from('workers')
     .select('*')
     .eq('pin_code', pinCode)
-    .maybeSingle();
+    .limit(1);
 
   if (error) {
     console.error("[Database] Error getting worker by PIN:", pinCode, error);
     return undefined;
   }
 
-  if (!data) {
+  if (!data || data.length === 0) {
     console.log("[Database] No worker found with PIN:", pinCode);
-    // 디버깅: 모든 worker의 PIN 확인
-    const { data: allWorkers } = await supabase
-      .from('workers')
-      .select('id, name, pin_code');
-    console.log("[Database] All workers with PINs:", allWorkers?.map((w: any) => ({ id: w.id, name: w.name, pin: w.pin_code })));
     return undefined;
   }
 
-  console.log("[Database] Found worker:", data.id, data.name, "with PIN:", pinCode);
-  return toCamelCase(data) as Worker;
+  // 중복 PIN 경고
+  if (data.length > 1) {
+    console.warn(`[Database] WARNING: Multiple workers found with PIN ${pinCode}. Using first one.`);
+  }
+
+  const worker = data[0];
+  console.log("[Database] Found worker:", worker.id, worker.name, "with PIN:", pinCode);
+  return toCamelCase(worker) as Worker;
 }
 
 export async function getWorkerByEmail(email: string): Promise<Worker | undefined> {
