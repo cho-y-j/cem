@@ -2374,6 +2374,7 @@ export async function getDeployments(filters?: {
   ownerId?: string;
   bpCompanyId?: string;
   epCompanyId?: string;
+  equipmentId?: string;
   workerId?: string;
   status?: string;
 }): Promise<Deployment[]> {
@@ -2404,6 +2405,7 @@ export async function getDeployments(filters?: {
   if (filters?.ownerId) query = query.eq('owner_id', filters.ownerId);
   if (filters?.bpCompanyId) query = query.eq('bp_company_id', filters.bpCompanyId);
   if (filters?.epCompanyId) query = query.eq('ep_company_id', filters.epCompanyId);
+  if (filters?.equipmentId) query = query.eq('equipment_id', filters.equipmentId);
   if (filters?.workerId) query = query.eq('worker_id', filters.workerId);
   if (filters?.status) query = query.eq('status', filters.status);
 

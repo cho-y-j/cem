@@ -17,12 +17,26 @@ export const deploymentRouter = router({
       z.object({
         ownerId: z.string().optional(),
         bpCompanyId: z.string().optional(),
+        epCompanyId: z.string().optional(),
+        equipmentId: z.string().optional(),
         workerId: z.string().optional(),
         status: z.string().optional(),
       })
     )
-    .query(async ({ input }) => {
-      const deployments = await db.getDeployments(input);
+    .query(async ({ input, ctx }) => {
+      const role = ctx.user.role?.toLowerCase();
+      const filters: any = { ...input };
+
+      // 역할별 자동 필터링
+      if (role === "bp" && ctx.user.companyId) {
+        filters.bpCompanyId = filters.bpCompanyId || ctx.user.companyId;
+      } else if (role === "ep" && ctx.user.companyId) {
+        filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
+      } else if (role === "owner") {
+        filters.ownerId = filters.ownerId || ctx.user.id;
+      }
+
+      const deployments = await db.getDeployments(filters);
       return deployments;
     }),
 

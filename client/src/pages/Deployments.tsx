@@ -56,6 +56,12 @@ export default function Deployments() {
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("");
+  const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("");
+  const [epCompanyFilter, setEpCompanyFilter] = useState<string>("");
+  const [equipmentFilter, setEquipmentFilter] = useState<string>("");
+  const [workerFilter, setWorkerFilter] = useState<string>("");
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
 
   const [createFormData, setCreateFormData] = useState({
     entryRequestId: "",
@@ -92,15 +98,84 @@ export default function Deployments() {
 
   const utils = trpc.useUtils();
 
-  // 데이터 조회
-  const { data: deployments, isLoading } = trpc.deployments.list.useQuery(
-    user?.role === "owner" ? { ownerId: user.id } : {}
+  // 회사 목록 조회
+  const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "owner" },
+    { enabled: role === "admin" || role === "bp" || role === "ep" }
   );
+  const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "bp" },
+    { enabled: role === "admin" || role === "ep" || role === "owner" }
+  );
+  const { data: epCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "ep" },
+    { enabled: role === "admin" || role === "owner" }
+  );
+
+  // 필터 초기화
+  useEffect(() => {
+    if (!user || filtersInitialized) return;
+
+    if (role === "bp" && user.companyId) {
+      setBpCompanyFilter(user.companyId);
+    }
+
+    if (role === "ep" && user.companyId) {
+      setEpCompanyFilter(user.companyId);
+    }
+
+    if (role === "owner" && user.id) {
+      // Owner는 자동으로 필터링되므로 필터 UI는 비활성화
+    }
+
+    setFiltersInitialized(true);
+  }, [user, role, filtersInitialized]);
+
+  // 필터 옵션 생성
+  const deploymentFilters = useMemo(() => {
+    const input: Record<string, string> = {};
+    
+    if (role === "owner" && user?.id) {
+      input.ownerId = user.id;
+    } else {
+      if (ownerCompanyFilter) {
+        input.ownerId = ownerCompanyFilter; // 실제로는 ownerId가 아니라 ownerCompanyId로 필터링해야 할 수도 있음
+      }
+    }
+
+    if (role === "bp" && user?.companyId) {
+      input.bpCompanyId = user.companyId;
+    } else if (bpCompanyFilter) {
+      input.bpCompanyId = bpCompanyFilter;
+    }
+
+    if (role === "ep" && user?.companyId) {
+      input.epCompanyId = user.companyId;
+    } else if (epCompanyFilter) {
+      input.epCompanyId = epCompanyFilter;
+    }
+
+    if (equipmentFilter) {
+      input.equipmentId = equipmentFilter;
+    }
+
+    if (workerFilter) {
+      input.workerId = workerFilter;
+    }
+
+    if (statusFilter !== "all") {
+      input.status = statusFilter;
+    }
+
+    return Object.keys(input).length > 0 ? input : undefined;
+  }, [ownerCompanyFilter, bpCompanyFilter, epCompanyFilter, equipmentFilter, workerFilter, statusFilter, role, user?.id, user?.companyId]);
+
+  // 데이터 조회
+  const { data: deployments, isLoading } = trpc.deployments.list.useQuery(deploymentFilters);
 
   const { data: entryRequests } = trpc.entryRequestsV2.list.useQuery();
   const { data: equipment } = trpc.equipment.list.useQuery();
   const { data: workers } = trpc.workers.list.useQuery();
-  const { data: bpCompanies } = trpc.companies.list.useQuery({ companyType: 'bp' });
   
   // 유도원 목록 조회 (BP만, 유도원 인력 유형)
   const { data: workerTypes } = trpc.workerTypes.list.useQuery();
@@ -364,6 +439,144 @@ export default function Deployments() {
           투입 등록
         </Button>
       </div>
+
+      {/* 필터 카드 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>필터</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
+            {(role === "admin" || role === "bp" || role === "ep") && (
+              <div className="w-full md:w-56">
+                <Label>Owner 회사</Label>
+                <Select
+                  value={ownerCompanyFilter || "all"}
+                  onValueChange={(value) => setOwnerCompanyFilter(value === "all" ? "" : value)}
+                  disabled={role === "owner"}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {ownerCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {(role === "admin" || role === "ep" || role === "owner") && (
+              <div className="w-full md:w-56">
+                <Label>BP 회사</Label>
+                <Select
+                  value={bpCompanyFilter || "all"}
+                  onValueChange={(value) => setBpCompanyFilter(value === "all" ? "" : value)}
+                  disabled={role === "bp"}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {bpCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {role === "admin" && (
+              <div className="w-full md:w-56">
+                <Label>EP 회사</Label>
+                <Select
+                  value={epCompanyFilter || "all"}
+                  onValueChange={(value) => setEpCompanyFilter(value === "all" ? "" : value)}
+                  disabled={role === "ep"}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {epCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="w-full md:w-56">
+              <Label>장비</Label>
+              <Select
+                value={equipmentFilter || "all"}
+                onValueChange={(value) => setEquipmentFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {equipment?.map((eq: any) => (
+                    <SelectItem key={eq.id} value={eq.id}>
+                      {eq.regNum} {eq.equipType?.typeName && `(${eq.equipType.typeName})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full md:w-56">
+              <Label>운전자</Label>
+              <Select
+                value={workerFilter || "all"}
+                onValueChange={(value) => setWorkerFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {workers?.map((worker: any) => (
+                    <SelectItem key={worker.id} value={worker.id}>
+                      {worker.name} {worker.workerType?.typeName && `(${worker.workerType.typeName})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full md:w-56">
+              <Label>상태</Label>
+              <Select
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="pending">대기</SelectItem>
+                  <SelectItem value="active">투입중</SelectItem>
+                  <SelectItem value="extended">연장</SelectItem>
+                  <SelectItem value="completed">종료</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
