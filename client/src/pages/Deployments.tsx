@@ -132,12 +132,13 @@ export default function Deployments() {
   }, [user, role, filtersInitialized]);
 
   // 필터 옵션 생성 (Owner는 서버에서 자동 필터링)
+  // Owner의 경우 안정적인 빈 객체를 반환하기 위해 useMemo 외부에 상수로 정의
+  const emptyFilters = useMemo(() => ({}), []);
+
   const deploymentFilters = useMemo(() => {
     // Owner는 서버에서 자동으로 ownerId 필터링하므로 빈 객체 전달
-    // 다른 역할만 필터 추가
     if (role === "owner") {
-      // Owner는 항상 빈 객체를 반환 (서버에서 ctx.user.id로 자동 필터링)
-      return {};
+      return emptyFilters;
     }
 
     const input: Record<string, string> = {};
@@ -173,7 +174,7 @@ export default function Deployments() {
     }
 
     return input;
-  }, [ownerCompanyFilter, bpCompanyFilter, epCompanyFilter, equipmentFilter, workerFilter, statusFilter, role, user?.id, user?.companyId]);
+  }, [ownerCompanyFilter, bpCompanyFilter, epCompanyFilter, equipmentFilter, workerFilter, statusFilter, role, user?.id, user?.companyId, emptyFilters]);
 
   // 데이터 조회
   const { data: deployments, isLoading } = trpc.deployments.list.useQuery(deploymentFilters);

@@ -168,6 +168,11 @@ export function EntryRequestDetail({
   // request ID를 안정적으로 추출 (원시값만 사용)
   const requestId = request?.id || detailData?.id || null;
 
+  // 완료된 검사/교육 정보를 원시값으로 추출 (dependency로 사용)
+  const entryInspectionCompletedAtValue = detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt || null;
+  const safetyTrainingCompletedAtValue = detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt || null;
+  const healthCheckCompletedAtValue = detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt || null;
+
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
   // 다이얼로그가 열릴 때마다 초기화
   useEffect(() => {
@@ -189,16 +194,11 @@ export function EntryRequestDetail({
     // 로딩 중이면 대기
     if (isLoading) return;
     
-    // useEffect 내부에서 직접 값을 계산하여 무한 루프 방지
-    const entryInspectionCompletedAt = detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt;
-    const safetyTrainingCompletedAt = detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt;
-    const healthCheckCompletedAt = detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt;
-    
-    // 완료된 정보가 있으면 체크박스 활성화
-    setEntryInspectionCompleted(!!entryInspectionCompletedAt);
-    setSafetyTrainingCompleted(!!safetyTrainingCompletedAt);
-    setHealthCheckCompleted(!!healthCheckCompletedAt);
-  }, [open, requestId, isLoading, detailData, request]);
+    // 완료된 정보가 있으면 체크박스 활성화 (원시값 사용)
+    setEntryInspectionCompleted(!!entryInspectionCompletedAtValue);
+    setSafetyTrainingCompleted(!!safetyTrainingCompletedAtValue);
+    setHealthCheckCompleted(!!healthCheckCompletedAtValue);
+  }, [open, requestId, isLoading, entryInspectionCompletedAtValue, safetyTrainingCompletedAtValue, healthCheckCompletedAtValue]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
