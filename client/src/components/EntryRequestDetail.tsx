@@ -4,7 +4,7 @@
  * - Owner/EP 승인 기능
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -165,8 +165,10 @@ export function EntryRequestDetail({
   // 상세 데이터가 있으면 사용, 없으면 기본 request 사용
   const requestData = detailData || request;
   
-  // request ID를 안정적으로 추출
-  const requestId = requestData?.id || request?.id;
+  // request ID를 안정적으로 추출 (useMemo로 안정화)
+  const requestId = useMemo(() => {
+    return request?.id || detailData?.id || null;
+  }, [request?.id, detailData?.id]);
 
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
   // 다이얼로그가 열릴 때마다 초기화
@@ -183,17 +185,24 @@ export function EntryRequestDetail({
       return;
     }
     
-    if (!requestData || !requestId) return;
+    // requestId가 없으면 실행하지 않음
+    if (!requestId) return;
+    
+    // requestData가 로딩 중이면 대기
+    if (isLoading) return;
     
     // 완료된 정보가 있으면 체크박스 활성화
-    const hasEntryInspection = !!(requestData.entry_inspection_completed_at || requestData.entryInspectionCompletedAt);
-    const hasSafetyTraining = !!(requestData.safety_training_completed_at || requestData.safetyTrainingCompletedAt);
-    const hasHealthCheck = !!(requestData.health_check_completed_at || requestData.healthCheckCompletedAt);
+    const currentData = detailData || request;
+    if (!currentData) return;
+    
+    const hasEntryInspection = !!(currentData.entry_inspection_completed_at || currentData.entryInspectionCompletedAt);
+    const hasSafetyTraining = !!(currentData.safety_training_completed_at || currentData.safetyTrainingCompletedAt);
+    const hasHealthCheck = !!(currentData.health_check_completed_at || currentData.healthCheckCompletedAt);
     
     setEntryInspectionCompleted(hasEntryInspection);
     setSafetyTrainingCompleted(hasSafetyTraining);
     setHealthCheckCompleted(hasHealthCheck);
-  }, [open, requestId]);
+  }, [open, requestId, isLoading, detailData, request]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
