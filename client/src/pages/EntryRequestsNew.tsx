@@ -629,8 +629,9 @@ export default function EntryRequestsNew() {
                             variant="default"
                             className="bg-purple-600 hover:bg-purple-700"
                             onClick={() => {
-                              // EntryRequestEpApprove 페이지로 이동 (안전교육/건강검진 체크박스 포함)
-                              window.location.href = `/entry-requests/${request.id}/ep-approve`;
+                              // 다이얼로그에서 상세 보기 및 승인
+                              setSelectedRequestForDetail(request);
+                              setDetailDialogOpen(true);
                             }}
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />

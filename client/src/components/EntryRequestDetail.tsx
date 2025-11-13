@@ -165,18 +165,30 @@ export function EntryRequestDetail({
 
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
   useEffect(() => {
-    if (requestData) {
-      if (requestData.entry_inspection_completed_at || requestData.entryInspectionCompletedAt) {
-        setEntryInspectionCompleted(true);
-      }
-      if (requestData.safety_training_completed_at || requestData.safetyTrainingCompletedAt) {
-        setSafetyTrainingCompleted(true);
-      }
-      if (requestData.health_check_completed_at || requestData.healthCheckCompletedAt) {
-        setHealthCheckCompleted(true);
-      }
+    if (!open || !requestData) return;
+    
+    // requestData의 ID를 기준으로 한 번만 실행되도록 체크
+    const requestId = requestData.id;
+    if (!requestId) return;
+    
+    if (requestData.entry_inspection_completed_at || requestData.entryInspectionCompletedAt) {
+      setEntryInspectionCompleted(true);
+    } else {
+      setEntryInspectionCompleted(false);
     }
-  }, [requestData]);
+    
+    if (requestData.safety_training_completed_at || requestData.safetyTrainingCompletedAt) {
+      setSafetyTrainingCompleted(true);
+    } else {
+      setSafetyTrainingCompleted(false);
+    }
+    
+    if (requestData.health_check_completed_at || requestData.healthCheckCompletedAt) {
+      setHealthCheckCompleted(true);
+    } else {
+      setHealthCheckCompleted(false);
+    }
+  }, [open, requestData?.id]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {

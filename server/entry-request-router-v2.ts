@@ -715,7 +715,8 @@ export const entryRequestsRouterV2 = router({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      if (request.status !== 'bp_approved') {
+      // BP가 직접 올린 요청(bp_approved) 또는 BP 승인 후 EP 검토 상태 모두 허용
+      if (request.status !== 'bp_approved' && request.status !== 'bp_requested') {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "승인할 수 없는 상태입니다.",
