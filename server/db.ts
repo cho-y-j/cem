@@ -2622,25 +2622,10 @@ export async function getDeployments(filters?: {
 
   console.log("[Database] getDeployments called with filters:", filters);
 
+  // guide_worker와 inspector는 optional이므로 별도로 조회
   let query = supabase
     .from('deployments')
-    .select(`
-      *,
-      guide_worker:workers!deployments_guide_worker_id_fkey(
-        id,
-        name,
-        license_num,
-        worker_type_id,
-        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
-      ),
-      inspector:workers!deployments_inspector_id_fkey(
-        id,
-        name,
-        license_num,
-        worker_type_id,
-        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
-      )
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (filters?.ownerId) {
@@ -2670,7 +2655,47 @@ export async function getDeployments(filters?: {
     console.log("[Database] Sample deployments (first 10):", allDeployments);
   }
 
-  return toCamelCaseArray(data || []) as Deployment[];
+  // guide_worker와 inspector 정보를 별도로 조회하여 추가
+  const deployments = toCamelCaseArray(data || []) as Deployment[];
+  
+  if (deployments.length > 0) {
+    const guideWorkerIds = deployments
+      .map(d => d.guideWorkerId)
+      .filter((id): id is string => !!id);
+    const inspectorIds = deployments
+      .map(d => d.inspectorId)
+      .filter((id): id is string => !!id);
+    
+    const allWorkerIds = [...new Set([...guideWorkerIds, ...inspectorIds])];
+    
+    if (allWorkerIds.length > 0) {
+      const { data: workers } = await supabase
+        .from('workers')
+        .select(`
+          id,
+          name,
+          license_num,
+          worker_type_id,
+          worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+        `)
+        .in('id', allWorkerIds);
+      
+      if (workers) {
+        const workerMap = new Map(workers.map((w: any) => [w.id, toCamelCase(w)]));
+        
+        deployments.forEach(deployment => {
+          if (deployment.guideWorkerId && workerMap.has(deployment.guideWorkerId)) {
+            (deployment as any).guideWorker = workerMap.get(deployment.guideWorkerId);
+          }
+          if (deployment.inspectorId && workerMap.has(deployment.inspectorId)) {
+            (deployment as any).inspector = workerMap.get(deployment.inspectorId);
+          }
+        });
+      }
+    }
+  }
+
+  return deployments;
 }
 
 export async function getDeploymentById(id: string): Promise<Deployment | undefined> {

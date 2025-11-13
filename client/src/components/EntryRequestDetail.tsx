@@ -168,10 +168,18 @@ export function EntryRequestDetail({
   // request ID를 안정적으로 추출 (원시값만 사용)
   const requestId = request?.id || detailData?.id || null;
 
-  // 완료된 검사/교육 정보를 원시값으로 추출 (dependency로 사용)
-  const entryInspectionCompletedAtValue = detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt || null;
-  const safetyTrainingCompletedAtValue = detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt || null;
-  const healthCheckCompletedAtValue = detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt || null;
+  // 완료된 검사/교육 정보를 원시값으로 추출 (useMemo로 안정화)
+  const entryInspectionCompletedAtValue = useMemo(() => {
+    return detailData?.entry_inspection_completed_at || request?.entry_inspection_completed_at || detailData?.entryInspectionCompletedAt || request?.entryInspectionCompletedAt || null;
+  }, [detailData?.entry_inspection_completed_at, request?.entry_inspection_completed_at, detailData?.entryInspectionCompletedAt, request?.entryInspectionCompletedAt]);
+  
+  const safetyTrainingCompletedAtValue = useMemo(() => {
+    return detailData?.safety_training_completed_at || request?.safety_training_completed_at || detailData?.safetyTrainingCompletedAt || request?.safetyTrainingCompletedAt || null;
+  }, [detailData?.safety_training_completed_at, request?.safety_training_completed_at, detailData?.safetyTrainingCompletedAt, request?.safetyTrainingCompletedAt]);
+  
+  const healthCheckCompletedAtValue = useMemo(() => {
+    return detailData?.health_check_completed_at || request?.health_check_completed_at || detailData?.healthCheckCompletedAt || request?.healthCheckCompletedAt || null;
+  }, [detailData?.health_check_completed_at, request?.health_check_completed_at, detailData?.healthCheckCompletedAt, request?.healthCheckCompletedAt]);
 
   // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
   // 다이얼로그가 열릴 때마다 초기화
