@@ -3512,6 +3512,22 @@ export async function getActiveDeploymentByEquipmentId(equipmentId: string): Pro
         owner_id,
         phone
       ),
+      guide_worker:workers!deployments_guide_worker_id_fkey(
+        id,
+        name,
+        license_num,
+        phone,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
+      inspector:workers!deployments_inspector_id_fkey(
+        id,
+        name,
+        license_num,
+        phone,
+        worker_type_id,
+        worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+      ),
       bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
       ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
     `)

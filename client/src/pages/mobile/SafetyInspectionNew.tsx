@@ -70,6 +70,15 @@ export default function SafetyInspectionNew() {
   const activeDeployment = equipmentContext?.activeDeployment;
   const equipmentDocs = equipmentContext?.docs?.equipment || [];
   const workerDocs = equipmentContext?.docs?.worker || [];
+  
+  // 유도원 서류 조회
+  const { data: guideWorkerDocs } = trpc.docs.getComplianceByTarget.useQuery(
+    {
+      targetType: "worker",
+      targetId: activeDeployment?.guideWorkerId || "",
+    },
+    { enabled: !!activeDeployment?.guideWorkerId }
+  );
 
   // 작업계획서 조회
   const { data: workPlan } = trpc.entryRequestsV2.getWorkPlanByEquipment.useQuery(
@@ -165,7 +174,7 @@ export default function SafetyInspectionNew() {
   };
 
   const [showDocsDialog, setShowDocsDialog] = useState(false);
-  const [docTab, setDocTab] = useState<"equipment" | "worker">("equipment");
+  const [docTab, setDocTab] = useState<"equipment" | "worker" | "guideWorker">("equipment");
 const hasDocs = (equipmentDocs.length > 0) || (workerDocs.length > 0);
 
 const handleOpenDocs = () => {
@@ -478,6 +487,39 @@ const handleOpenDocs = () => {
                   </div>
                 )}
               </div>
+
+              {/* 유도원 정보 표시 */}
+              {activeDeployment?.guideWorker && (
+                <div className="border-t pt-3 space-y-2 mt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">유도원</span>
+                    <span className="font-semibold text-green-700">
+                      {activeDeployment.guideWorker.name}
+                    </span>
+                  </div>
+                  {activeDeployment.guideWorker.phone && (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>연락처</span>
+                      <span>{activeDeployment.guideWorker.phone}</span>
+                    </div>
+                  )}
+                  {/* 유도원 서류 확인 버튼 */}
+                  {(guideWorkerDocs && guideWorkerDocs.length > 0) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => {
+                        setDocTab("guideWorker");
+                        setShowDocsDialog(true);
+                      }}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      유도원 서류 확인 ({guideWorkerDocs.length})
+                    </Button>
+                  )}
+                </div>
+              )}
 
               {/* 작업계획서 보기 버튼 */}
               {workPlan?.hasWorkPlan && (
@@ -846,10 +888,10 @@ const handleOpenDocs = () => {
           <DialogHeader>
             <DialogTitle>서류 목록</DialogTitle>
             <DialogDescription>
-              장비 및 운전자 서류를 확인합니다.
+              장비, 운전자 및 유도원 서류를 확인합니다.
             </DialogDescription>
           </DialogHeader>
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex gap-2 flex-wrap">
             <Button
               variant={docTab === "equipment" ? "default" : "outline"}
               size="sm"
@@ -866,9 +908,28 @@ const handleOpenDocs = () => {
             >
               운전자 서류 ({workerDocs.length})
             </Button>
+            {activeDeployment?.guideWorkerId && (
+              <Button
+                variant={docTab === "guideWorker" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDocTab("guideWorker")}
+                disabled={(guideWorkerDocs?.length || 0) === 0}
+              >
+                유도원 서류 ({guideWorkerDocs?.length || 0})
+              </Button>
+            )}
           </div>
           <div className="space-y-3">
-            {(docTab === "equipment" ? equipmentDocs : workerDocs).map((doc: any) => (
+            {(() => {
+              let docs: any[] = [];
+              if (docTab === "equipment") {
+                docs = equipmentDocs;
+              } else if (docTab === "worker") {
+                docs = workerDocs;
+              } else if (docTab === "guideWorker") {
+                docs = guideWorkerDocs || [];
+              }
+              return docs.map((doc: any) => (
               <Card key={doc.id}>
                 <CardContent className="p-4 space-y-2">
                   <div className="flex items-center justify-between">
@@ -900,9 +961,19 @@ const handleOpenDocs = () => {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+              ));
+            })()}
 
-            {(docTab === "equipment" ? equipmentDocs : workerDocs).length === 0 && (
+            {(() => {
+              let docs: any[] = [];
+              if (docTab === "equipment") {
+                docs = equipmentDocs;
+              } else if (docTab === "worker") {
+                docs = workerDocs;
+              } else if (docTab === "guideWorker") {
+                docs = guideWorkerDocs || [];
+              }
+              return docs.length === 0 && (
               <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
                   서류가 없습니다.
