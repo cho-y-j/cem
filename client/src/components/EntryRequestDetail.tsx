@@ -72,6 +72,14 @@ export function EntryRequestDetail({
   const [bpWorkPlanFile, setBpWorkPlanFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // EP 승인용 state (안전교육/건강검진)
+  const [entryInspectionCompleted, setEntryInspectionCompleted] = useState(false);
+  const [entryInspectionFile, setEntryInspectionFile] = useState<File | null>(null);
+  const [safetyTrainingCompleted, setSafetyTrainingCompleted] = useState(false);
+  const [safetyTrainingFile, setSafetyTrainingFile] = useState<File | null>(null);
+  const [healthCheckCompleted, setHealthCheckCompleted] = useState(false);
+  const [healthCheckFile, setHealthCheckFile] = useState<File | null>(null);
+
   // PDF 뷰어 상태
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const [viewingDocuments, setViewingDocuments] = useState<any[]>([]);
@@ -154,6 +162,21 @@ export function EntryRequestDetail({
 
   // 상세 데이터가 있으면 사용, 없으면 기본 request 사용
   const requestData = detailData || request;
+
+  // 이미 완료된 검사/교육 정보가 있으면 초기 상태 설정
+  useEffect(() => {
+    if (requestData) {
+      if (requestData.entry_inspection_completed_at || requestData.entryInspectionCompletedAt) {
+        setEntryInspectionCompleted(true);
+      }
+      if (requestData.safety_training_completed_at || requestData.safetyTrainingCompletedAt) {
+        setSafetyTrainingCompleted(true);
+      }
+      if (requestData.health_check_completed_at || requestData.healthCheckCompletedAt) {
+        setHealthCheckCompleted(true);
+      }
+    }
+  }, [requestData]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
