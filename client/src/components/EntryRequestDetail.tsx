@@ -181,6 +181,51 @@ export function EntryRequestDetail({
     }
   };
 
+  // EP 승인용 파일 변환
+  const handleEpApproveWithFiles = async () => {
+    let entryInspectionFileData: string | undefined;
+    let safetyTrainingFileData: string | undefined;
+    let healthCheckFileData: string | undefined;
+    
+    if (entryInspectionFile) {
+      try {
+        entryInspectionFileData = await fileToBase64(entryInspectionFile);
+      } catch (error) {
+        toast.error("반입 검사 확인서 업로드에 실패했습니다.");
+        return;
+      }
+    }
+    
+    if (safetyTrainingFile) {
+      try {
+        safetyTrainingFileData = await fileToBase64(safetyTrainingFile);
+      } catch (error) {
+        toast.error("안전교육 서류 업로드에 실패했습니다.");
+        return;
+      }
+    }
+    
+    if (healthCheckFile) {
+      try {
+        healthCheckFileData = await fileToBase64(healthCheckFile);
+      } catch (error) {
+        toast.error("건강검진 서류 업로드에 실패했습니다.");
+        return;
+      }
+    }
+    
+    epApproveMutation.mutate({
+      id: requestData.id,
+      comment: comment.trim() || undefined,
+      entryInspectionCompleted: entryInspectionCompleted,
+      entryInspectionFile: entryInspectionFileData,
+      safetyTrainingCompleted: safetyTrainingCompleted,
+      safetyTrainingFile: safetyTrainingFileData,
+      healthCheckCompleted: healthCheckCompleted,
+      healthCheckFile: healthCheckFileData,
+    });
+  };
+
   const handleApprove = () => {
     if (userRole === "owner") {
       if (!workPlanFile) {
