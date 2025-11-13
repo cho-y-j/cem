@@ -85,3 +85,45 @@ ON equipment(owner_company_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_owner_id_company_id 
 ON equipment(owner_id, owner_company_id);
 
+-- ============================================================
+-- Migration 0013: deployments 테이블에 guide_worker_id 컬럼 추가
+-- ============================================================
+
+ALTER TABLE deployments
+ADD COLUMN IF NOT EXISTS guide_worker_id VARCHAR(64);
+
+CREATE INDEX IF NOT EXISTS idx_deployments_guide_worker_id 
+ON deployments(guide_worker_id);
+
+-- ============================================================
+-- Migration 0014: entry_requests 테이블에 반입 검사/안전교육/건강검진 필드 추가
+-- ============================================================
+
+ALTER TABLE entry_requests
+ADD COLUMN IF NOT EXISTS entry_inspection_completed_at TIMESTAMP;
+
+ALTER TABLE entry_requests
+ADD COLUMN IF NOT EXISTS entry_inspection_file_url VARCHAR(500);
+
+ALTER TABLE entry_requests
+ADD COLUMN IF NOT EXISTS safety_training_completed_at TIMESTAMP;
+
+ALTER TABLE entry_requests
+ADD COLUMN IF NOT EXISTS safety_training_file_url VARCHAR(500);
+
+ALTER TABLE entry_requests
+ADD COLUMN IF NOT EXISTS health_check_completed_at TIMESTAMP;
+
+ALTER TABLE entry_requests
+ADD COLUMN IF NOT EXISTS health_check_file_url VARCHAR(500);
+
+-- ============================================================
+-- Migration 0015: deployments 테이블에 inspector_id 컬럼 추가
+-- ============================================================
+
+ALTER TABLE deployments
+ADD COLUMN IF NOT EXISTS inspector_id VARCHAR(64);
+
+CREATE INDEX IF NOT EXISTS idx_deployments_inspector_id 
+ON deployments(inspector_id);
+

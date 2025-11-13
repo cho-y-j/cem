@@ -399,6 +399,14 @@ export const entryRequests = pgTable("entry_requests", {
   epApprovedBy: varchar("ep_approved_by", { length: 64 }),
   epComment: text("ep_comment"),
   
+  // EP가 수행하는 검사 및 교육
+  entryInspectionCompletedAt: timestamp("entry_inspection_completed_at"), // 반입 검사 완료 (EP)
+  entryInspectionFileUrl: varchar("entry_inspection_file_url", { length: 500 }), // 반입 검사 확인서
+  safetyTrainingCompletedAt: timestamp("safety_training_completed_at"), // 안전교육 완료 (EP)
+  safetyTrainingFileUrl: varchar("safety_training_file_url", { length: 500 }), // 안전교육 서류
+  healthCheckCompletedAt: timestamp("health_check_completed_at"), // 배치전 건강검진 완료 (EP)
+  healthCheckFileUrl: varchar("health_check_file_url", { length: 500 }), // 건강검진 서류
+  
   // 반려
   rejectedAt: timestamp("rejected_at"),
   rejectedBy: varchar("rejected_by", { length: 64 }),
@@ -455,6 +463,8 @@ export const deployments = pgTable("deployments", {
   ownerId: varchar("owner_id", { length: 64 }).notNull(),
   bpCompanyId: varchar("bp_company_id", { length: 64 }).notNull(),
   epCompanyId: varchar("ep_company_id", { length: 64 }),
+  guideWorkerId: varchar("guide_worker_id", { length: 64 }), // 유도원 ID (BP가 추가)
+  inspectorId: varchar("inspector_id", { length: 64 }), // 안전점검원 ID (EP가 지정)
 
   startDate: timestamp("start_date").notNull(),
   plannedEndDate: timestamp("planned_end_date").notNull(),
