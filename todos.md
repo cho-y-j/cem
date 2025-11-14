@@ -1,13 +1,186 @@
 # 건설장비 및 인력 관리 시스템 (ERMS) - TODO 및 작업 가이드
 
-**마지막 업데이트**: 2025-11-14 (오후)
+**마지막 업데이트**: 2025-11-14 (저녁)
 **프로젝트**: Equipment and Resource Management System (ERMS)
 **Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY
-**현재 단계**: ✅ **입장 요청 장비 표시 문제 해결 완료** → 🔄 **워커-차량 매칭 및 GPS 위치 추적 개선 준비**
+**현재 단계**: ✅ **모바일 유도원 차량 배정 및 작업확인서 매칭 완료** → 🎯 **다음: 워커-차량 매칭 및 GPS 위치 추적 개선**
 
 ---
 
-## 🎉 오늘 완료한 작업 (2025-11-14)
+## 🎉 오늘 완료한 작업 (2025-11-14 저녁)
+
+### ✅ 모바일 유도원(Guide) 차량 배정 및 작업확인서 매칭 완전 해결
+
+**배경:**
+- 모바일 유도원(u1@com.com) 로그인 시 배정된 차량이 표시되지 않음
+- 운전자(shb@test.com)는 정상 작동하지만 유도원만 문제 발생
+- 유도원의 작업확인서(work journal) 목록도 표시되지 않음
+
+**문제 1: Foreign Key 관계 누락으로 인한 차량 배정 표시 오류**
+
+**근본 원인:**
+```
+PGRST200: Could not find a relationship between 'deployments' and 'workers'
+using the hint 'deployments_guide_worker_id_fkey' in the schema 'public'
+```
+- `deployments` 테이블의 `guide_worker_id`와 `inspector_id` 컬럼에 FK 제약 조건 없음
+- Supabase PostgREST가 `.select()` 쿼리에서 관계를 자동 해석하지 못함
+- Drizzle 스키마에는 `.references()` 선언이 있었지만 실제 DB에는 FK가 없었음
+
+**해결 방법 1 - FK 관계 설정:**
+
+1. ✅ **Drizzle 스키마 확인 및 수정** (`drizzle/schema.ts:459-486`):
+   ```typescript
+   export const deployments = pgTable("deployments", {
+     // ... 기존 필드
+     guideWorkerId: varchar("guide_worker_id", { length: 64 })
+       .references(() => workers.id), // FK 선언
+     inspectorId: varchar("inspector_id", { length: 64 })
+       .references(() => workers.id), // FK 선언
+   });
+   ```
+
+2. ✅ **PostgREST 네이밍 규칙 준수 SQL 생성** (`fix-foreign-key-names.sql`):
+   - PostgREST는 FK 이름이 `{table}_{column}_fkey` 패턴이어야 자동 인식
+   - 초기 시도: `deployments_guide_worker_id_workers_id_fk` (❌ 인식 안 됨)
+   - 수정: `deployments_guide_worker_id_fkey` (✅ 인식됨)
+
+   ```sql
+   -- 기존 FK 삭제
+   ALTER TABLE "deployments" DROP CONSTRAINT IF EXISTS "deployments_guide_worker_id_workers_id_fk";
+   ALTER TABLE "deployments" DROP CONSTRAINT IF EXISTS "deployments_inspector_id_workers_id_fk";
+
+   -- PostgREST 인식 가능한 이름으로 FK 생성
+   ALTER TABLE "deployments"
+     ADD CONSTRAINT "deployments_guide_worker_id_fkey"
+     FOREIGN KEY ("guide_worker_id") REFERENCES "public"."workers"("id")
+     ON DELETE NO ACTION ON UPDATE NO ACTION;
+
+   ALTER TABLE "deployments"
+     ADD CONSTRAINT "deployments_inspector_id_fkey"
+     FOREIGN KEY ("inspector_id") REFERENCES "public"."workers"("id")
+     ON DELETE NO ACTION ON UPDATE NO ACTION;
+   ```
+
+3. ✅ **Supabase SQL Editor에서 실행** (사용자가 수동 실행 완료)
+
+**결과:**
+- ✅ 유도원 모바일 로그인 시 배정된 차량 정상 표시
+- ✅ Supabase PostgREST가 `guide_worker` 관계를 자동 해석
+- ✅ `mobile.worker.getCurrentDeployment` 쿼리가 유도원 deployment 조회 성공
+
+---
+
+**문제 2: 작업확인서 조회 시 users.id와 workers.id 불일치**
+
+**근본 원인:**
+- `work-journal-router.ts`의 `myList` 쿼리가 `ctx.user.id` 사용
+- `ctx.user.id`는 `users` 테이블 ID
+- `work_journal.worker_id`는 `workers` 테이블 ID
+- 두 테이블의 ID는 다른 값이므로 매칭 실패
+
+**해결 방법 2 - users.id → workers.id 변환:**
+
+✅ **work-journal-router.ts 수정** (`server/work-journal-router.ts:88-130`):
+```typescript
+myList: protectedProcedure
+  .input(z.object({
+    status: z.string().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+  }))
+  .query(async ({ input, ctx }) => {
+    // ⭐ users.id를 workers.id로 변환
+    const userPin = ctx.user.pin;
+    const userEmail = ctx.user.email;
+
+    let worker: any = null;
+
+    // PIN으로 worker 찾기
+    if (userPin) {
+      worker = await db.getWorkerByPinCode(userPin);
+    }
+
+    // PIN으로 못 찾으면 Email로 찾기
+    if (!worker && userEmail) {
+      worker = await db.getWorkerByEmail(userEmail);
+    }
+
+    if (!worker) {
+      console.log('[WorkJournal] No worker found for user:', ctx.user.id, ctx.user.email);
+      return [];
+    }
+
+    console.log('[WorkJournal] myList - Found worker:', worker.id, worker.name);
+
+    const journals = await db.getWorkJournals({
+      workerId: worker.id, // ⭐ workers.id 사용 (not ctx.user.id)
+      status: input.status,
+      startDate: input.startDate,
+      endDate: input.endDate,
+    });
+    return journals;
+  }),
+```
+
+**로직:**
+1. JWT 토큰에서 `ctx.user.pin` 또는 `ctx.user.email` 추출
+2. PIN으로 `workers` 테이블 조회 (`getWorkerByPinCode`)
+3. PIN이 없거나 실패하면 Email로 조회 (`getWorkerByEmail`)
+4. 찾은 `worker.id`로 `getWorkJournals` 호출
+5. 운전자와 유도원 모두 동일한 로직 사용
+
+---
+
+**수정된 파일:**
+1. `drizzle/schema.ts` - FK 관계 선언 확인
+2. `fix-foreign-key-names.sql` - PostgREST 네이밍 규칙 준수 SQL (신규 생성)
+3. `server/work-journal-router.ts` - myList 쿼리 users.id → workers.id 변환
+
+**생성된 진단 스크립트들:**
+- `check-worker-equipment.js` - deployment 데이터 확인
+- `check-users-workers-link.js` - users-workers 매핑 확인
+- `check-duplicate-pins.js` - PIN 중복 확인 (9명이 "0000" 사용 중 발견)
+- `fix-worker-pins.js` - 테스트 유저 PIN 변경 (shb@test.com→1111, u1@com.com→2222)
+- `check-foreign-keys.js` - FK 관계 쿼리 테스트
+- `test-mobile-api.js` - API 로직 시뮬레이션
+- `apply-fk-direct.js` - PostgreSQL 직접 FK 생성 (네트워크 문제로 미사용)
+
+**최종 결과:**
+- ✅ 유도원 차량 배정 표시 정상 작동
+- ✅ 유도원 작업확인서 목록 정상 표시
+- ✅ 운전자 모든 기능 정상 작동 (차량, 작업확인서, 장비 점검)
+- ✅ PostgREST FK 자동 해석 정상 작동
+- ✅ users.id ↔ workers.id 변환 로직 안정화
+
+**Git 커밋:**
+```
+수정: 유도원 작업확인서 조회 오류 해결 및 FK 관계 설정
+
+작업 확인서(work journal) 조회 시 유도원(guide) 데이터가 표시되지 않던 문제를 해결했습니다.
+
+주요 변경사항:
+1. work-journal-router.ts myList 쿼리 수정
+   - ctx.user.id (users 테이블 ID) → workers.id 변환 로직 추가
+   - PIN/Email 기반 worker 조회 후 work_journal.worker_id와 매칭
+   - 운전자와 유도원 모두 작업확인서 정상 표시
+
+2. FK 관계 설정 SQL 추가 (fix-foreign-key-names.sql)
+   - deployments.guide_worker_id → workers.id FK
+   - deployments.inspector_id → workers.id FK
+   - PostgREST 인식 가능한 네이밍 규칙 적용 (*_fkey)
+
+해결된 문제:
+- 유도원 모바일 로그인 시 배정 차량 표시 ✅
+- 유도원 작업확인서 목록 표시 ✅
+- 운전자 모든 데이터 정상 표시 ✅
+```
+
+**상태:** ✅ **완료 및 배포 대기**
+
+---
+
+## 🎉 오늘 완료한 작업 (2025-11-14 오후)
 
 ### ✅ 입장 요청 상세에서 장비 정보 표시 오류 완전 해결
 
