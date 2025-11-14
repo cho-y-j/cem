@@ -744,54 +744,54 @@ export default function EntryRequestsNew() {
                         className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md min-h-[3rem]"
                         style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
                       >
-                      <Checkbox
-                        id={`equipment-${equip.id}`}
-                        checked={selectedEquipmentIds.includes(equip.id)}
-                        onCheckedChange={() => handleEquipmentToggle(equip.id)}
-                      />
-                      <label
-                        htmlFor={`equipment-${equip.id}`}
-                        className="flex-1 cursor-pointer"
-                      >
-                        <div className="font-medium">{regNum}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {equipTypeName}
-                        </div>
-                      </label>
-                      {selectedEquipmentIds.includes(equip.id) && (
-                        <Select
-                          value={equipmentWorkerPairs[equip.id] || ""}
-                          onValueChange={(value) => {
-                            setEquipmentWorkerPairs({
-                              ...equipmentWorkerPairs,
-                              [equip.id]: value,
-                            });
-                          }}
+                        <Checkbox
+                          id={`equipment-${equip.id}`}
+                          checked={selectedEquipmentIds.includes(equip.id)}
+                          onCheckedChange={() => handleEquipmentToggle(equip.id)}
+                        />
+                        <label
+                          htmlFor={`equipment-${equip.id}`}
+                          className="flex-1 cursor-pointer"
                         >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="운전자 선택" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {workers?.filter(w => w.phone && w.pinCode).map((worker: any) => (
-                              <SelectItem key={worker.id} value={worker.id}>
-                                {worker.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {validationResult && (
-                        <div>
-                          {(() => {
-                            const item = validationResult.items.find(
-                              (i) => i.itemId === equip.id && i.itemType === "equipment"
-                            );
-                            return item ? (
-                              <DocumentStatusBadge status={item.overallStatus} />
-                            ) : null;
-                          })()}
-                        </div>
-                      )}
+                          <div className="font-medium">{regNum}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {equipTypeName}
+                          </div>
+                        </label>
+                        {selectedEquipmentIds.includes(equip.id) && (
+                          <Select
+                            value={equipmentWorkerPairs[equip.id] || ""}
+                            onValueChange={(value) => {
+                              setEquipmentWorkerPairs({
+                                ...equipmentWorkerPairs,
+                                [equip.id]: value,
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="운전자 선택" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {workers?.filter(w => w.phone && w.pinCode).map((worker: any) => (
+                                <SelectItem key={worker.id} value={worker.id}>
+                                  {worker.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {validationResult && (
+                          <div>
+                            {(() => {
+                              const item = validationResult.items.find(
+                                (i) => i.itemId === equip.id && i.itemType === "equipment"
+                              );
+                              return item ? (
+                                <DocumentStatusBadge status={item.overallStatus} />
+                              ) : null;
+                            })()}
+                          </div>
+                        )}
                       </div>
                     );
                   })
