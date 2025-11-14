@@ -4089,7 +4089,17 @@ export async function getActiveDeploymentByEquipmentId(equipmentId: string): Pro
         worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
       ),
       bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
-      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
+      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type),
+      work_zone:work_zones!deployments_work_zone_id_fkey(
+        id,
+        name,
+        description,
+        zone_type,
+        center_lat,
+        center_lng,
+        radius_meters,
+        polygon_coordinates
+      )
     `)
     .eq('equipment_id', equipmentId)
     .eq('status', 'active')

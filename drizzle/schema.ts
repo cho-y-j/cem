@@ -467,6 +467,9 @@ export const deployments = pgTable("deployments", {
   guideWorkerId: varchar("guide_worker_id", { length: 64 }).references(() => workers.id), // 유도원 ID (BP가 추가)
   inspectorId: varchar("inspector_id", { length: 64 }).references(() => workers.id), // 안전점검원 ID (EP가 지정)
 
+  // 작업 구역 연결 (현장명 자동 연결 + GPS 출근 구역)
+  workZoneId: varchar("work_zone_id", { length: 64 }).references(() => workZones.id),
+
   startDate: timestamp("start_date").notNull(),
   plannedEndDate: timestamp("planned_end_date").notNull(),
   actualEndDate: timestamp("actual_end_date"),
@@ -474,7 +477,7 @@ export const deployments = pgTable("deployments", {
   status: varchar("status", { length: 50 }).default("active").notNull(),
 
   // 작업확인서용 추가 정보
-  siteName: varchar("site_name", { length: 200 }), // 공사명/현장명
+  siteName: varchar("site_name", { length: 200 }), // 공사명/현장명 (호환성 유지, workZone.name으로 대체 예정)
   workType: varchar("work_type", { length: 20 }), // 'daily' | 'monthly'
   dailyRate: decimal("daily_rate", { precision: 10, scale: 2 }), // 일대 단가
   monthlyRate: decimal("monthly_rate", { precision: 10, scale: 2 }), // 월대 단가

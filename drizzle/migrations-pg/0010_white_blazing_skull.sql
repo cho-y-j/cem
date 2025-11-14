@@ -1,0 +1,2 @@
+ALTER TABLE "deployments" ADD COLUMN "work_zone_id" varchar(64);--> statement-breakpoint
+ALTER TABLE "deployments" ADD CONSTRAINT "deployments_work_zone_id_work_zones_id_fk" FOREIGN KEY ("work_zone_id") REFERENCES "public"."work_zones"("id") ON DELETE no action ON UPDATE no action;
