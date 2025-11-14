@@ -32,7 +32,7 @@ const menuItems = [
   { icon: Truck, label: "장비 관리", path: "/equipment", roles: ["owner", "admin", "bp", "ep"] },
   { icon: HardHat, label: "인력 관리", path: "/workers", roles: ["owner", "admin", "bp", "ep"] },
   { icon: FileText, label: "서류 관리", path: "/documents", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: ArrowRightLeft, label: "반입 요청", path: "/entry-requests", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: ArrowRightLeft, label: "반입,출입 요청", path: "/entry-requests", roles: ["owner", "ep", "bp", "admin"] },
   { icon: PackageCheck, label: "투입 관리", path: "/deployments", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Shield, label: "안전점검 확인", path: "/safety-inspection-review", roles: ["ep", "admin"] },
   { icon: FileText, label: "작업 확인서", path: "/work-journal", roles: ["owner", "ep", "bp", "admin"] },

@@ -550,7 +550,7 @@ export function EntryRequestDetail({
       owner_requested: { label: "승인 대기", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
       bp_requested: { label: "BP 요청", className: "bg-blue-100 text-blue-700 border-blue-300" },
       bp_reviewing: { label: "BP 검토중", className: "bg-indigo-100 text-indigo-700 border-indigo-300" },
-      bp_approved: { label: "BP 승인", className: "bg-cyan-100 text-cyan-700 border-cyan-300" },
+      bp_approved: { label: "결제 대기", className: "bg-orange-100 text-orange-700 border-orange-300" },
       ep_reviewing: { label: "EP 검토중", className: "bg-purple-100 text-purple-700 border-purple-300" },
       owner_approved: { label: "Owner 승인", className: "bg-teal-100 text-teal-700 border-teal-300" },
       ep_approved: { label: "EP 최종 승인", className: "bg-green-100 text-green-700 border-green-300" },
@@ -568,7 +568,7 @@ export function EntryRequestDetail({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              반입 요청 상세
+              반입,출입 요청 상세
             </DialogTitle>
             <DialogDescription>
               요청 번호: {requestData.requestNumber || requestData.request_number || requestData.id}

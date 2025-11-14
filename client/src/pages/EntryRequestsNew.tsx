@@ -366,7 +366,7 @@ export default function EntryRequestsNew() {
       owner_requested: { label: "승인 대기", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
       bp_requested: { label: "BP 요청", className: "bg-blue-100 text-blue-700 border-blue-300" },
       bp_reviewing: { label: "BP 검토중", className: "bg-indigo-100 text-indigo-700 border-indigo-300" },
-      bp_approved: { label: "BP 승인", className: "bg-cyan-100 text-cyan-700 border-cyan-300" },
+      bp_approved: { label: "결제 대기", className: "bg-orange-100 text-orange-700 border-orange-300" },
       ep_reviewing: { label: "EP 검토중", className: "bg-purple-100 text-purple-700 border-purple-300" },
       owner_approved: { label: "Owner 승인", className: "bg-teal-100 text-teal-700 border-teal-300" },
       ep_approved: { label: "EP 최종 승인", className: "bg-green-100 text-green-700 border-green-300" },
@@ -405,11 +405,17 @@ export default function EntryRequestsNew() {
 
   // 2. 정렬 (승인 대기 우선)
   const sortedRequests = [...filteredRequests].sort((a, b) => {
-    // EP 사용자: bp_approved, ep_reviewing, bp_requested 우선
+    // EP 사용자: bp_approved (결제 대기) 최우선, 그 다음 ep_reviewing, bp_requested
     if (user?.role === "ep") {
-      const aPriority = (a.status === "bp_approved" || a.status === "ep_reviewing" || a.status === "bp_requested") ? 1 : 0;
-      const bPriority = (b.status === "bp_approved" || b.status === "ep_reviewing" || b.status === "bp_requested") ? 1 : 0;
-      if (aPriority !== bPriority) return bPriority - aPriority;
+      const getEpPriority = (status: string) => {
+        if (status === "bp_approved") return 3; // 결제 대기 최우선
+        if (status === "ep_reviewing") return 2;
+        if (status === "bp_requested") return 1;
+        return 0;
+      };
+      const aPriority = getEpPriority(a.status);
+      const bPriority = getEpPriority(b.status);
+      if (aPriority !== bPriority) return bPriority - aPriority; // 높은 우선순위가 위로
     }
     
     // BP 사용자: owner_requested 우선
@@ -471,9 +477,9 @@ export default function EntryRequestsNew() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">반입 요청 관리</h1>
+          <h1 className="text-3xl font-bold">반입,출입 요청 관리</h1>
           <p className="text-muted-foreground mt-1">
-            장비 및 인력 반입 요청을 관리합니다.
+            장비 및 인력 반입,출입 요청을 관리합니다.
             {pendingCount > 0 && (
               <span className="ml-2 text-orange-600 font-semibold">
                 ⚠️ 승인 대기 {pendingCount}건
@@ -483,15 +489,15 @@ export default function EntryRequestsNew() {
         </div>
         <Button onClick={() => setIsDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          반입 요청 등록
+          반입,출입 요청 등록
         </Button>
       </div>
 
       {/* 반입 요청 목록 */}
       <Card>
         <CardHeader>
-          <CardTitle>반입 요청 목록 ({sortedRequests.length}건)</CardTitle>
-          <CardDescription>등록된 반입 요청을 확인하고 관리합니다.</CardDescription>
+          <CardTitle>반입,출입 요청 목록 ({sortedRequests.length}건)</CardTitle>
+          <CardDescription>등록된 반입,출입 요청을 확인하고 관리합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 필터 UI - 한 줄 통일 디자인 */}
