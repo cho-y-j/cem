@@ -720,14 +720,18 @@ export default function EntryRequestsNew() {
 
           <div className="space-y-6">
             {/* 장비 선택 */}
-            <div>
+            <div className="w-full">
               <Label className="text-lg font-semibold mb-3 block">장비 선택</Label>
-              <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
+              <div 
+                className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto bg-background"
+                style={{ minHeight: '100px' }}
+              >
                 {equipmentLoading ? (
                   <div className="text-center text-muted-foreground py-4">
                     장비 목록을 불러오는 중...
                   </div>
                 ) : equipment && equipment.length > 0 ? (
+                  <div style={{ display: 'block', visibility: 'visible' }}>
                   equipment.map((equip: any) => {
                     // 필드명 호환성 처리
                     const regNum = equip.regNum || equip.reg_num || equip.id;
@@ -738,7 +742,8 @@ export default function EntryRequestsNew() {
                     return (
                     <div
                       key={equip.id}
-                      className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md"
+                      className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md min-h-[3rem]"
+                      style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
                     >
                       <Checkbox
                         id={`equipment-${equip.id}`}
