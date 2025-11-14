@@ -741,8 +741,7 @@ export default function EntryRequestsNew() {
                     return (
                       <div
                         key={equip.id}
-                        className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md min-h-[3rem]"
-                        style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
+                        className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md"
                       >
                         <Checkbox
                           id={`equipment-${equip.id}`}
