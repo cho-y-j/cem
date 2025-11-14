@@ -810,6 +810,12 @@ export function EntryRequestDetail({
               // 디버깅: items 확인
               console.log('[EntryRequestDetail] requestData.items:', requestData.items);
               console.log('[EntryRequestDetail] requestData:', requestData);
+              if (requestData.items && requestData.items.length > 0) {
+                console.log('[EntryRequestDetail] First item:', requestData.items[0]);
+                console.log('[EntryRequestDetail] First item keys:', Object.keys(requestData.items[0]));
+                console.log('[EntryRequestDetail] First item equipTypeName:', requestData.items[0].equipTypeName);
+                console.log('[EntryRequestDetail] First item equip_type_name:', requestData.items[0].equip_type_name);
+              }
               
               const equipmentCount = requestData.items?.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").length || 0;
               const workerCount = requestData.items?.filter((i: any) => i.itemType === "worker" || i.item_type === "worker").length || 0;
@@ -865,12 +871,6 @@ export function EntryRequestDetail({
                             </div>
                             {item.specification && (
                               <div className="text-muted-foreground">규격: {item.specification}</div>
-                            )}
-                            {item.model && (
-                              <div className="text-muted-foreground">모델: {item.model}</div>
-                            )}
-                            {item.manufacturer && (
-                              <div className="text-muted-foreground">제조사: {item.manufacturer}</div>
                             )}
                           </div>
                         </div>

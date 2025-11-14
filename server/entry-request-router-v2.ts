@@ -219,7 +219,8 @@ export const entryRequestsRouterV2 = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      const supabase = db.getSupabase();
+      // Admin 클라이언트 사용 (RLS 우회)
+      const supabase = db.getSupabaseAdmin() || db.getSupabase();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       console.log('[EntryRequestsV2] getById:', input.id);
@@ -252,11 +253,17 @@ export const entryRequestsRouterV2 = router({
 
           if (item.item_type === 'equipment' && item.item_id) {
             // 장비 정보
-            const { data: equip } = await supabase
+            console.log(`[EntryRequestsV2] Querying equipment: ${item.item_id}`);
+            const { data: equip, error: equipError } = await supabase
               .from('equipment')
-              .select('id, reg_num, equip_type_id, specification, model, manufacturer')
+              .select('id, reg_num, equip_type_id, specification')
               .eq('id', item.item_id)
               .maybeSingle();
+
+            if (equipError) {
+              console.error(`[EntryRequestsV2] Equipment query error for ${item.item_id}:`, equipError);
+            }
+            console.log(`[EntryRequestsV2] Equipment data for ${item.item_id}:`, equip);
 
             if (equip) {
               // 장비 타입 정보
@@ -278,8 +285,6 @@ export const entryRequestsRouterV2 = router({
                 equipTypeName: equipType?.name || '-',
                 equipTypeDescription: equipType?.description || '',
                 specification: equip.specification || '',
-                model: equip.model || '',
-                manufacturer: equip.manufacturer || '',
               };
 
               // 장비 서류 조회
@@ -306,8 +311,6 @@ export const entryRequestsRouterV2 = router({
                 equipTypeName: '장비 정보를 찾을 수 없습니다',
                 equipTypeDescription: '',
                 specification: '',
-                model: '',
-                manufacturer: '',
               };
             }
           } else if (item.item_type === 'worker' && item.item_id) {
@@ -381,6 +384,9 @@ export const entryRequestsRouterV2 = router({
       );
 
       console.log('[EntryRequestsV2] Enriched items ready with documents');
+      if (enrichedItems.length > 0) {
+        console.log('[EntryRequestsV2] Sample enriched item (before camelCase):', enrichedItems[0]);
+      }
 
       // BP 회사명 조회
       let bpCompanyName = '-';
@@ -416,12 +422,37 @@ export const entryRequestsRouterV2 = router({
 
       // toCamelCase 적용하여 반환
       const { toCamelCase } = await import('./db-utils');
+
+      // enrichedItems의 각 항목에도 toCamelCase 적용 (단, 이미 camelCase로 설정한 필드는 유지)
+      const camelCaseItems = enrichedItems.map((item: any) => {
+        const baseCamelCase = toCamelCase(item);
+        // itemDetails에서 설정한 필드들은 이미 camelCase이므로 그대로 유지
+        return {
+          ...baseCamelCase,
+          // 명시적으로 설정된 필드들 유지
+          itemType: item.itemType,
+          itemId: item.itemId,
+          itemName: item.itemName,
+          equipmentRegNum: item.equipmentRegNum,
+          equipTypeName: item.equipTypeName,
+          equipTypeDescription: item.equipTypeDescription,
+          workerName: item.workerName,
+          workerTypeName: item.workerTypeName,
+          workerTypeDescription: item.workerTypeDescription,
+          documents: item.documents,
+        };
+      });
+
+      if (camelCaseItems.length > 0) {
+        console.log('[EntryRequestsV2] Sample camelCase item (after conversion):', camelCaseItems[0]);
+      }
+
       return {
         ...toCamelCase(request),
         bpCompanyName,
         bpUserName,
         ownerName,
-        items: enrichedItems,
+        items: camelCaseItems,
       };
     }),
 
