@@ -2827,9 +2827,9 @@ export async function getDeployments(filters?: {
     console.log("[Database] Sample deployments (first 10):", allDeployments);
   }
 
-  // guide_worker와 inspector 정보를 별도로 조회하여 추가
+  // guide_worker, inspector, workZone 정보를 별도로 조회하여 추가
   const deployments = toCamelCaseArray(data || []) as Deployment[];
-  
+
   if (deployments.length > 0) {
     const guideWorkerIds = deployments
       .map(d => d.guideWorkerId)
@@ -2837,9 +2837,13 @@ export async function getDeployments(filters?: {
     const inspectorIds = deployments
       .map(d => d.inspectorId)
       .filter((id): id is string => !!id);
-    
+    const workZoneIds = deployments
+      .map(d => d.workZoneId)
+      .filter((id): id is string => !!id);
+
     const allWorkerIds = [...new Set([...guideWorkerIds, ...inspectorIds])];
-    
+
+    // Workers 조회
     if (allWorkerIds.length > 0) {
       const { data: workers } = await supabase
         .from('workers')
@@ -2851,16 +2855,43 @@ export async function getDeployments(filters?: {
           worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
         `)
         .in('id', allWorkerIds);
-      
+
       if (workers) {
         const workerMap = new Map(workers.map((w: any) => [w.id, toCamelCase(w)]));
-        
+
         deployments.forEach(deployment => {
           if (deployment.guideWorkerId && workerMap.has(deployment.guideWorkerId)) {
             (deployment as any).guideWorker = workerMap.get(deployment.guideWorkerId);
           }
           if (deployment.inspectorId && workerMap.has(deployment.inspectorId)) {
             (deployment as any).inspector = workerMap.get(deployment.inspectorId);
+          }
+        });
+      }
+    }
+
+    // WorkZones 조회
+    if (workZoneIds.length > 0) {
+      const { data: workZones } = await supabase
+        .from('work_zones')
+        .select(`
+          id,
+          name,
+          description,
+          zone_type,
+          center_lat,
+          center_lng,
+          radius_meters,
+          polygon_coordinates
+        `)
+        .in('id', workZoneIds);
+
+      if (workZones) {
+        const workZoneMap = new Map(workZones.map((wz: any) => [wz.id, toCamelCase(wz)]));
+
+        deployments.forEach(deployment => {
+          if (deployment.workZoneId && workZoneMap.has(deployment.workZoneId)) {
+            (deployment as any).workZone = workZoneMap.get(deployment.workZoneId);
           }
         });
       }
@@ -2920,7 +2951,17 @@ export async function getDeploymentByWorkerId(workerId: string): Promise<Deploym
         worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
       ),
       bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
-      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
+      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type),
+      work_zone:work_zones!deployments_work_zone_id_fkey(
+        id,
+        name,
+        description,
+        zone_type,
+        center_lat,
+        center_lng,
+        radius_meters,
+        polygon_coordinates
+      )
     `)
     .eq('worker_id', workerId)
     .eq('status', 'active')
@@ -2983,7 +3024,17 @@ export async function getDeploymentByGuideWorkerId(guideWorkerId: string): Promi
         worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
       ),
       bp_company:companies!deployments_bp_company_id_fkey(id, name, company_type),
-      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type)
+      ep_company:companies!deployments_ep_company_id_fkey(id, name, company_type),
+      work_zone:work_zones!deployments_work_zone_id_fkey(
+        id,
+        name,
+        description,
+        zone_type,
+        center_lat,
+        center_lng,
+        radius_meters,
+        polygon_coordinates
+      )
     `)
     .eq('guide_worker_id', guideWorkerId)
     .eq('status', 'active')
