@@ -97,8 +97,31 @@ export const workJournalRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
+      // users.id를 workers.id로 변환
+      const userPin = ctx.user.pin;
+      const userEmail = ctx.user.email;
+
+      let worker: any = null;
+
+      // PIN으로 worker 찾기
+      if (userPin) {
+        worker = await db.getWorkerByPinCode(userPin);
+      }
+
+      // PIN으로 못 찾으면 Email로 찾기
+      if (!worker && userEmail) {
+        worker = await db.getWorkerByEmail(userEmail);
+      }
+
+      if (!worker) {
+        console.log('[WorkJournal] No worker found for user:', ctx.user.id, ctx.user.email);
+        return [];
+      }
+
+      console.log('[WorkJournal] myList - Found worker:', worker.id, worker.name);
+
       const journals = await db.getWorkJournals({
-        workerId: ctx.user.id,
+        workerId: worker.id, // workers.id 사용
         status: input.status,
         startDate: input.startDate,
         endDate: input.endDate,
