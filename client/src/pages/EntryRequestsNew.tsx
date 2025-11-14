@@ -795,7 +795,8 @@ export default function EntryRequestsNew() {
                       )}
                     </div>
                     );
-                  })
+                  })}
+                  </>
                 ) : (
                   <p className="text-center text-muted-foreground py-4">
                     {equipment === undefined 
