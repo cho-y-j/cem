@@ -1,16 +1,8 @@
-import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import MobileLayout from "@/components/mobile/MobileLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   FileText,
   Calendar,
@@ -20,7 +12,6 @@ import {
   XCircle,
   Loader2,
   AlertCircle,
-  Filter,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -32,12 +23,9 @@ import { ko } from "date-fns/locale";
  */
 export default function WorkJournalList() {
   const [, setLocation] = useLocation();
-  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // 작업확인서 목록 조회
-  const { data: journals, isLoading } = trpc.workJournal.myList.useQuery({
-    status: statusFilter === "all" ? undefined : statusFilter,
-  });
+  const { data: journals, isLoading } = trpc.workJournal.myList.useQuery({});
 
   // 상태별 뱃지 스타일
   const getStatusBadge = (status: string) => {
@@ -76,29 +64,6 @@ export default function WorkJournalList() {
   return (
     <MobileLayout title="작업확인서 목록" showBack>
       <div className="p-4 space-y-4">
-        {/* 필터 섹션 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              상태 필터
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-11">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                <SelectItem value="pending_bp">BP 승인 대기</SelectItem>
-                <SelectItem value="bp_approved">승인 완료</SelectItem>
-                <SelectItem value="rejected">반려됨</SelectItem>
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-
         {/* 목록 섹션 */}
         {isLoading ? (
           <Card>
@@ -112,9 +77,7 @@ export default function WorkJournalList() {
             <CardContent className="pt-6 text-center">
               <FileText className="h-12 w-12 mx-auto mb-3 text-blue-400" />
               <p className="font-medium text-blue-900 mb-2">
-                {statusFilter === "all"
-                  ? "작성한 작업확인서가 없습니다"
-                  : "해당 상태의 작업확인서가 없습니다"}
+                작성한 작업확인서가 없습니다
               </p>
               <p className="text-sm text-blue-700 mb-4">
                 작업 종료 후 작업확인서를 작성해주세요

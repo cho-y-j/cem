@@ -70,15 +70,7 @@ export default function SafetyInspectionNew() {
   const activeDeployment = equipmentContext?.activeDeployment;
   const equipmentDocs = equipmentContext?.docs?.equipment || [];
   const workerDocs = equipmentContext?.docs?.worker || [];
-  
-  // 유도원 서류 조회
-  const { data: guideWorkerDocs } = trpc.docs.getComplianceByTarget.useQuery(
-    {
-      targetType: "worker",
-      targetId: activeDeployment?.guideWorkerId || "",
-    },
-    { enabled: !!activeDeployment?.guideWorkerId }
-  );
+  const guideWorkerDocs = equipmentContext?.docs?.guideWorker || [];
 
   // 작업계획서 조회
   const { data: workPlan } = trpc.entryRequestsV2.getWorkPlanByEquipment.useQuery(

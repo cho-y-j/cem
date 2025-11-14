@@ -4130,6 +4130,8 @@ export async function getEquipmentInspectionContext(equipmentId: string) {
   const equipmentDocs = await getDocsComplianceByTarget("equipment", equipmentId);
   const workerDocs =
     activeDeployment?.workerId ? await getDocsComplianceByTarget("worker", activeDeployment.workerId) : [];
+  const guideWorkerDocs =
+    activeDeployment?.guideWorkerId ? await getDocsComplianceByTarget("worker", activeDeployment.guideWorkerId) : [];
 
   return {
     equipment,
@@ -4137,6 +4139,7 @@ export async function getEquipmentInspectionContext(equipmentId: string) {
     docs: {
       equipment: equipmentDocs,
       worker: workerDocs,
+      guideWorker: guideWorkerDocs,
     },
   };
 }
