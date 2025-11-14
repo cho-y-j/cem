@@ -134,7 +134,7 @@ export default function EntryRequestsNew() {
       console.log('[EntryRequestsNew] First equipment regNum:', equipment[0].regNum, equipment[0].reg_num);
       console.log('[EntryRequestsNew] First equipment equipTypeName:', equipment[0].equipTypeName, equipment[0].equip_type);
     }
-  }, [equipment, equipmentLoading]);
+  }, [equipment, equipmentLoading, isDialogOpen]);
   const { data: bpCompanies } = trpc.companies.listByType.useQuery({ companyType: "bp" }, { enabled: !isBp });
   const { data: epCompanies } = trpc.companies.listByType.useQuery({ companyType: "ep" }, { enabled: isBp });
 
@@ -723,11 +723,17 @@ export default function EntryRequestsNew() {
             <div>
               <Label className="text-lg font-semibold mb-3 block">장비 선택</Label>
               <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
-                {equipment && equipment.length > 0 ? (
+                {equipmentLoading ? (
+                  <div className="text-center text-muted-foreground py-4">
+                    장비 목록을 불러오는 중...
+                  </div>
+                ) : equipment && equipment.length > 0 ? (
                   equipment.map((equip: any) => {
                     // 필드명 호환성 처리
                     const regNum = equip.regNum || equip.reg_num || equip.id;
                     const equipTypeName = equip.equipTypeName || equip.equip_type?.name || "장비 종류 없음";
+                    
+                    console.log('[EntryRequestsNew] Rendering equipment:', equip.id, regNum, equipTypeName);
                     
                     return (
                     <div
@@ -787,7 +793,9 @@ export default function EntryRequestsNew() {
                   })
                 ) : (
                   <p className="text-center text-muted-foreground py-4">
-                    등록된 장비가 없습니다.
+                    {equipment === undefined 
+                      ? "장비 목록을 불러오는 중..." 
+                      : "등록된 장비가 없습니다."}
                   </p>
                 )}
               </div>
