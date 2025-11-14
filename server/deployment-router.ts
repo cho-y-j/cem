@@ -78,6 +78,7 @@ export const deploymentRouter = router({
         workerId: z.string(),
         bpCompanyId: z.string(),
         epCompanyId: z.string().optional(),
+        workZoneId: z.string().optional(), // 작업 구역 ID (현장명 + GPS 구역)
         startDate: z.date(),
         plannedEndDate: z.date(),
         // 작업확인서용 추가 정보
@@ -120,9 +121,10 @@ export const deploymentRouter = router({
         ownerId: ctx.user.id,
         bpCompanyId: input.bpCompanyId,
         epCompanyId: epCompanyId,
+        workZoneId: input.workZoneId, // 작업 구역 추가
         startDate: input.startDate,
         plannedEndDate: input.plannedEndDate,
-        status: "pending", // BP 승인 대기
+        status: "pending_bp", // BP 승인 대기 (pending에서 pending_bp로 변경)
         // 작업확인서용 추가 정보
         siteName: input.siteName,
         workType: input.workType,
@@ -132,7 +134,7 @@ export const deploymentRouter = router({
         nightRate: input.nightRate,
       });
 
-      console.log('[Deployment] Deployment created successfully:', id);
+      console.log('[Deployment] Deployment created with status pending_bp:', id);
       return { id };
     }),
 
@@ -266,14 +268,21 @@ export const deploymentRouter = router({
     }),
 
   /**
-   * BP 투입 승인 (pending → active)
-   * BP가 유도원 추가와 함께 승인 가능
+   * BP 투입 승인 (pending_bp → active)
+   * BP가 단가 확인 후 유도원 추가와 함께 승인
    */
   approvePending: protectedProcedure
     .input(
       z.object({
         deploymentId: z.string(),
         guideWorkerId: z.string().optional(), // 유도원 추가 (선택)
+        workZoneId: z.string().optional(), // 작업 구역 ID (현장명 + GPS 구역)
+        // 단가 정보 (BP가 확인/수정 가능)
+        workType: z.enum(["daily", "monthly"]).optional(),
+        dailyRate: z.number().optional(),
+        monthlyRate: z.number().optional(),
+        otRate: z.number().optional(),
+        nightRate: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -300,10 +309,10 @@ export const deploymentRouter = router({
       }
 
       // 이미 승인된 경우 에러
-      if (deployment.status !== 'pending') {
+      if (deployment.status !== 'pending_bp') {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "이미 승인되었거나 승인 대기 상태가 아닙니다.",
+          message: `이미 승인되었거나 승인 대기 상태가 아닙니다. (현재 상태: ${deployment.status})`,
         });
       }
 
@@ -315,7 +324,7 @@ export const deploymentRouter = router({
         });
       }
 
-      // 투입 승인 (상태를 active로 변경, 유도원 추가 가능)
+      // 투입 승인 (상태를 active로 변경, 유도원/작업구역/단가 추가 가능)
       const updateData: any = {
         status: 'active',
         updated_at: new Date().toISOString(),
@@ -324,6 +333,17 @@ export const deploymentRouter = router({
       if (input.guideWorkerId) {
         updateData.guide_worker_id = input.guideWorkerId;
       }
+
+      if (input.workZoneId) {
+        updateData.work_zone_id = input.workZoneId;
+      }
+
+      // 단가 정보 업데이트 (BP가 확인/수정)
+      if (input.workType) updateData.work_type = input.workType;
+      if (input.dailyRate !== undefined) updateData.daily_rate = input.dailyRate;
+      if (input.monthlyRate !== undefined) updateData.monthly_rate = input.monthlyRate;
+      if (input.otRate !== undefined) updateData.ot_rate = input.otRate;
+      if (input.nightRate !== undefined) updateData.night_rate = input.nightRate;
 
       const { error } = await supabase
         .from('deployments')
@@ -489,4 +509,98 @@ export const deploymentRouter = router({
 
     return data || [];
   }),
+
+  /**
+   * BP 승인 대기 중인 투입 목록 조회 (status = 'pending_bp')
+   */
+  getPendingApprovals: protectedProcedure.query(async ({ ctx }) => {
+    // BP 권한 확인
+    if (ctx.user.role !== 'bp' && ctx.user.role !== 'admin') {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "승인 대기 목록 조회 권한이 없습니다.",
+      });
+    }
+
+    const filters: any = {
+      status: 'pending_bp',
+    };
+
+    // BP인 경우 자신의 회사 deployment만
+    if (ctx.user.role === 'bp' && ctx.user.companyId) {
+      filters.bpCompanyId = ctx.user.companyId;
+    }
+
+    const deployments = await db.getDeployments(filters);
+    return deployments;
+  }),
+
+  /**
+   * BP 투입 거부 (pending_bp → rejected)
+   */
+  rejectPending: protectedProcedure
+    .input(
+      z.object({
+        deploymentId: z.string(),
+        reason: z.string().optional(), // 거부 사유
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // BP 권한 확인
+      if (ctx.user.role !== 'bp' && ctx.user.role !== 'admin') {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "투입 거부 권한이 없습니다.",
+        });
+      }
+
+      const supabase = db.getSupabase();
+      if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Deployment 확인
+      const { data: deployment } = await supabase
+        .from('deployments')
+        .select('*')
+        .eq('id', input.deploymentId)
+        .single();
+
+      if (!deployment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "투입 정보를 찾을 수 없습니다." });
+      }
+
+      // 거부 가능한 상태 확인
+      if (deployment.status !== 'pending_bp') {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `거부할 수 없는 상태입니다. (현재 상태: ${deployment.status})`,
+        });
+      }
+
+      // BP 권한 확인 (자신의 회사 deployment만)
+      if (ctx.user.role === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "해당 투입을 거부할 권한이 없습니다.",
+        });
+      }
+
+      // 상태를 completed로 변경 (거부된 투입은 종료 처리)
+      // 또는 별도의 'rejected' 상태가 필요하면 enum에 추가 필요
+      const { error } = await supabase
+        .from('deployments')
+        .update({
+          status: 'completed',
+          actual_end_date: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', input.deploymentId);
+
+      if (error) {
+        console.error('[Deployment] Reject pending error:', error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+
+      console.log(`[Deployment] Deployment rejected: ${input.deploymentId} by BP ${ctx.user.id}${input.reason ? `, reason: ${input.reason}` : ''}`);
+      return { success: true };
+    }),
 });

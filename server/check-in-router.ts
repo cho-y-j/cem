@@ -79,10 +79,17 @@ export const checkInRouter = router({
 
       // 2. 활성 투입(deployment) 확인 - 투입된 사람만 출근 가능
       console.log("[CheckIn] Checking deployment for worker:", worker.id);
-      
+
       const { data: activeDeployment, error: deploymentError } = await supabase
         .from("deployments")
-        .select("id, bp_company_id, ep_company_id, equipment_id, status")
+        .select(`
+          id,
+          bp_company_id,
+          ep_company_id,
+          equipment_id,
+          work_zone_id,
+          status
+        `)
         .eq("worker_id", worker.id)
         .eq("status", "active")
         .order("created_at", { ascending: false })
@@ -131,102 +138,63 @@ export const checkInRouter = router({
       }
 
       // 3. 작업 구역 ID 결정 및 GPS 검증
-      let workZoneId = input.workZoneId;
       const deploymentId = activeDeployment.id;
       let isWithinZone = false;
       let distanceFromZone: number | undefined;
 
-      // workZoneId가 없으면 deployment의 ep_company_id와 일치하는 활성 작업 구역 찾기
+      // deployment에 지정된 workZoneId 사용 (없으면 출근 불가)
+      const workZoneId = activeDeployment.work_zone_id;
+
       if (!workZoneId) {
-        console.log("[CheckIn] Finding work zone for deployment:", deploymentId);
-        console.log("[CheckIn] EP Company ID:", activeDeployment.ep_company_id);
-        console.log("[CheckIn] Current GPS position:", input.lat, input.lng);
-
-        // deployment의 ep_company_id와 일치하는 활성 작업 구역만 조회
-        const { data: activeWorkZones, error: workZonesError } = await supabase
-          .from("work_zones")
-          .select("*")
-          .eq("is_active", true)
-          .eq("company_id", activeDeployment.ep_company_id); // EP 회사 ID와 일치하는 구역만
-
-        console.log("[CheckIn] Found active work zones for EP company:", {
-          count: activeWorkZones?.length || 0,
-          epCompanyId: activeDeployment.ep_company_id,
-          workZones: activeWorkZones,
-          error: workZonesError,
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "투입 정보에 작업 구역이 지정되지 않았습니다. 관리자에게 문의하세요.",
         });
+      }
 
-        if (workZonesError) {
-          console.error("[CheckIn] Error fetching work zones:", workZonesError);
-        }
+      console.log("[CheckIn] Checking work zone for deployment:", {
+        deploymentId,
+        workZoneId,
+        userPosition: { lat: input.lat, lng: input.lng },
+      });
 
-        if (activeWorkZones && activeWorkZones.length > 0) {
-          // 각 작업 구역까지의 거리 계산 및 구역 내 여부 확인
-          let nearestZone = null;
-          let minDistance = Infinity;
-          let nearestWithinZone = null;
-          let minDistanceWithin = Infinity;
-
-          for (const zone of activeWorkZones) {
-            try {
-            const result = await db.isWithinWorkZone(zone.id, input.lat, input.lng);
-              console.log(`[CheckIn] Zone "${zone.name}" (${zone.id}): distance=${result.distance}m, within=${result.isWithin}, zoneType=${zone.zone_type || 'circle'}`);
-
-              // 가장 가까운 구역 추적
-            if (result.distance < minDistance) {
-              minDistance = result.distance;
-              nearestZone = zone;
-              }
-
-              // 구역 내에 있는 가장 가까운 구역 추적 (우선순위)
-              if (result.isWithin && result.distance < minDistanceWithin) {
-                minDistanceWithin = result.distance;
-                nearestWithinZone = zone;
-                isWithinZone = true;
-              distanceFromZone = result.distance;
-              }
-            } catch (error) {
-              console.error(`[CheckIn] Error checking zone ${zone.id}:`, error);
-            }
-          }
-
-          // 구역 내에 있는 구역이 있으면 그것을 선택, 없으면 가장 가까운 구역 선택
-          if (nearestWithinZone) {
-            workZoneId = nearestWithinZone.id;
-            console.log(`[CheckIn] ✅ Selected work zone (within): "${nearestWithinZone.name}" (${workZoneId}), distance=${distanceFromZone}m, within=${isWithinZone}`);
-          } else if (nearestZone) {
-            workZoneId = nearestZone.id;
-            // 가장 가까운 구역까지의 거리 재계산
-            const result = await db.isWithinWorkZone(nearestZone.id, input.lat, input.lng);
-            isWithinZone = result.isWithin;
-            distanceFromZone = result.distance;
-            console.log(`[CheckIn] ⚠️ Selected nearest work zone (outside): "${nearestZone.name}" (${workZoneId}), distance=${distanceFromZone}m, within=${isWithinZone}`);
-          }
-        } else {
-          console.warn(`[CheckIn] ❌ No active work zones found for EP company: ${activeDeployment.ep_company_id}`);
-        }
-      } else {
-        // workZoneId가 명시적으로 제공된 경우
-        // deployment의 ep_company_id와 일치하는지 확인
-        const { data: workZone } = await supabase
-          .from("work_zones")
-          .select("id, company_id")
-          .eq("id", workZoneId)
-          .maybeSingle();
-
-        if (workZone && workZone.company_id !== activeDeployment.ep_company_id) {
-          console.warn(`[CheckIn] Work zone ${workZoneId} does not match deployment EP company ${activeDeployment.ep_company_id}`);
-        }
-
+      // deployment에 지정된 workZone만 확인
+      try {
         const result = await db.isWithinWorkZone(workZoneId, input.lat, input.lng);
         isWithinZone = result.isWithin;
         distanceFromZone = result.distance;
-        console.log(`[CheckIn] Using provided work zone: ${workZoneId}, distance=${distanceFromZone}m, within=${isWithinZone}`);
-      }
 
-      // 작업 구역 밖이면 경고 (하지만 출근은 허용 - 관리자가 나중에 확인)
-      if (!isWithinZone && workZoneId) {
-        console.warn(`[CheckIn] Worker ${ctx.user.id} checked in outside work zone (${distanceFromZone}m away)`);
+        console.log(`[CheckIn] Work zone check result:`, {
+          workZoneId,
+          distance: distanceFromZone,
+          within: isWithinZone,
+        });
+
+        // 구역 밖이면 출근 거부
+        if (!isWithinZone) {
+          const { data: zone } = await supabase
+            .from("work_zones")
+            .select("name")
+            .eq("id", workZoneId)
+            .maybeSingle();
+
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `지정된 작업 구역(${zone?.name || "알 수 없음"}) 밖에서는 출근할 수 없습니다. 현재 거리: ${distanceFromZone?.toFixed(0)}m`,
+          });
+        }
+      } catch (error: any) {
+        // TRPCError는 그대로 throw
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        // 기타 에러는 로그 후 에러 메시지 반환
+        console.error("[CheckIn] Error checking work zone:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "작업 구역 확인 중 오류가 발생했습니다.",
+        });
       }
 
       // 출근 기록 생성

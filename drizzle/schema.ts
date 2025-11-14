@@ -450,7 +450,7 @@ export type InsertEntryRequestItem = typeof entryRequestItems.$inferInsert;
 // 투입 관리 (Deployments)
 // ============================================================
 
-export const deploymentStatusEnum = pgEnum("deployment_status", ["pending", "active", "extended", "completed"]);
+export const deploymentStatusEnum = pgEnum("deployment_status", ["pending", "pending_bp", "active", "extended", "completed"]);
 
 /**
  * 투입 관리
@@ -474,7 +474,7 @@ export const deployments = pgTable("deployments", {
   plannedEndDate: timestamp("planned_end_date").notNull(),
   actualEndDate: timestamp("actual_end_date"),
 
-  status: varchar("status", { length: 50 }).default("active").notNull(),
+  status: deploymentStatusEnum("status").default("active").notNull(),
 
   // 작업확인서용 추가 정보
   siteName: varchar("site_name", { length: 200 }), // 공사명/현장명 (호환성 유지, workZone.name으로 대체 예정)
