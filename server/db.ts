@@ -665,6 +665,8 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
 
   const { ownerCompanyId, bpCompanyId, epCompanyId, search, ownerId } = filters;
 
+  console.log('[getEquipmentWithFilters] Filters:', JSON.stringify(filters, null, 2));
+
   let query = supabase
     .from('equipment')
     .select(`
@@ -675,10 +677,12 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
 
   // Owner 필터링
   if (ownerCompanyId) {
+    console.log('[getEquipmentWithFilters] Filtering by ownerCompanyId:', ownerCompanyId);
     query = query.eq('owner_company_id', ownerCompanyId);
   }
 
   if (ownerId) {
+    console.log('[getEquipmentWithFilters] Filtering by ownerId:', ownerId);
     query = query.eq('owner_id', ownerId);
   }
 
@@ -815,15 +819,30 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
     return [];
   }
 
+  console.log('[getEquipmentWithFilters] Query result count:', data?.length || 0);
+  if (data && data.length > 0) {
+    console.log('[getEquipmentWithFilters] First item equip_type:', data[0].equip_type);
+  }
+
   // equip_type 정보를 equipTypeName으로 변환
   const enrichedData = (data || []).map((item: any) => {
     const equipType = item.equip_type;
+    console.log('[getEquipmentWithFilters] Processing item:', item.id, 'equip_type:', equipType);
     return {
       ...item,
       equipTypeName: equipType?.name || null,
       equipTypeDescription: equipType?.description || null,
     };
   });
+
+  console.log('[getEquipmentWithFilters] Enriched data count:', enrichedData.length);
+  if (enrichedData.length > 0) {
+    console.log('[getEquipmentWithFilters] First enriched item:', {
+      id: enrichedData[0].id,
+      regNum: enrichedData[0].reg_num,
+      equipTypeName: enrichedData[0].equipTypeName,
+    });
+  }
 
   return toCamelCaseArray(enrichedData) as Equipment[];
 }
