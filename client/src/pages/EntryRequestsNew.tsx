@@ -128,6 +128,12 @@ export default function EntryRequestsNew() {
     console.log('[EntryRequestsNew] Equipment data:', equipment);
     console.log('[EntryRequestsNew] Equipment loading:', equipmentLoading);
     console.log('[EntryRequestsNew] Equipment count:', equipment?.length);
+    if (equipment && equipment.length > 0) {
+      console.log('[EntryRequestsNew] First equipment item:', equipment[0]);
+      console.log('[EntryRequestsNew] First equipment keys:', Object.keys(equipment[0]));
+      console.log('[EntryRequestsNew] First equipment regNum:', equipment[0].regNum, equipment[0].reg_num);
+      console.log('[EntryRequestsNew] First equipment equipTypeName:', equipment[0].equipTypeName, equipment[0].equip_type);
+    }
   }, [equipment, equipmentLoading]);
   const { data: bpCompanies } = trpc.companies.listByType.useQuery({ companyType: "bp" }, { enabled: !isBp });
   const { data: epCompanies } = trpc.companies.listByType.useQuery({ companyType: "ep" }, { enabled: isBp });
@@ -718,7 +724,12 @@ export default function EntryRequestsNew() {
               <Label className="text-lg font-semibold mb-3 block">장비 선택</Label>
               <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
                 {equipment && equipment.length > 0 ? (
-                  equipment.map((equip: any) => (
+                  equipment.map((equip: any) => {
+                    // 필드명 호환성 처리
+                    const regNum = equip.regNum || equip.reg_num || equip.id;
+                    const equipTypeName = equip.equipTypeName || equip.equip_type?.name || "장비 종류 없음";
+                    
+                    return (
                     <div
                       key={equip.id}
                       className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md"
@@ -732,9 +743,9 @@ export default function EntryRequestsNew() {
                         htmlFor={`equipment-${equip.id}`}
                         className="flex-1 cursor-pointer"
                       >
-                        <div className="font-medium">{equip.regNum}</div>
+                        <div className="font-medium">{regNum}</div>
                         <div className="text-sm text-muted-foreground">
-                          {equip.equipTypeName || "장비 종류 없음"}
+                          {equipTypeName}
                         </div>
                       </label>
                       {selectedEquipmentIds.includes(equip.id) && (
@@ -772,7 +783,8 @@ export default function EntryRequestsNew() {
                         </div>
                       )}
                     </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-center text-muted-foreground py-4">
                     등록된 장비가 없습니다.
