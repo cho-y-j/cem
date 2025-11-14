@@ -722,10 +722,7 @@ export default function EntryRequestsNew() {
             {/* 장비 선택 */}
             <div className="w-full">
               <Label className="text-lg font-semibold mb-3 block">장비 선택</Label>
-              <div 
-                className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto bg-background"
-                style={{ minHeight: '100px' }}
-              >
+              <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
                 {equipmentLoading ? (
                   <div className="text-center text-muted-foreground py-4">
                     장비 목록을 불러오는 중...
