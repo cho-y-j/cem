@@ -1243,7 +1243,10 @@ export async function getWorkerByPinCode(pinCode: string): Promise<Worker | unde
   // PIN 중복 가능성이 있으므로 limit(1)로 첫 번째 결과만 가져오기
   const { data, error } = await supabase
     .from('workers')
-    .select('*')
+    .select(`
+      *,
+      worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+    `)
     .eq('pin_code', pinCode)
     .limit(1);
 
@@ -1263,7 +1266,7 @@ export async function getWorkerByPinCode(pinCode: string): Promise<Worker | unde
   }
 
   const worker = data[0];
-  console.log("[Database] Found worker:", worker.id, worker.name, "with PIN:", pinCode);
+  console.log("[Database] Found worker:", worker.id, worker.name, "WorkerType:", worker.worker_type?.name, "with PIN:", pinCode);
   return toCamelCase(worker) as Worker;
 }
 
@@ -1275,7 +1278,10 @@ export async function getWorkerByEmail(email: string): Promise<Worker | undefine
 
   const { data, error } = await supabase
     .from('workers')
-    .select('*')
+    .select(`
+      *,
+      worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+    `)
     .eq('email', email)
     .maybeSingle();
 
@@ -1289,7 +1295,7 @@ export async function getWorkerByEmail(email: string): Promise<Worker | undefine
     return undefined;
   }
 
-  console.log("[Database] Found worker:", data.id, data.name, "with email:", email);
+  console.log("[Database] Found worker:", data.id, data.name, "WorkerType:", data.worker_type?.name, "with email:", email);
   return toCamelCase(data) as Worker;
 }
 

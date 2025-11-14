@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import MobileLayout from "@/components/mobile/MobileLayout";
-import MobileBottomNav, { workerNavItems } from "@/components/mobile/MobileBottomNav";
+import MobileBottomNav, { getWorkerNavItems } from "@/components/mobile/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -133,6 +133,13 @@ export default function WorkerMain() {
     console.log('[WorkerMain] Assigned Equipment:', assignedEquipment);
     console.log('[WorkerMain] Current Deployment:', currentDeployment);
   }, [user, assignedEquipment, currentDeployment]);
+
+  // Worker Type에 따른 동적 네비게이션 아이템 생성
+  const workerNavItems = useMemo(() => {
+    const workerTypeName = currentDeployment?.worker?.workerType?.name;
+    console.log('[WorkerMain] Worker Type Name:', workerTypeName);
+    return getWorkerNavItems(workerTypeName);
+  }, [currentDeployment?.worker?.workerType?.name]);
 
   // 현재 작업 세션 조회
   const { 

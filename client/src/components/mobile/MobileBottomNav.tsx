@@ -51,13 +51,30 @@ export default function MobileBottomNav({ items }: MobileBottomNavProps) {
   );
 }
 
-// 장비 운전자용 네비게이션 아이템
-export const workerNavItems: NavItem[] = [
-  { icon: Home, label: "메인", path: "/mobile/worker" },
-  { icon: ClipboardCheck, label: "점검표", path: "/mobile/driver-inspection" },
-  { icon: History, label: "점검이력", path: "/mobile/driver-inspection/history" },
-  { icon: FileText, label: "작업일지", path: "/mobile/work-journal-list" },
-];
+// 장비 운전자용 네비게이션 아이템 (동적 생성)
+export const getWorkerNavItems = (workerTypeName?: string): NavItem[] => {
+  const items: NavItem[] = [
+    { icon: Home, label: "메인", path: "/mobile/worker" },
+  ];
+
+  // 운전원만 차량점검 메뉴 표시
+  if (workerTypeName === "운전원") {
+    items.push(
+      { icon: ClipboardCheck, label: "점검표", path: "/mobile/driver-inspection" },
+      { icon: History, label: "점검이력", path: "/mobile/driver-inspection/history" }
+    );
+  }
+
+  // 작업일지는 모두 표시 (운전원, 유도원 등)
+  items.push(
+    { icon: FileText, label: "작업일지", path: "/mobile/work-journal-list" }
+  );
+
+  return items;
+};
+
+// 기본 워커 네비게이션 (호환성 유지)
+export const workerNavItems: NavItem[] = getWorkerNavItems();
 
 // 현장 안전점검원용 네비게이션 아이템
 export const inspectorNavItems: NavItem[] = [
