@@ -274,6 +274,20 @@ export const mobileRouter = router({
             bpCompany: deployment.bpCompany?.name,
             epCompany: deployment.epCompany?.name,
           });
+
+          // equipment 정보도 함께 조회
+          if (deployment.equipmentId) {
+            const equipment = await db.getEquipmentById(deployment.equipmentId);
+            if (equipment) {
+              console.log('[Mobile] Equipment for deployment:', {
+                id: equipment.id,
+                regNum: equipment.regNum,
+                equipType: equipment.equipType,
+              });
+              // deployment 객체에 equipment 추가
+              (deployment as any).equipment = equipment;
+            }
+          }
         }
 
         return deployment || null; // 명시적으로 null 반환

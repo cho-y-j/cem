@@ -276,7 +276,8 @@ export default function WorkerMain() {
       toast.success("작업이 시작되었습니다.");
       refetchSession();
       // 즉시 위치 전송
-      if (assignedEquipment) {
+      const equipment = assignedEquipment || currentDeployment?.equipment;
+      if (equipment) {
         toast.info("GPS로 현위치가 전송됩니다.");
         sendLocationOnce();
       }
@@ -290,13 +291,14 @@ export default function WorkerMain() {
   const endWorkMutation = trpc.mobile.worker.endWorkSession.useMutation({
     onSuccess: async () => {
       // 퇴근 시 위치 전송
-      if (assignedEquipment && "geolocation" in navigator) {
+      const equipment = assignedEquipment || currentDeployment?.equipment;
+      if (equipment && "geolocation" in navigator) {
         try {
           navigator.geolocation.getCurrentPosition(
             async (position) => {
               try {
                 await sendLocationMutation.mutateAsync({
-                  equipmentId: assignedEquipment.id,
+                  equipmentId: equipment.id,
                   latitude: position.coords.latitude,
                   longitude: position.coords.longitude,
                   accuracy: position.coords.accuracy,
@@ -816,14 +818,17 @@ export default function WorkerMain() {
   const handleStartWork = () => {
     console.log('[WorkerMain] handleStartWork called');
     console.log('[WorkerMain] assignedEquipment:', assignedEquipment);
+    console.log('[WorkerMain] currentDeployment:', currentDeployment);
 
-    if (!assignedEquipment) {
+    const equipment = assignedEquipment || currentDeployment?.equipment;
+
+    if (!equipment) {
       toast.error("배정된 장비가 없습니다. 관리자에게 문의하세요.");
       return;
     }
 
-    console.log('[WorkerMain] Starting work session with equipment:', assignedEquipment.id);
-    startWorkMutation.mutate({ equipmentId: assignedEquipment.id });
+    console.log('[WorkerMain] Starting work session with equipment:', equipment.id);
+    startWorkMutation.mutate({ equipmentId: equipment.id });
   };
 
   // 로딩 중일 때
@@ -1061,16 +1066,20 @@ export default function WorkerMain() {
                 </div>
                 <div className="space-y-3">
                   {/* 차량 정보 */}
-                  {assignedEquipment && (
+                  {(assignedEquipment || currentDeployment?.equipment) && (
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-600 text-sm">차량번호:</span>
-                        <span className="text-lg font-bold text-blue-900">{assignedEquipment.regNum}</span>
+                        <span className="text-lg font-bold text-blue-900">
+                          {assignedEquipment?.regNum || currentDeployment?.equipment?.regNum}
+                        </span>
                       </div>
-                      {assignedEquipment.equipType?.name && (
+                      {(assignedEquipment?.equipType?.name || currentDeployment?.equipment?.equipType?.name) && (
                         <div className="flex items-center gap-2">
                           <span className="text-gray-600 text-sm">차량종류:</span>
-                          <span className="font-medium text-gray-800">{assignedEquipment.equipType.name}</span>
+                          <span className="font-medium text-gray-800">
+                            {assignedEquipment?.equipType?.name || currentDeployment?.equipment?.equipType?.name}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1096,7 +1105,7 @@ export default function WorkerMain() {
               size="lg"
               className="w-full h-20 text-xl font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg active:scale-95 transition-transform"
               onClick={handleStartWork}
-              disabled={!assignedEquipment || startWorkMutation.isPending}
+              disabled={!(assignedEquipment || currentDeployment?.equipment) || startWorkMutation.isPending}
             >
               {startWorkMutation.isPending ? (
                 <>
