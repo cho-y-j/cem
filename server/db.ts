@@ -680,7 +680,7 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
   }
 
   // BP 필터링: EP가 BP 필터를 선택한 경우 deployments를 통해 필터링
-  // EP가 아닌 경우 (BP 자신이 조회하는 경우)는 current_bp_id로 직접 필터링
+  // EP가 아닌 경우 (BP 자신이 조회하는 경우)는 current_bp_id + deployments + EP 승인된 반입요청 포함
   let equipmentIdsFromBp: string[] | null = null;
   if (bpCompanyId) {
     // EP가 BP 필터를 선택한 경우: deployments를 통해 필터링
@@ -693,7 +693,7 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
       if (bpError) {
         console.error("[Database] Error getting deployments for BP filter:", bpError);
       } else if (bpDeployments) {
-        const allowedStatuses = new Set(['active', 'extended']);
+        const allowedStatuses = new Set(['pending', 'active', 'extended']); // pending도 포함
         equipmentIdsFromBp = bpDeployments
           .filter((dep: any) => dep?.equipment_id)
           .filter((dep: any) => !dep.status || allowedStatuses.has(dep.status))
@@ -703,8 +703,71 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
         }
       }
     } else {
-      // BP 자신이 조회하는 경우: current_bp_id로 직접 필터링
-      query = query.eq('current_bp_id', bpCompanyId);
+      // BP 자신이 조회하는 경우: current_bp_id + deployments + EP 승인된 반입요청
+      const equipmentIdsSet = new Set<string>();
+      
+      // 1. current_bp_id로 직접 필터링된 장비
+      const { data: currentBpEquipment, error: currentBpError } = await supabase
+        .from('equipment')
+        .select('id')
+        .eq('current_bp_id', bpCompanyId);
+      
+      if (currentBpError) {
+        console.error("[Database] Error getting current_bp_id equipment:", currentBpError);
+      } else if (currentBpEquipment) {
+        currentBpEquipment.forEach((eq: any) => equipmentIdsSet.add(eq.id));
+      }
+      
+      // 2. deployments의 장비 (pending, active, extended 모두 포함)
+      const { data: bpDeployments, error: depError } = await supabase
+        .from('deployments')
+        .select('equipment_id')
+        .eq('bp_company_id', bpCompanyId)
+        .in('status', ['pending', 'active', 'extended']);
+      
+      if (depError) {
+        console.error("[Database] Error getting deployments for BP equipment:", depError);
+      } else if (bpDeployments) {
+        bpDeployments.forEach((dep: any) => {
+          if (dep.equipment_id) equipmentIdsSet.add(dep.equipment_id);
+        });
+      }
+      
+      // 3. EP 승인된 반입요청의 장비
+      const { data: approvedRequests, error: reqError } = await supabase
+        .from('entry_requests')
+        .select('id')
+        .eq('status', 'ep_approved')
+        .or(`target_bp_company_id.eq.${bpCompanyId},bp_company_id.eq.${bpCompanyId}`);
+      
+      if (reqError) {
+        console.error("[Database] Error getting approved entry requests for BP equipment:", reqError);
+      } else if (approvedRequests && approvedRequests.length > 0) {
+        const requestIds = approvedRequests.map((r: any) => r.id);
+        
+        const { data: requestItems, error: itemsError } = await supabase
+          .from('entry_request_items')
+          .select('item_id')
+          .in('entry_request_id', requestIds)
+          .eq('item_type', 'equipment');
+        
+        if (itemsError) {
+          console.error("[Database] Error getting entry request items for BP equipment:", itemsError);
+        } else if (requestItems) {
+          requestItems.forEach((item: any) => {
+            if (item.item_id) equipmentIdsSet.add(item.item_id);
+          });
+        }
+      }
+      
+      // Set을 배열로 변환하여 필터링
+      if (equipmentIdsSet.size > 0) {
+        equipmentIdsFromBp = Array.from(equipmentIdsSet);
+        query = query.in('id', equipmentIdsFromBp);
+      } else {
+        // 장비가 없으면 빈 배열 반환
+        return [];
+      }
     }
   }
 
@@ -982,20 +1045,54 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
   };
 
   if (bpCompanyId) {
-    const { data, error } = await supabase
+    const workerIdsSet = new Set<string>();
+    
+    // 1. deployments의 worker_id와 guide_worker_id (pending, active, extended 모두 포함)
+    const { data: deployments, error: depError } = await supabase
       .from('deployments')
-      .select('worker_id, status')
-      .eq('bp_company_id', bpCompanyId);
+      .select('worker_id, guide_worker_id, status')
+      .eq('bp_company_id', bpCompanyId)
+      .in('status', ['pending', 'active', 'extended']);
 
-    if (error) {
-      console.error("[Database] Error getting deployments for BP filter:", error);
-    } else if (data) {
-      const allowedStatuses = new Set(['active', 'extended']);
-      const ids = data
-        .filter((dep: any) => dep?.worker_id)
-        .filter((dep: any) => !dep.status || allowedStatuses.has(dep.status))
-        .map((dep: any) => dep.worker_id as string);
-      collectWorkerIds(ids);
+    if (depError) {
+      console.error("[Database] Error getting deployments for BP filter:", depError);
+    } else if (deployments) {
+      deployments.forEach((dep: any) => {
+        if (dep.worker_id) workerIdsSet.add(dep.worker_id);
+        if (dep.guide_worker_id) workerIdsSet.add(dep.guide_worker_id); // 유도원도 포함
+      });
+    }
+    
+    // 2. EP 승인된 반입요청의 인력
+    const { data: approvedRequests, error: reqError } = await supabase
+      .from('entry_requests')
+      .select('id')
+      .eq('status', 'ep_approved')
+      .or(`target_bp_company_id.eq.${bpCompanyId},bp_company_id.eq.${bpCompanyId}`);
+    
+    if (reqError) {
+      console.error("[Database] Error getting approved entry requests for BP workers:", reqError);
+    } else if (approvedRequests && approvedRequests.length > 0) {
+      const requestIds = approvedRequests.map((r: any) => r.id);
+      
+      const { data: requestItems, error: itemsError } = await supabase
+        .from('entry_request_items')
+        .select('item_id')
+        .in('entry_request_id', requestIds)
+        .eq('item_type', 'worker');
+      
+      if (itemsError) {
+        console.error("[Database] Error getting entry request items for BP workers:", itemsError);
+      } else if (requestItems) {
+        requestItems.forEach((item: any) => {
+          if (item.item_id) workerIdsSet.add(item.item_id);
+        });
+      }
+    }
+    
+    // Set을 배열로 변환하여 collectWorkerIds 호출
+    if (workerIdsSet.size > 0) {
+      collectWorkerIds(Array.from(workerIdsSet));
     }
   }
 
@@ -1320,44 +1417,90 @@ export async function getDocsComplianceForEp(epCompanyId: string): Promise<DocsC
 
 /**
  * BP 회사에 투입된 장비/인력의 서류만 조회
+ * - deployment의 장비/인력/유도원
+ * - EP 승인된 반입요청의 장비/인력
  */
 export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsCompliance[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  // BP 회사에 투입된 deployment 조회
+  const equipmentIds = new Set<string>();
+  const workerIds = new Set<string>();
+
+  // 1. BP 회사에 투입된 deployment 조회 (pending, active, extended 모두 포함)
   const { data: deployments, error: depError } = await supabase
     .from('deployments')
-    .select('equipment_id, worker_id')
+    .select('equipment_id, worker_id, guide_worker_id')
     .eq('bp_company_id', bpCompanyId)
-    .in('status', ['active', 'extended']);
+    .in('status', ['pending', 'active', 'extended']);
 
   if (depError) {
     console.error("[Database] Error getting deployments for BP docs:", depError);
+  } else if (deployments && deployments.length > 0) {
+    deployments.forEach((d: any) => {
+      if (d.equipment_id) equipmentIds.add(d.equipment_id);
+      if (d.worker_id) workerIds.add(d.worker_id);
+      if (d.guide_worker_id) workerIds.add(d.guide_worker_id); // 유도원도 포함
+    });
+  }
+
+  // 2. EP 승인된 반입요청의 장비/인력 조회
+  const { data: approvedRequests, error: reqError } = await supabase
+    .from('entry_requests')
+    .select('id, target_bp_company_id, bp_company_id, status')
+    .eq('status', 'ep_approved')
+    .or(`target_bp_company_id.eq.${bpCompanyId},bp_company_id.eq.${bpCompanyId}`);
+
+  if (reqError) {
+    console.error("[Database] Error getting approved entry requests for BP docs:", reqError);
+  } else if (approvedRequests && approvedRequests.length > 0) {
+    const requestIds = approvedRequests.map((r: any) => r.id);
+    
+    // 반입요청의 아이템 조회
+    const { data: requestItems, error: itemsError } = await supabase
+      .from('entry_request_items')
+      .select('item_type, item_id')
+      .in('entry_request_id', requestIds);
+
+    if (itemsError) {
+      console.error("[Database] Error getting entry request items for BP docs:", itemsError);
+    } else if (requestItems && requestItems.length > 0) {
+      requestItems.forEach((item: any) => {
+        if (item.item_type === 'equipment' && item.item_id) {
+          equipmentIds.add(item.item_id);
+        } else if (item.item_type === 'worker' && item.item_id) {
+          workerIds.add(item.item_id);
+        }
+      });
+    }
+  }
+
+  // 장비/인력 ID가 없으면 빈 배열 반환
+  if (equipmentIds.size === 0 && workerIds.size === 0) {
+    console.log("[Database] No equipment or workers found for BP:", bpCompanyId);
     return [];
   }
 
-  if (!deployments || deployments.length === 0) {
-    return [];
-  }
+  // Set을 배열로 변환
+  const equipmentIdsArray = Array.from(equipmentIds);
+  const workerIdsArray = Array.from(workerIds);
 
-  const equipmentIds = deployments.map((d: any) => d.equipment_id).filter(Boolean);
-  const workerIds = deployments.map((d: any) => d.worker_id).filter(Boolean);
+  console.log(`[Database] BP docs query: ${equipmentIdsArray.length} equipment, ${workerIdsArray.length} workers`);
 
   // 해당 장비/인력의 서류 조회
-  if (equipmentIds.length > 0 && workerIds.length > 0) {
+  if (equipmentIdsArray.length > 0 && workerIdsArray.length > 0) {
     // 장비와 인력 모두 있는 경우: 두 타입 모두 조회
     const { data: equipDocs, error: equipError } = await supabase
       .from('docs_compliance')
       .select('*')
       .eq('target_type', 'equipment')
-      .in('target_id', equipmentIds);
+      .in('target_id', equipmentIdsArray);
     
     const { data: workerDocs, error: workerError } = await supabase
       .from('docs_compliance')
       .select('*')
       .eq('target_type', 'worker')
-      .in('target_id', workerIds);
+      .in('target_id', workerIdsArray);
     
     if (equipError || workerError) {
       console.error("[Database] Error getting docs compliance for BP:", equipError || workerError);
@@ -1365,12 +1508,12 @@ export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsC
     }
     
     return toCamelCaseArray([...(equipDocs || []), ...(workerDocs || [])]) as DocsCompliance[];
-  } else if (equipmentIds.length > 0) {
+  } else if (equipmentIdsArray.length > 0) {
     const { data, error } = await supabase
       .from('docs_compliance')
       .select('*')
       .eq('target_type', 'equipment')
-      .in('target_id', equipmentIds);
+      .in('target_id', equipmentIdsArray);
     
     if (error) {
       console.error("[Database] Error getting docs compliance for BP:", error);
@@ -1378,12 +1521,12 @@ export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsC
     }
     
     return toCamelCaseArray(data || []) as DocsCompliance[];
-  } else if (workerIds.length > 0) {
+  } else if (workerIdsArray.length > 0) {
     const { data, error } = await supabase
       .from('docs_compliance')
       .select('*')
       .eq('target_type', 'worker')
-      .in('target_id', workerIds);
+      .in('target_id', workerIdsArray);
     
     if (error) {
       console.error("[Database] Error getting docs compliance for BP:", error);
