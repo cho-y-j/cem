@@ -720,7 +720,7 @@ export default function EntryRequestsNew() {
 
           <div className="space-y-6">
             {/* 장비 선택 */}
-            <div className="w-full">
+            <div>
               <Label className="text-lg font-semibold mb-3 block">장비 선택</Label>
               <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
                 {equipmentLoading ? (
