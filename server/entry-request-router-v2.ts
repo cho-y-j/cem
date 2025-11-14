@@ -256,15 +256,19 @@ export const entryRequestsRouterV2 = router({
               .from('equipment')
               .select('id, reg_num, equip_type_id, specification, model, manufacturer')
               .eq('id', item.item_id)
-              .single();
+              .maybeSingle();
 
             if (equip) {
               // 장비 타입 정보
-              const { data: equipType } = await supabase
-                .from('equip_types')
-                .select('name, description')
-                .eq('id', equip.equip_type_id)
-                .single();
+              let equipType = null;
+              if (equip.equip_type_id) {
+                const { data } = await supabase
+                  .from('equip_types')
+                  .select('name, description')
+                  .eq('id', equip.equip_type_id)
+                  .maybeSingle();
+                equipType = data;
+              }
 
               itemDetails = {
                 itemType: 'equipment',
@@ -291,6 +295,20 @@ export const entryRequestsRouterV2 = router({
                 expiryDate: d.expiry_date,
                 status: 'approved', // 임시: 자동 승인
               }));
+            } else {
+              // 장비 정보를 찾을 수 없는 경우에도 기본 정보 제공
+              console.warn(`[EntryRequestsV2] Equipment not found: ${item.item_id}`);
+              itemDetails = {
+                itemType: 'equipment',
+                itemId: item.item_id,
+                itemName: '알 수 없는 장비',
+                equipmentRegNum: '정보 없음',
+                equipTypeName: '장비 정보를 찾을 수 없습니다',
+                equipTypeDescription: '',
+                specification: '',
+                model: '',
+                manufacturer: '',
+              };
             }
           } else if (item.item_type === 'worker' && item.item_id) {
             // 인력 정보
@@ -298,15 +316,19 @@ export const entryRequestsRouterV2 = router({
               .from('workers')
               .select('id, name, worker_type_id, license_num, phone, email')
               .eq('id', item.item_id)
-              .single();
+              .maybeSingle();
 
             if (worker) {
               // 인력 타입 정보
-              const { data: workerType } = await supabase
-                .from('worker_types')
-                .select('name, description')
-                .eq('id', worker.worker_type_id)
-                .single();
+              let workerType = null;
+              if (worker.worker_type_id) {
+                const { data } = await supabase
+                  .from('worker_types')
+                  .select('name, description')
+                  .eq('id', worker.worker_type_id)
+                  .maybeSingle();
+                workerType = data;
+              }
 
               itemDetails = {
                 itemType: 'worker',
@@ -333,6 +355,20 @@ export const entryRequestsRouterV2 = router({
                 expiryDate: d.expiry_date,
                 status: 'approved', // 임시: 자동 승인
               }));
+            } else {
+              // 인력 정보를 찾을 수 없는 경우에도 기본 정보 제공
+              console.warn(`[EntryRequestsV2] Worker not found: ${item.item_id}`);
+              itemDetails = {
+                itemType: 'worker',
+                itemId: item.item_id,
+                itemName: '알 수 없는 인력',
+                workerName: '정보 없음',
+                workerTypeName: '인력 정보를 찾을 수 없습니다',
+                workerTypeDescription: '',
+                licenseNum: '',
+                phone: '',
+                email: '',
+              };
             }
           }
 
