@@ -346,10 +346,45 @@ export const entryRequestsRouterV2 = router({
 
       console.log('[EntryRequestsV2] Enriched items ready with documents');
 
+      // BP 회사명 조회
+      let bpCompanyName = '-';
+      const bpCompanyId = request.target_bp_company_id || request.bp_company_id;
+      if (bpCompanyId) {
+        const { data: bpCompany } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('id', bpCompanyId)
+          .single();
+        bpCompanyName = bpCompany?.name || '-';
+      }
+
+      // 요청자 정보 조회 (Owner 또는 BP)
+      let bpUserName = '-';
+      let ownerName = '-';
+      if (request.owner_user_id) {
+        const { data: ownerUser } = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('id', request.owner_user_id)
+          .single();
+        ownerName = ownerUser?.name || ownerUser?.email || '-';
+      }
+      if (request.bp_user_id) {
+        const { data: bpUser } = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('id', request.bp_user_id)
+          .single();
+        bpUserName = bpUser?.name || bpUser?.email || '-';
+      }
+
       // toCamelCase 적용하여 반환
       const { toCamelCase } = await import('./db-utils');
       return {
         ...toCamelCase(request),
+        bpCompanyName,
+        bpUserName,
+        ownerName,
         items: enrichedItems,
       };
     }),

@@ -122,7 +122,7 @@ export const deploymentRouter = router({
         epCompanyId: epCompanyId,
         startDate: input.startDate,
         plannedEndDate: input.plannedEndDate,
-        status: "active",
+        status: "pending", // BP 승인 대기
         // 작업확인서용 추가 정보
         siteName: input.siteName,
         workType: input.workType,
@@ -262,6 +262,99 @@ export const deploymentRouter = router({
       }
 
       console.log(`[Deployment] Guide worker added: ${input.guideWorkerId} to deployment ${input.deploymentId}`);
+      return { success: true };
+    }),
+
+  /**
+   * BP 투입 승인 (pending → active)
+   * BP가 유도원 추가와 함께 승인 가능
+   */
+  approvePending: protectedProcedure
+    .input(
+      z.object({
+        deploymentId: z.string(),
+        guideWorkerId: z.string().optional(), // 유도원 추가 (선택)
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // BP 권한 확인
+      if (ctx.user.role !== 'bp' && ctx.user.role !== 'admin') {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "투입 승인 권한이 없습니다.",
+        });
+      }
+
+      const supabase = db.getSupabase();
+      if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Deployment 확인
+      const { data: deployment } = await supabase
+        .from('deployments')
+        .select('*')
+        .eq('id', input.deploymentId)
+        .single();
+
+      if (!deployment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "투입 정보를 찾을 수 없습니다." });
+      }
+
+      // 이미 승인된 경우 에러
+      if (deployment.status !== 'pending') {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "이미 승인되었거나 승인 대기 상태가 아닙니다.",
+        });
+      }
+
+      // BP 권한 확인 (자신의 회사 deployment만)
+      if (ctx.user.role === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "해당 투입을 승인할 권한이 없습니다.",
+        });
+      }
+
+      // 투입 승인 (상태를 active로 변경, 유도원 추가 가능)
+      const updateData: any = {
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      };
+
+      if (input.guideWorkerId) {
+        updateData.guide_worker_id = input.guideWorkerId;
+      }
+
+      const { error } = await supabase
+        .from('deployments')
+        .update(updateData)
+        .eq('id', input.deploymentId);
+
+      if (error) {
+        console.error('[Deployment] Approve pending error:', error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+
+      // BP 승인 시 차량 배정 완료: 장비에 운전자 배정
+      if (deployment.equipment_id && deployment.worker_id) {
+        const { error: assignError } = await supabase
+          .from('equipment')
+          .update({
+            assigned_worker_id: deployment.worker_id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', deployment.equipment_id);
+
+        if (assignError) {
+          console.error('[Deployment] Assign driver error:', assignError);
+          // 차량 배정 실패해도 투입 승인은 완료 (경고만)
+          console.warn(`[Deployment] ⚠️ 차량 배정 실패했지만 투입 승인은 완료: ${deployment.equipment_id} -> ${deployment.worker_id}`);
+        } else {
+          console.log(`[Deployment] ✅ 차량 배정 완료: 장비 ${deployment.equipment_id}에 운전자 ${deployment.worker_id} 배정`);
+        }
+      }
+
+      console.log(`[Deployment] Deployment approved: ${input.deploymentId} by BP ${ctx.user.id}`);
       return { success: true };
     }),
 

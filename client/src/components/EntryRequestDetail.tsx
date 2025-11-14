@@ -609,7 +609,16 @@ export function EntryRequestDetail({
                     <div>
                       <div className="text-sm text-muted-foreground">요청일</div>
                       <div className="font-medium">
-                        {requestData.createdAt || requestData.created_at ? new Date(requestData.createdAt || requestData.created_at).toLocaleDateString() : "-"}
+                        {requestData.createdAt || requestData.created_at 
+                          ? new Date(requestData.createdAt || requestData.created_at).toLocaleString('ko-KR', { 
+                              timeZone: 'Asia/Seoul',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : "-"}
                       </div>
                     </div>
                   </div>
@@ -1084,7 +1093,7 @@ export function EntryRequestDetail({
                   <CardDescription>모든 서류를 확인하고 최종 승인합니다.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* 반입 검사 (장비 항목이 있는 경우) */}
+                  {/* 반입 검사 (장비 항목이 있는 경우만 - 장비는 반입검사만) */}
                   {requestData.items?.some((item: any) => (item.itemType === 'equipment' || item.item_type === 'equipment')) && (
                     <div className="space-y-3 p-4 border rounded-lg">
                       <div className="flex items-center space-x-2">
@@ -1119,7 +1128,7 @@ export function EntryRequestDetail({
                     </div>
                   )}
 
-                  {/* 안전교육 및 건강검진 (인력 항목이 있는 경우) */}
+                  {/* 안전교육 및 건강검진 (인력 항목이 있는 경우만 - 인력은 안전교육과 건강검진만) */}
                   {requestData.items?.some((item: any) => (item.itemType === 'worker' || item.item_type === 'worker')) && (
                     <>
                       <div className="space-y-3 p-4 border rounded-lg">

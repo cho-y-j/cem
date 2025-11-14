@@ -54,6 +54,7 @@ export default function Deployments() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isGuideWorkerOpen, setIsGuideWorkerOpen] = useState(false);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("");
@@ -94,6 +95,10 @@ export default function Deployments() {
 
   const [inspectorFormData, setInspectorFormData] = useState({
     inspectorId: "",
+  });
+
+  const [approveFormData, setApproveFormData] = useState({
+    guideWorkerId: "",
   });
 
   const utils = trpc.useUtils();
@@ -308,6 +313,17 @@ export default function Deployments() {
       setInspectorFormData({ inspectorId: "" });
     },
     onError: (error) => toast.error("안전점검원 지정 실패: " + error.message),
+  });
+
+  // BP 투입 승인 mutation
+  const approvePendingMutation = trpc.deployments.approvePending.useMutation({
+    onSuccess: () => {
+      toast.success("투입이 승인되었습니다.");
+      utils.deployments.list.invalidate();
+      setIsApproveOpen(false);
+      setApproveFormData({ guideWorkerId: "" });
+    },
+    onError: (error) => toast.error("투입 승인 실패: " + error.message),
   });
 
   // 폼 리셋
@@ -690,6 +706,23 @@ export default function Deployments() {
                                 >
                                   상세보기
                                 </Button>
+                                {/* BP: pending 상태 투입 승인 */}
+                                {isBp && deployment.status === "pending" && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => {
+                                      setSelectedDeployment(deployment);
+                                      setApproveFormData({
+                                        guideWorkerId: deployment.guideWorkerId || "",
+                                      });
+                                      setIsApproveOpen(true);
+                                    }}
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    승인
+                                  </Button>
+                                )}
                                 {(deployment.status === "active" ||
                                   deployment.status === "extended") && (
                                   <>
@@ -1451,6 +1484,64 @@ export default function Deployments() {
             >
               {addGuideWorkerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {selectedDeployment?.guideWorkerId ? "교체" : "추가"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* BP 투입 승인 다이얼로그 */}
+      <Dialog open={isApproveOpen} onOpenChange={setIsApproveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>투입 승인</DialogTitle>
+            <DialogDescription>
+              투입을 승인하고 유도원을 추가할 수 있습니다 (선택사항)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="approveGuideWorkerId">유도원 선택 (선택사항)</Label>
+              <Select
+                value={approveFormData.guideWorkerId}
+                onValueChange={(value) =>
+                  setApproveFormData({ ...approveFormData, guideWorkerId: value })
+                }
+              >
+                <SelectTrigger id="approveGuideWorkerId">
+                  <SelectValue placeholder="유도원 선택 (선택사항)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">유도원 없음</SelectItem>
+                  {guideWorkers.map((worker: any) => (
+                    <SelectItem key={worker.id} value={worker.id}>
+                      {worker.name} {worker.licenseNum && `(${worker.licenseNum})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                유도원은 나중에 추가하거나 변경할 수 있습니다.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsApproveOpen(false)}>
+              취소
+            </Button>
+            <Button
+              onClick={() => {
+                if (!selectedDeployment) return;
+                approvePendingMutation.mutate({
+                  deploymentId: selectedDeployment.id,
+                  guideWorkerId: approveFormData.guideWorkerId || undefined,
+                });
+              }}
+              disabled={approvePendingMutation.isPending}
+            >
+              {approvePendingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              승인
             </Button>
           </DialogFooter>
         </DialogContent>
