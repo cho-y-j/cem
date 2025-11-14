@@ -807,6 +807,10 @@ export function EntryRequestDetail({
 
             {/* 장비 및 인력 목록 */}
             {(() => {
+              // 디버깅: items 확인
+              console.log('[EntryRequestDetail] requestData.items:', requestData.items);
+              console.log('[EntryRequestDetail] requestData:', requestData);
+              
               const equipmentCount = requestData.items?.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").length || 0;
               const workerCount = requestData.items?.filter((i: any) => i.itemType === "worker" || i.item_type === "worker").length || 0;
               const hasEquipment = equipmentCount > 0;
@@ -840,8 +844,9 @@ export function EntryRequestDetail({
                   )}
 
               <TabsContent value="equipment" className="space-y-3">
-                {requestData.items?.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").map((item: any) => (
-                  <Card key={item.id}>
+                {requestData.items && requestData.items.length > 0 && requestData.items.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").length > 0 ? (
+                  requestData.items.filter((i: any) => i.itemType === "equipment" || i.item_type === "equipment").map((item: any) => (
+                  <Card key={item.id || item.item_id || `equipment-${item.itemId}`}>
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -909,12 +914,18 @@ export function EntryRequestDetail({
                       )}
                     </CardContent>
                   </Card>
-                ))}
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    장비 정보가 없습니다.
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="worker" className="space-y-3">
-                {requestData.items?.filter((i: any) => i.itemType === "worker" || i.item_type === "worker").map((item: any) => (
-                  <Card key={item.id}>
+                {requestData.items && requestData.items.length > 0 && requestData.items.filter((i: any) => i.itemType === "worker" || i.item_type === "worker").length > 0 ? (
+                  requestData.items.filter((i: any) => i.itemType === "worker" || i.item_type === "worker").map((item: any) => (
+                  <Card key={item.id || item.item_id || `worker-${item.itemId}`}>
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -982,7 +993,12 @@ export function EntryRequestDetail({
                       )}
                     </CardContent>
                   </Card>
-                ))}
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    인력 정보가 없습니다.
+                  </div>
+                )}
               </TabsContent>
                 </Tabs>
               );
