@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -120,8 +120,15 @@ export default function EntryRequestsNew() {
 
   const utils = trpc.useUtils();
   const { data: requests, isLoading } = trpc.entryRequestsV2.list.useQuery();
-  const { data: equipment } = trpc.equipment.list.useQuery();
+  const { data: equipment, isLoading: equipmentLoading } = trpc.equipment.list.useQuery();
   const { data: workers } = trpc.workers.list.useQuery();
+  
+  // 디버깅: 장비 목록 확인
+  useEffect(() => {
+    console.log('[EntryRequestsNew] Equipment data:', equipment);
+    console.log('[EntryRequestsNew] Equipment loading:', equipmentLoading);
+    console.log('[EntryRequestsNew] Equipment count:', equipment?.length);
+  }, [equipment, equipmentLoading]);
   const { data: bpCompanies } = trpc.companies.listByType.useQuery({ companyType: "bp" }, { enabled: !isBp });
   const { data: epCompanies } = trpc.companies.listByType.useQuery({ companyType: "ep" }, { enabled: isBp });
 

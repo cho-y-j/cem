@@ -667,7 +667,10 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
 
   let query = supabase
     .from('equipment')
-    .select('*')
+    .select(`
+      *,
+      equip_type:equip_types!equipment_equip_type_id_fkey(id, name, description)
+    `)
     .order('created_at', { ascending: false });
 
   // Owner 필터링
@@ -812,7 +815,17 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
     return [];
   }
 
-  return toCamelCaseArray(data || []) as Equipment[];
+  // equip_type 정보를 equipTypeName으로 변환
+  const enrichedData = (data || []).map((item: any) => {
+    const equipType = item.equip_type;
+    return {
+      ...item,
+      equipTypeName: equipType?.name || null,
+      equipTypeDescription: equipType?.description || null,
+    };
+  });
+
+  return toCamelCaseArray(enrichedData) as Equipment[];
 }
 
 export async function getEquipmentByAssignedWorker(workerId: string): Promise<Equipment | undefined> {
