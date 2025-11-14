@@ -731,8 +731,7 @@ export default function EntryRequestsNew() {
                     장비 목록을 불러오는 중...
                   </div>
                 ) : equipment && equipment.length > 0 ? (
-                  <>
-                  {equipment.map((equip: any) => {
+                  equipment.map((equip: any) => {
                     // 필드명 호환성 처리
                     const regNum = equip.regNum || equip.reg_num || equip.id;
                     const equipTypeName = equip.equipTypeName || equip.equip_type?.name || "장비 종류 없음";
@@ -795,8 +794,7 @@ export default function EntryRequestsNew() {
                       )}
                     </div>
                     );
-                  })}
-                  </>
+                  })
                 ) : (
                   <p className="text-center text-muted-foreground py-4">
                     {equipment === undefined 
