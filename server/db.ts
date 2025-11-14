@@ -703,22 +703,11 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
         }
       }
     } else {
-      // BP 자신이 조회하는 경우: current_bp_id + deployments + EP 승인된 반입요청
+      // BP 자신이 조회하는 경우: 해당 BP 회사에 대한 반입요청에서 승인된 장비만 조회
+      // current_bp_id는 제거 (모든 BP 회사에 할당된 장비를 보여주는 것이 아님)
       const equipmentIdsSet = new Set<string>();
       
-      // 1. current_bp_id로 직접 필터링된 장비
-      const { data: currentBpEquipment, error: currentBpError } = await supabase
-        .from('equipment')
-        .select('id')
-        .eq('current_bp_id', bpCompanyId);
-      
-      if (currentBpError) {
-        console.error("[Database] Error getting current_bp_id equipment:", currentBpError);
-      } else if (currentBpEquipment) {
-        currentBpEquipment.forEach((eq: any) => equipmentIdsSet.add(eq.id));
-      }
-      
-      // 2. deployments의 장비 (pending, active, extended 모두 포함)
+      // 1. deployments의 장비 (pending, active, extended 모두 포함)
       const { data: bpDeployments, error: depError } = await supabase
         .from('deployments')
         .select('equipment_id')
@@ -733,7 +722,7 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
         });
       }
       
-      // 3. EP 승인된 반입요청의 장비
+      // 2. EP 승인된 반입요청의 장비 (해당 BP 회사에 대한 요청만)
       const { data: approvedRequests, error: reqError } = await supabase
         .from('entry_requests')
         .select('id')
