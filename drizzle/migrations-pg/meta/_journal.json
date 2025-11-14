@@ -64,6 +64,13 @@
       "when": 1762840947643,
       "tag": "0008_moaning_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1763114841481,
+      "tag": "0009_huge_dragon_lord",
+      "breakpoints": true
     }
   ]
 }

@@ -459,13 +459,13 @@ export const deploymentStatusEnum = pgEnum("deployment_status", ["pending", "act
 export const deployments = pgTable("deployments", {
   id: varchar("id", { length: 64 }).primaryKey(),
   entryRequestId: varchar("entry_request_id", { length: 64 }).notNull(),
-  equipmentId: varchar("equipment_id", { length: 64 }).notNull(),
-  workerId: varchar("worker_id", { length: 64 }).notNull(),
+  equipmentId: varchar("equipment_id", { length: 64 }).notNull().references(() => equipment.id),
+  workerId: varchar("worker_id", { length: 64 }).notNull().references(() => workers.id),
   ownerId: varchar("owner_id", { length: 64 }).notNull(),
   bpCompanyId: varchar("bp_company_id", { length: 64 }).notNull(),
   epCompanyId: varchar("ep_company_id", { length: 64 }),
-  guideWorkerId: varchar("guide_worker_id", { length: 64 }), // 유도원 ID (BP가 추가)
-  inspectorId: varchar("inspector_id", { length: 64 }), // 안전점검원 ID (EP가 지정)
+  guideWorkerId: varchar("guide_worker_id", { length: 64 }).references(() => workers.id), // 유도원 ID (BP가 추가)
+  inspectorId: varchar("inspector_id", { length: 64 }).references(() => workers.id), // 안전점검원 ID (EP가 지정)
 
   startDate: timestamp("start_date").notNull(),
   plannedEndDate: timestamp("planned_end_date").notNull(),

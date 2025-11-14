@@ -47,7 +47,8 @@
       "Bash(taskkill /F /PID 7024)",
       "Bash(taskkill:*)",
       "Bash(git checkout:*)",
-      "Bash(temp_original.tsx)"
+      "Bash(temp_original.tsx)",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": []
