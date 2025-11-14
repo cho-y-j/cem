@@ -149,7 +149,14 @@ export default function Workers() {
 
   // 선택된 인력유형의 licenseRequired 확인
   const selectedWorkerType = workerTypes?.find((type) => type.id === formData.workerTypeId);
-  const isLicenseRequired = selectedWorkerType?.licenseRequired || false;
+  const isLicenseRequired = selectedWorkerType?.licenseRequired === true; // 명시적으로 true인 경우만
+  
+  // 디버깅: 인력유형 및 면허 인증 필수 여부 확인
+  useEffect(() => {
+    if (formData.workerTypeId && selectedWorkerType) {
+      console.log('[Workers] Selected worker type:', selectedWorkerType.name, 'licenseRequired:', selectedWorkerType.licenseRequired);
+    }
+  }, [formData.workerTypeId, selectedWorkerType]);
 
   // 인력 유형 변경 시 필수 서류 목록 및 면허 검증 상태 초기화
   useEffect(() => {
@@ -230,8 +237,9 @@ export default function Workers() {
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...formData });
     } else {
-      // 면허 인증 체크 (licenseRequired가 true인 경우에만)
-      if (isLicenseRequired && !licenseVerified && formData.licenseNum) {
+      // 면허 인증 체크 (licenseRequired가 true이고 면허번호가 있는 경우에만)
+      // 유도원 등 licenseRequired가 false인 경우에는 면허 인증을 요구하지 않음
+      if (isLicenseRequired && formData.licenseNum && !licenseVerified) {
         toast.error("면허 인증을 완료해주세요.");
         return;
       }
