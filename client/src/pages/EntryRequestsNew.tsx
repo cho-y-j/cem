@@ -739,11 +739,11 @@ export default function EntryRequestsNew() {
                     console.log('[EntryRequestsNew] Rendering equipment:', equip.id, regNum, equipTypeName);
                     
                     return (
-                    <div
-                      key={equip.id}
-                      className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md min-h-[3rem]"
-                      style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
-                    >
+                      <div
+                        key={equip.id}
+                        className="flex items-center space-x-3 p-2 hover:bg-accent rounded-md min-h-[3rem]"
+                        style={{ display: 'flex', visibility: 'visible', opacity: 1 }}
+                      >
                       <Checkbox
                         id={`equipment-${equip.id}`}
                         checked={selectedEquipmentIds.includes(equip.id)}
@@ -792,7 +792,7 @@ export default function EntryRequestsNew() {
                           })()}
                         </div>
                       )}
-                    </div>
+                      </div>
                     );
                   })
                 ) : (
