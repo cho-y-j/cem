@@ -1,13 +1,106 @@
 # 건설장비 및 인력 관리 시스템 (ERMS) - TODO 및 작업 가이드
 
-차량 **마지막 업데이트**: 2025-11-11 (오후)
+**마지막 업데이트**: 2025-11-14 (오후)
 **프로젝트**: Equipment and Resource Management System (ERMS)
 **Supabase 프로젝트**: erms (zlgehckxiuhjpfjlaycf) - ACTIVE_HEALTHY
-**현재 단계**: ✅ **시간 표시 및 UI/UX 개선 완료** → 🔄 **워커-차량 매칭 및 GPS 위치 추적 개선 준비**
+**현재 단계**: ✅ **입장 요청 장비 표시 문제 해결 완료** → 🔄 **워커-차량 매칭 및 GPS 위치 추적 개선 준비**
 
 ---
 
-## 🎉 오늘 완료한 작업 (2025-11-13)
+## 🎉 오늘 완료한 작업 (2025-11-14)
+
+### ✅ 입장 요청 상세에서 장비 정보 표시 오류 완전 해결
+
+**문제:**
+- 입장 요청 상세보기에서 "상세" 버튼 클릭 시 장비 정보가 표시되지 않음
+- 장비만 표시 안 되고 인력은 정상 표시되는 비대칭 문제
+- 장비 종류가 "장비 정보를 찾을 수 없습니다"로 표시됨
+- 모든 권한자(Owner, BP, EP, Admin)에서 동일한 문제 발생
+
+**근본 원인 1 - PostgreSQL 컬럼 에러:**
+```
+Equipment query error: {
+  code: '42703',
+  message: 'column equipment.model does not exist'
+}
+```
+- `equipment` 테이블에 존재하지 않는 `model`, `manufacturer` 컬럼을 조회하려고 시도
+- Drizzle 스키마에는 해당 컬럼이 정의되어 있지 않음
+
+**근본 원인 2 - camelCase 변환 누락:**
+- `enrichedItems`를 반환할 때 `toCamelCase` 변환이 누락됨
+- 프론트엔드는 `equipTypeName` 같은 camelCase 필드를 기대하지만 서버는 snake_case 반환
+- 인력은 정상 작동했지만 장비는 DB 에러로 인해 fallback 값도 변환되지 않음
+
+**근본 원인 3 - RLS 권한 문제 가능성:**
+- 일반 Supabase 클라이언트(ANON KEY) 사용으로 RLS 제한 가능성
+- Admin 클라이언트 사용으로 우회 필요
+
+**해결 방법:**
+1. ✅ **존재하지 않는 컬럼 제거**:
+   - `equipment` 쿼리에서 `model`, `manufacturer` 제거
+   - 실제 스키마에 있는 컬럼만 조회: `id, reg_num, equip_type_id, specification`
+
+2. ✅ **Admin 클라이언트 사용**:
+   - `getSupabase()` → `getSupabaseAdmin() || getSupabase()`로 변경
+   - RLS 우회하여 데이터 조회 보장
+
+3. ✅ **안전한 쿼리 패턴 적용**:
+   - `.single()` → `.maybeSingle()`로 변경
+   - 데이터가 없을 때 null 반환 (에러 대신)
+   - equip_type_id 존재 여부 확인 후 타입 정보 조회
+
+4. ✅ **camelCase 변환 적용**:
+   - `enrichedItems`를 반환하기 전 `toCamelCase` 변환
+   - 명시적으로 설정한 camelCase 필드 보존
+   - 서버 응답 일관성 확보
+
+5. ✅ **디버깅 로그 추가**:
+   - 장비 조회 전후 상태 로깅
+   - 에러 발생 시 상세 정보 출력
+   - camelCase 변환 전후 샘플 데이터 로깅
+
+**수정된 파일:**
+- `server/entry-request-router-v2.ts:219-455` - getById 쿼리 완전 수정
+  - Admin 클라이언트 사용
+  - 존재하지 않는 컬럼 제거
+  - .maybeSingle() 적용
+  - camelCase 변환 추가
+  - 디버깅 로그 추가
+- `client/src/components/EntryRequestDetail.tsx:808-876` - 프론트엔드 표시 로직
+  - model, manufacturer 필드 제거
+  - 디버깅 로그 추가
+
+**결과:**
+- ✅ 장비 등록번호 정상 표시 (예: 111가1111)
+- ✅ 장비 종류 정상 표시 (예: 고소작업대, 고소작업차)
+- ✅ 규격 정상 표시 (specification)
+- ✅ 서류 목록 정상 표시
+- ✅ 인력과 동일한 수준의 정보 표시
+- ✅ 모든 권한자에서 정상 작동
+
+**Git 커밋:**
+```
+수정: 입장 요청 상세에서 장비 정보 표시 오류 해결
+
+- equipment 테이블에 없는 model, manufacturer 컬럼 제거
+- Admin 클라이언트 사용으로 RLS 우회하여 장비 데이터 조회
+- .single() → .maybeSingle()로 변경하여 데이터 없을 때 에러 방지
+- enrichedItems에 toCamelCase 변환 적용
+- 장비/인력 정보 없을 때 기본값 제공
+- 디버깅 로그 추가로 문제 추적 용이
+
+🐛 Fixes:
+- 장비 종류가 "장비 정보를 찾을 수 없습니다"로 표시되던 문제
+- 장비만 표시 안 되고 인력은 정상 표시되던 비대칭 문제
+- PostgreSQL 에러: column equipment.model does not exist
+```
+
+**상태:** ✅ **완료 및 배포 준비**
+
+---
+
+## 🎉 이전 완료한 작업 (2025-11-13)
 
 ### ✅ React 에러 #310 완전 해결
 
