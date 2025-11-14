@@ -1653,3 +1653,120 @@ pnpm db:push          # 마이그레이션 생성 및 적용
 - ✅ Owner 투입 목록 표시 문제 해결
 - ✅ 반입 요청 UI/UX 개선
 - 🔴 장비 유도원 로그인 에러 발견 (다음 작업 필요)
+
+---
+
+## 📊 작업 통계 (2025-11-15)
+
+### 완료된 기능
+- ✅ **유도원(Guide Worker) 별도 관리 시스템 완성**
+  - Worker Type 기반 메뉴 조건부 표시
+  - 차량점검은 "운전원"만 표시, 유도원은 작업일지만 표시
+  - 유도원 서류 조회 기능 추가
+  
+- ✅ **WorkZone 통합 관리**
+  - Deployment에 workZoneId 컬럼 추가
+  - 현장명과 GPS 구역을 WorkZone으로 통합 관리
+  - 모든 deployment 조회 함수에 workZone join 추가
+  
+- ✅ **출근 체크 GPS 제한 강화**
+  - 기존: EP company의 모든 workZone에서 출근 가능
+  - 변경: deployment에 지정된 workZone에서만 출근 가능
+  - 출근 제한 로직 완전 개선
+  
+- ✅ **BP 투입 승인 워크플로우 구현**
+  - Owner → BP 승인 프로세스 추가
+  - Deployment status enum에 'pending_bp' 추가
+  - BP 승인 시 단가/유도원/작업구역 설정 가능
+  - BP 거부 기능 추가
+
+### API 추가 (deployment-router.ts)
+1. **`deployment.create`** - 투입 등록 (status: pending_bp)
+   - workZoneId 입력 추가
+2. **`deployment.approvePending`** - BP 투입 승인
+   - guideWorkerId, workZoneId, 단가 정보 입력
+   - pending_bp → active 상태 전환
+3. **`deployment.getPendingApprovals`** - BP 승인 대기 목록 조회
+4. **`deployment.rejectPending`** - BP 투입 거부
+
+### 데이터베이스 마이그레이션
+- **Schema 변경** (`drizzle/schema.ts`)
+  - `deployments.workZoneId` 컬럼 추가
+  - `deploymentStatusEnum`에 'pending_bp' 추가
+  - status 컬럼을 varchar → enum으로 변경
+  
+- **Migration 파일**
+  - `0011_little_network.sql` - Drizzle 자동 생성
+  - `add-pending-bp-status.sql` - Supabase 수동 실행용
+    - deployment_status enum 생성 (없으면)
+    - pending_bp 값 추가
+    - status 컬럼 타입 변환
+
+### 수정된 파일
+1. **server/check-in-router.ts**
+   - 출근 체크를 deployment.workZoneId 기반으로 제한
+   - 기존 EP company 전체 구역 검색 로직 제거 (140줄 이상 삭제)
+   
+2. **server/deployment-router.ts**
+   - BP 승인 워크플로우 API 추가 (100줄 이상 추가)
+   - 단가 정보 업데이트 로직 추가
+   
+3. **server/db.ts**
+   - Worker 조회 시 workerType join 추가
+   - 모든 deployment 조회에 workZone join 추가
+   - Guide worker 서류 조회 추가
+   
+4. **client/src/components/mobile/MobileBottomNav.tsx**
+   - `getWorkerNavItems(workerTypeName)` 동적 생성 함수 추가
+   
+5. **client/src/pages/mobile/WorkerMain.tsx**
+   - WorkerType 기반 동적 네비게이션 구현
+   
+6. **client/src/pages/mobile/SafetyInspectionNew.tsx**
+   - Guide worker 서류 표시 추가
+   
+7. **client/src/pages/mobile/WorkJournalList.tsx**
+   - 불필요한 status 필터 제거
+
+### 해결된 이슈
+- ✅ Inspector 안전점검 화면에서 유도원 서류가 0으로 표시되던 문제
+- ✅ 유도원 로그인 시 작업확인서 배정 문제
+- ✅ 차량점검 메뉴가 모든 Worker에게 표시되던 문제
+- ✅ 출근 체크 시 다른 현장 WorkZone에서도 출근 가능하던 문제
+
+### 워크플로우 개선
+```
+이전: Owner → Deployment 바로 Active
+변경: Owner → Deployment (pending_bp) → BP 승인 → Active
+```
+
+**BP 승인 과정**:
+1. Owner가 투입 등록 (equipmentId, workerId, 단가 정보)
+2. 상태: `pending_bp` (BP 승인 대기)
+3. BP가 승인 대기 목록에서 확인
+4. BP가 단가 확인 + 유도원 지정 + 작업구역 설정
+5. 승인 → `active` 또는 거부 → `completed`
+6. Active 투입만 출근 가능 (GPS 제한 적용)
+
+### 빌드 상태
+- ✅ TypeScript 컴파일 성공
+- ⚠️ DB 마이그레이션 대기 중 (add-pending-bp-status.sql 실행 필요)
+
+### 다음 작업 필요
+1. **Supabase SQL Editor**에서 `add-pending-bp-status.sql` 실행
+2. BP 투입 승인 UI 구현 (Frontend)
+3. 기존 deployment 데이터의 status 확인 및 업데이트
+
+---
+
+**마지막 업데이트**: 2025-11-15 (저녁)
+**다음 작업**: BP 투입 승인 UI 구현
+**Supabase MCP**: ✅ 연결됨 및 사용 가능
+**오늘 작업 요약**:
+- ✅ 유도원 별도 관리 시스템 완성
+- ✅ WorkZone 통합 관리 (현장명 + GPS 구역)
+- ✅ BP 투입 승인 워크플로우 구현
+- ✅ 출근 체크 GPS 제한 강화
+- ✅ Deployment status enum 개선 (pending_bp 추가)
+- ✅ API 4개 추가 (승인, 거부, 대기목록, 등록 개선)
+- ⚠️ DB 마이그레이션 파일 생성 완료 (실행 대기)
