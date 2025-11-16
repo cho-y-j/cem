@@ -29,6 +29,7 @@ import Approvals from "./pages/Approvals";
 import EntryRequests from "./pages/EntryRequests";
 import EntryRequestsNew from "./pages/EntryRequestsNew";
 import Deployments from "./pages/Deployments";
+import DeploymentApprovals from "./pages/DeploymentApprovals";
 import Statistics from "./pages/Statistics";
 import WorkerMobile from "./pages/mobile/WorkerMobile";
 import DocumentUpload from "./pages/mobile/DocumentUpload";
@@ -85,6 +86,7 @@ function Router() {
         <Route path="/entry-requests/:id/ep-approve" component={EntryRequestEpApprove} />
         <Route path="/entry-requests-old" component={EntryRequests} />
         <Route path="/deployments" component={Deployments} />
+        <Route path="/deployment-approvals" component={DeploymentApprovals} />
         <Route path="/statistics" component={Statistics} />
         <Route path="/location-tracking" component={LocationTracking} />
         <Route path="/emergency-alerts" component={EmergencyAlerts} />

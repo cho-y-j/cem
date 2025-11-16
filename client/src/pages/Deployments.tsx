@@ -69,6 +69,7 @@ export default function Deployments() {
     equipmentId: "",
     workerId: "",
     bpCompanyId: "",
+    workZoneId: "", // 작업 구역 (현장명 + GPS)
     startDate: "",
     plannedEndDate: "",
     siteName: "",
@@ -116,6 +117,11 @@ export default function Deployments() {
     { companyType: "ep" },
     { enabled: role === "admin" || role === "owner" }
   );
+
+  // WorkZone 목록 조회 (활성화된 작업 구역만)
+  const { data: workZones = [] } = trpc.workZones.list.useQuery({
+    isActive: true,
+  });
 
   // 필터 초기화
   useEffect(() => {
@@ -365,6 +371,7 @@ export default function Deployments() {
       equipmentId: createFormData.equipmentId,
       workerId: createFormData.workerId,
       bpCompanyId: createFormData.bpCompanyId,
+      workZoneId: createFormData.workZoneId || undefined, // 작업 구역 추가
       startDate: new Date(createFormData.startDate),
       plannedEndDate: new Date(createFormData.plannedEndDate),
       siteName: createFormData.siteName || undefined,
@@ -863,6 +870,36 @@ export default function Deployments() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 투입할 BP 현장을 선택하세요
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="workZoneId">작업 구역 (현장명 + GPS 구역) <span className="text-destructive">*</span></Label>
+              <Select
+                value={createFormData.workZoneId}
+                onValueChange={(value) =>
+                  setCreateFormData({ ...createFormData, workZoneId: value })
+                }
+              >
+                <SelectTrigger id="workZoneId">
+                  <SelectValue placeholder="작업 구역 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workZones.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      활성화된 작업 구역이 없습니다
+                    </div>
+                  ) : (
+                    workZones.map((zone: any) => (
+                      <SelectItem key={zone.id} value={zone.id}>
+                        {zone.name} {zone.description && `- ${zone.description}`}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                출근 GPS 제한 및 현장명 자동 연결됩니다
               </p>
             </div>
 

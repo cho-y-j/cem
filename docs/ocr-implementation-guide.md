@@ -408,3 +408,5 @@ const worker = await Tesseract.createWorker('kor', 1, {
 
 
 
+
+

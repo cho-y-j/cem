@@ -48,7 +48,8 @@
       "Bash(taskkill:*)",
       "Bash(git checkout:*)",
       "Bash(temp_original.tsx)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(pnpm drizzle-kit:*)"
     ],
     "deny": [],
     "ask": []
