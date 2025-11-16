@@ -87,6 +87,8 @@ export const workJournalRouter = router({
 
   /**
    * Worker 자신의 작업확인서 목록 조회
+   * 운전자: worker_id로 조회
+   * 유도원: guide_worker_id로 deployment를 찾아서 그 deployment_id로 조회
    */
   myList: protectedProcedure
     .input(
@@ -120,12 +122,32 @@ export const workJournalRouter = router({
 
       console.log('[WorkJournal] myList - Found worker:', worker.id, worker.name);
 
-      const journals = await db.getWorkJournals({
-        workerId: worker.id, // workers.id 사용
+      // 1. 먼저 운전자(worker_id)로 조회
+      let journals = await db.getWorkJournals({
+        workerId: worker.id,
         status: input.status,
         startDate: input.startDate,
         endDate: input.endDate,
       });
+
+      // 2. 결과가 없으면 유도원(guide_worker_id)으로 deployment 찾아서 조회
+      if (journals.length === 0) {
+        console.log('[WorkJournal] No journals found as driver, checking as guide worker...');
+
+        const deployment = await db.getDeploymentByGuideWorkerId(worker.id);
+
+        if (deployment) {
+          console.log('[WorkJournal] Found deployment as guide worker:', deployment.id);
+          journals = await db.getWorkJournals({
+            deploymentId: deployment.id,
+            status: input.status,
+            startDate: input.startDate,
+            endDate: input.endDate,
+          });
+        }
+      }
+
+      console.log('[WorkJournal] myList returned:', journals.length, 'journals');
       return journals;
     }),
 
