@@ -2794,10 +2794,15 @@ export async function getDeployments(filters?: {
 
   console.log("[Database] getDeployments called with filters:", filters);
 
-  // guide_worker와 inspector는 optional이므로 별도로 조회
+  // equipment, worker, guide_worker 정보를 JOIN하여 함께 조회
   let query = supabase
     .from('deployments')
-    .select('*')
+    .select(`
+      *,
+      equipment:equipment!deployments_equipment_id_fkey(id, reg_num, equip_type:equipment_types(id, type_name)),
+      worker:workers!deployments_worker_id_fkey(id, name, phone, worker_type:worker_types(id, type_name)),
+      guide_worker:workers!deployments_guide_worker_id_fkey(id, name, phone, worker_type:worker_types(id, type_name))
+    `)
     .order('created_at', { ascending: false });
 
   if (filters?.ownerId) {

@@ -136,9 +136,10 @@ export default function Deployments() {
       setBpCompanyFilter(user.companyId);
     }
 
-    if (role === "ep" && user.companyId) {
-      setEpCompanyFilter(user.companyId);
-    }
+    // EP와 Admin은 모든 deployment 조회 가능 (자동 필터링 없음)
+    // if (role === "ep" && user.companyId) {
+    //   setEpCompanyFilter(user.companyId);
+    // }
 
     if (role === "owner" && user.id) {
       // Owner는 자동으로 필터링되므로 필터 UI는 비활성화
@@ -653,8 +654,10 @@ export default function Deployments() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>등록일</TableHead>
                       <TableHead>장비</TableHead>
                       <TableHead>운전자</TableHead>
+                      <TableHead>유도원</TableHead>
                       <TableHead>BP 회사</TableHead>
                       <TableHead>투입일</TableHead>
                       <TableHead>종료 예정일</TableHead>
@@ -665,39 +668,38 @@ export default function Deployments() {
                   <TableBody>
                     {filteredDeployments && filteredDeployments.length > 0 ? (
                       filteredDeployments.map((deployment) => {
-                        const equip = equipment?.find((e) => e.id === deployment.equipmentId);
-                        const worker = workers?.find((w) => w.id === deployment.workerId);
                         const bpCompany = bpCompanies?.find((c) => c.id === deployment.bpCompanyId);
 
                         return (
                           <TableRow key={deployment.id}>
                             <TableCell>
-                              {equip?.regNum || "-"}
+                              {format(new Date(deployment.createdAt), "MM/dd HH:mm", {
+                                locale: ko,
+                              })}
+                            </TableCell>
+                            <TableCell>
+                              {deployment.equipment?.regNum || "-"}
                               <br />
                               <span className="text-xs text-muted-foreground">
-                                {equip?.equipType?.typeName}
+                                {deployment.equipment?.equipType?.typeName || ""}
                               </span>
                             </TableCell>
                             <TableCell>
-                              {worker?.name || "-"}
+                              {deployment.worker?.name || "-"}
                               <br />
                               <span className="text-xs text-muted-foreground">
-                                {worker?.workerType?.typeName}
+                                {deployment.worker?.workerType?.typeName || ""}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {deployment.guideWorker?.name || "-"}
+                              <br />
+                              <span className="text-xs text-muted-foreground">
+                                {deployment.guideWorker?.workerType?.typeName || ""}
                               </span>
                             </TableCell>
                             <TableCell>
                               {bpCompany?.name || "-"}
-                              {/* 유도원 정보 표시 */}
-                              {deployment.guideWorkerId && (() => {
-                                const guideWorker = workers?.find((w: any) => w.id === deployment.guideWorkerId);
-                                return guideWorker ? (
-                                  <div className="mt-1">
-                                    <Badge variant="outline" className="text-xs">
-                                      유도원: {guideWorker.name}
-                                    </Badge>
-                                  </div>
-                                ) : null;
-                              })()}
                               {/* Inspector 정보 표시 */}
                               {deployment.inspectorId && (() => {
                                 const inspector = inspectors?.find((i: any) => i.id === deployment.inspectorId);
@@ -792,8 +794,8 @@ export default function Deployments() {
                                       <UserCheck className="h-3 w-3 mr-1" />
                                       운전자 교체
                                     </Button>
-                                    {/* BP: 유도원 추가/교체 */}
-                                    {isBp && (
+                                    {/* Owner/BP: 유도원 추가/교체 */}
+                                    {(isOwner || isBp) && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -843,7 +845,7 @@ export default function Deployments() {
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           투입 내역이 없습니다
                         </TableCell>
                       </TableRow>
