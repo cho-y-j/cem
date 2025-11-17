@@ -109,9 +109,10 @@ export const workZoneRouter = router({
     .query(async ({ input, ctx }) => {
       const userRole = ctx.user.role?.toLowerCase();
 
-      // BP/Owner는 자신의 회사 작업 구역만 조회
+      // BP만 자신의 회사 작업 구역만 조회
+      // Owner는 EP가 만든 모든 활성 작업 구역을 볼 수 있어야 함 (투입 등록 시 선택)
       let filters = input || {};
-      if (userRole === "bp" || userRole === "owner") {
+      if (userRole === "bp") {
         filters = {
           ...filters,
           companyId: ctx.user.companyId || undefined,
