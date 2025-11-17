@@ -794,8 +794,8 @@ export default function Deployments() {
                                       <UserCheck className="h-3 w-3 mr-1" />
                                       운전자 교체
                                     </Button>
-                                    {/* Owner/BP: 유도원 추가/교체 */}
-                                    {(isOwner || isBp) && (
+                                    {/* BP: 유도원 추가/교체 */}
+                                    {isBp && (
                                       <Button
                                         size="sm"
                                         variant="outline"

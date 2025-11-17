@@ -2799,7 +2799,7 @@ export async function getDeployments(filters?: {
     .from('deployments')
     .select(`
       *,
-      equipment:equipment!deployments_equipment_id_fkey(id, reg_num, equip_type:equipment_types(id, type_name)),
+      equipment:equipment!deployments_equipment_id_fkey(id, reg_num, equip_type:equip_types(id, type_name)),
       worker:workers!deployments_worker_id_fkey(id, name, phone, worker_type:worker_types(id, type_name)),
       guide_worker:workers!deployments_guide_worker_id_fkey(id, name, phone, worker_type:worker_types(id, type_name))
     `)
