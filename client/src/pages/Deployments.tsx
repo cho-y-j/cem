@@ -100,6 +100,12 @@ export default function Deployments() {
 
   const [approveFormData, setApproveFormData] = useState({
     guideWorkerId: "",
+    workZoneId: "",
+    workType: "daily",
+    dailyRate: "",
+    monthlyRate: "",
+    otRate: "",
+    nightRate: "",
   });
 
   const utils = trpc.useUtils();
@@ -619,6 +625,7 @@ export default function Deployments() {
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList>
               <TabsTrigger value="all">전체</TabsTrigger>
+              {isBp && <TabsTrigger value="pending_bp">승인대기</TabsTrigger>}
               <TabsTrigger value="active">투입중</TabsTrigger>
               <TabsTrigger value="extended">연장</TabsTrigger>
               <TabsTrigger value="completed">종료</TabsTrigger>
@@ -1528,17 +1535,71 @@ export default function Deployments() {
 
       {/* BP 투입 승인 다이얼로그 */}
       <Dialog open={isApproveOpen} onOpenChange={setIsApproveOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>투입 승인</DialogTitle>
             <DialogDescription>
-              투입을 승인하고 유도원을 추가할 수 있습니다 (선택사항)
+              단가를 확인/수정하고 유도원 및 작업 구역을 지정한 후 승인하세요
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            {/* 투입 정보 요약 */}
+            {selectedDeployment && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">장비:</span> {selectedDeployment.equipment?.regNum}
+                  </div>
+                  <div>
+                    <span className="font-medium">운전자:</span> {selectedDeployment.worker?.name}
+                  </div>
+                  <div>
+                    <span className="font-medium">시작일:</span>{" "}
+                    {selectedDeployment.startDate
+                      ? format(new Date(selectedDeployment.startDate), "yyyy-MM-dd")
+                      : "-"}
+                  </div>
+                  <div>
+                    <span className="font-medium">종료 예정:</span>{" "}
+                    {selectedDeployment.plannedEndDate
+                      ? format(new Date(selectedDeployment.plannedEndDate), "yyyy-MM-dd")
+                      : "-"}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 작업 구역 선택 */}
             <div className="grid gap-2">
-              <Label htmlFor="approveGuideWorkerId">유도원 선택 (선택사항)</Label>
+              <Label htmlFor="approveWorkZoneId">
+                작업 구역 (현장명 + GPS) <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={approveFormData.workZoneId}
+                onValueChange={(value) =>
+                  setApproveFormData({ ...approveFormData, workZoneId: value })
+                }
+              >
+                <SelectTrigger id="approveWorkZoneId">
+                  <SelectValue placeholder="작업 구역 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workZones.map((zone: any) => (
+                    <SelectItem key={zone.id} value={zone.id}>
+                      {zone.name} {zone.description && `- ${zone.description}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                출근 GPS 제한 및 현장명이 자동으로 연결됩니다
+              </p>
+            </div>
+
+            {/* 유도원 선택 */}
+            <div className="grid gap-2">
+              <Label htmlFor="approveGuideWorkerId">유도원 (선택사항)</Label>
               <Select
                 value={approveFormData.guideWorkerId}
                 onValueChange={(value) =>
@@ -1549,17 +1610,95 @@ export default function Deployments() {
                   <SelectValue placeholder="유도원 선택 (선택사항)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">유도원 없음</SelectItem>
+                  <SelectItem value="">선택 안 함</SelectItem>
                   {guideWorkers.map((worker: any) => (
                     <SelectItem key={worker.id} value={worker.id}>
-                      {worker.name} {worker.licenseNum && `(${worker.licenseNum})`}
+                      {worker.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
-                유도원은 나중에 추가하거나 변경할 수 있습니다.
-              </p>
+            </div>
+
+            {/* 단가 정보 */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">단가 정보</h4>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="approveWorkType">계약 타입</Label>
+                  <Select
+                    value={approveFormData.workType}
+                    onValueChange={(value) =>
+                      setApproveFormData({ ...approveFormData, workType: value })
+                    }
+                  >
+                    <SelectTrigger id="approveWorkType">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">일대</SelectItem>
+                      <SelectItem value="monthly">월대</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {approveFormData.workType === "daily" && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="approveDailyRate">일대 단가 (원)</Label>
+                    <Input
+                      id="approveDailyRate"
+                      type="number"
+                      placeholder="예: 350000"
+                      value={approveFormData.dailyRate}
+                      onChange={(e) =>
+                        setApproveFormData({ ...approveFormData, dailyRate: e.target.value })
+                      }
+                    />
+                  </div>
+                )}
+
+                {approveFormData.workType === "monthly" && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="approveMonthlyRate">월대 단가 (원)</Label>
+                    <Input
+                      id="approveMonthlyRate"
+                      type="number"
+                      placeholder="예: 7000000"
+                      value={approveFormData.monthlyRate}
+                      onChange={(e) =>
+                        setApproveFormData({ ...approveFormData, monthlyRate: e.target.value })
+                      }
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="approveOtRate">OT 단가 (원)</Label>
+                    <Input
+                      id="approveOtRate"
+                      type="number"
+                      placeholder="예: 50000"
+                      value={approveFormData.otRate}
+                      onChange={(e) =>
+                        setApproveFormData({ ...approveFormData, otRate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="approveNightRate">철야 단가 (원)</Label>
+                    <Input
+                      id="approveNightRate"
+                      type="number"
+                      placeholder="예: 100000"
+                      value={approveFormData.nightRate}
+                      onChange={(e) =>
+                        setApproveFormData({ ...approveFormData, nightRate: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1573,9 +1712,15 @@ export default function Deployments() {
                 approvePendingMutation.mutate({
                   deploymentId: selectedDeployment.id,
                   guideWorkerId: approveFormData.guideWorkerId || undefined,
+                  workZoneId: approveFormData.workZoneId || undefined,
+                  workType: approveFormData.workType || undefined,
+                  dailyRate: approveFormData.dailyRate ? parseFloat(approveFormData.dailyRate) : undefined,
+                  monthlyRate: approveFormData.monthlyRate ? parseFloat(approveFormData.monthlyRate) : undefined,
+                  otRate: approveFormData.otRate ? parseFloat(approveFormData.otRate) : undefined,
+                  nightRate: approveFormData.nightRate ? parseFloat(approveFormData.nightRate) : undefined,
                 });
               }}
-              disabled={approvePendingMutation.isPending}
+              disabled={approvePendingMutation.isPending || !approveFormData.workZoneId}
             >
               {approvePendingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               승인
