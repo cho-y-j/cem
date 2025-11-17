@@ -111,6 +111,16 @@ export const deploymentRouter = router({
       // epCompanyId가 없으면 entry_request에서 가져오기
       const epCompanyId = input.epCompanyId || entryRequest.targetEpCompanyId || undefined;
 
+      // workZoneId가 있으면 작업 구역 이름을 siteName으로 자동 설정
+      let siteName = input.siteName;
+      if (input.workZoneId && !siteName) {
+        const workZone = await db.getWorkZoneById(input.workZoneId);
+        if (workZone) {
+          siteName = workZone.name;
+          console.log(`[Deployment] Auto-set siteName from workZone: ${siteName}`);
+        }
+      }
+
       const id = nanoid();
 
       await db.createDeployment({
@@ -126,7 +136,7 @@ export const deploymentRouter = router({
         plannedEndDate: input.plannedEndDate,
         status: "pending_bp", // BP 승인 대기 (pending에서 pending_bp로 변경)
         // 작업확인서용 추가 정보
-        siteName: input.siteName,
+        siteName: siteName,
         workType: input.workType,
         dailyRate: input.dailyRate,
         monthlyRate: input.monthlyRate,
@@ -336,6 +346,13 @@ export const deploymentRouter = router({
 
       if (input.workZoneId) {
         updateData.work_zone_id = input.workZoneId;
+
+        // workZoneId가 설정되면 작업 구역 이름을 siteName으로 자동 설정
+        const workZone = await db.getWorkZoneById(input.workZoneId);
+        if (workZone) {
+          updateData.site_name = workZone.name;
+          console.log(`[Deployment] Auto-set siteName from workZone on approval: ${workZone.name}`);
+        }
       }
 
       // 단가 정보 업데이트 (BP가 확인/수정)

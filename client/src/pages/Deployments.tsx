@@ -69,10 +69,9 @@ export default function Deployments() {
     equipmentId: "",
     workerId: "",
     bpCompanyId: "",
-    workZoneId: "", // 작업 구역 (현장명 + GPS)
+    workZoneId: "", // 작업 구역 (현장명 + GPS - siteName 자동 설정)
     startDate: "",
     plannedEndDate: "",
-    siteName: "",
     workType: "daily", // 'daily' | 'monthly'
     dailyRate: "",
     monthlyRate: "",
@@ -345,9 +344,9 @@ export default function Deployments() {
       equipmentId: "",
       workerId: "",
       bpCompanyId: "",
+      workZoneId: "",
       startDate: "",
       plannedEndDate: "",
-      siteName: "",
       workType: "daily",
       dailyRate: "",
       monthlyRate: "",
@@ -377,10 +376,10 @@ export default function Deployments() {
       equipmentId: createFormData.equipmentId,
       workerId: createFormData.workerId,
       bpCompanyId: createFormData.bpCompanyId,
-      workZoneId: createFormData.workZoneId || undefined, // 작업 구역 추가
+      workZoneId: createFormData.workZoneId || undefined, // 작업 구역 (siteName 자동 설정)
       startDate: new Date(createFormData.startDate),
       plannedEndDate: new Date(createFormData.plannedEndDate),
-      siteName: createFormData.siteName || undefined,
+      // siteName은 서버에서 workZoneId로부터 자동 설정됨
       workType: createFormData.workType || undefined,
       dailyRate: createFormData.dailyRate ? parseFloat(createFormData.dailyRate) : undefined,
       monthlyRate: createFormData.monthlyRate ? parseFloat(createFormData.monthlyRate) : undefined,
@@ -720,8 +719,8 @@ export default function Deployments() {
                                 >
                                   상세보기
                                 </Button>
-                                {/* BP: pending 상태 투입 승인 */}
-                                {isBp && deployment.status === "pending" && (
+                                {/* BP: pending_bp 상태 투입 승인 */}
+                                {isBp && deployment.status === "pending_bp" && (
                                   <Button
                                     size="sm"
                                     variant="default"
@@ -729,6 +728,12 @@ export default function Deployments() {
                                       setSelectedDeployment(deployment);
                                       setApproveFormData({
                                         guideWorkerId: deployment.guideWorkerId || "",
+                                        workZoneId: deployment.workZoneId || "",
+                                        workType: deployment.workType || "daily",
+                                        dailyRate: deployment.dailyRate?.toString() || "",
+                                        monthlyRate: deployment.monthlyRate?.toString() || "",
+                                        otRate: deployment.otRate?.toString() || "",
+                                        nightRate: deployment.nightRate?.toString() || "",
                                       });
                                       setIsApproveOpen(true);
                                     }}
@@ -1011,22 +1016,11 @@ export default function Deployments() {
             {/* 작업확인서용 추가 정보 */}
             <div className="border-t pt-4 mt-2">
               <h3 className="text-sm font-semibold mb-3">작업확인서 정보</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                * 공사명/현장명은 위에서 선택한 작업 구역 이름이 자동으로 사용됩니다
+              </p>
 
               <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="siteName">공사명/현장명</Label>
-                  <Input
-                    id="siteName"
-                    placeholder="예: 용인 클러스터 공사"
-                    value={createFormData.siteName}
-                    onChange={(e) =>
-                      setCreateFormData({ ...createFormData, siteName: e.target.value })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    작업확인서에 자동으로 표시됩니다
-                  </p>
-                </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="workType">계약 타입</Label>
