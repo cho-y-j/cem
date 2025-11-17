@@ -158,7 +158,7 @@ export default function Deployments() {
     }
 
     const input: Record<string, string> = {};
-    
+
     if (ownerCompanyFilter) {
       // Admin/BP/EP가 Owner 회사 필터를 선택한 경우
       // ownerCompanyFilter는 company ID이므로, 해당 company의 owner user ID를 찾아야 함
@@ -171,9 +171,9 @@ export default function Deployments() {
       input.bpCompanyId = bpCompanyFilter;
     }
 
-    if (role === "ep" && user?.companyId) {
-      input.epCompanyId = user.companyId;
-    } else if (epCompanyFilter) {
+    // EP와 Admin은 모든 deployment 조회 가능 (자동 필터링 없음)
+    // 수동으로 필터를 선택한 경우에만 적용
+    if (epCompanyFilter) {
       input.epCompanyId = epCompanyFilter;
     }
 
@@ -447,9 +447,23 @@ export default function Deployments() {
     return d.status === statusFilter;
   });
 
+  // 🔍 디버깅: deployment 데이터 확인
+  console.log('=== [Deployments] 투입 데이터 확인 ===');
+  console.log('전체 deployments 개수:', deployments?.length || 0);
+  if (deployments && deployments.length > 0) {
+    console.log('첫 번째 deployment:', deployments[0]);
+    console.log('모든 deployment 상태:');
+    deployments.forEach((d, i) => {
+      console.log(`  [${i}] ID: ${d.id}, Status: "${d.status}", Equipment: ${d.equipmentId}`);
+    });
+  }
+  console.log('현재 statusFilter:', statusFilter);
+  console.log('filteredDeployments 개수:', filteredDeployments?.length || 0);
+
   // 상태 뱃지
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: any }> = {
+      pending_bp: { label: "승인대기", variant: "secondary" },
       pending: { label: "대기", variant: "secondary" },
       active: { label: "투입중", variant: "default" },
       extended: { label: "연장", variant: "outline" },
@@ -1447,16 +1461,6 @@ export default function Deployments() {
                 </div>
               )}
 
-              {/* 추후 확장 영역 */}
-              <div className="border rounded-lg p-4 border-dashed">
-                <h3 className="font-semibold text-lg mb-2">추가 정보 (추후 개발)</h3>
-                <p className="text-sm text-muted-foreground">
-                  • 작업확인서 목록<br />
-                  • 안전점검 기록<br />
-                  • 기간 연장 이력<br />
-                  • 운전자 교체 이력
-                </p>
-              </div>
             </div>
           )}
 
@@ -1543,10 +1547,12 @@ export default function Deployments() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="font-medium">장비:</span> {selectedDeployment.equipment?.regNum}
+                    <span className="font-medium">장비:</span>{" "}
+                    {equipment?.find((e) => e.id === selectedDeployment.equipmentId)?.regNum || "-"}
                   </div>
                   <div>
-                    <span className="font-medium">운전자:</span> {selectedDeployment.worker?.name}
+                    <span className="font-medium">운전자:</span>{" "}
+                    {workers?.find((w) => w.id === selectedDeployment.workerId)?.name || "-"}
                   </div>
                   <div>
                     <span className="font-medium">시작일:</span>{" "}
@@ -1595,16 +1601,16 @@ export default function Deployments() {
             <div className="grid gap-2">
               <Label htmlFor="approveGuideWorkerId">유도원 (선택사항)</Label>
               <Select
-                value={approveFormData.guideWorkerId}
+                value={approveFormData.guideWorkerId || "none"}
                 onValueChange={(value) =>
-                  setApproveFormData({ ...approveFormData, guideWorkerId: value })
+                  setApproveFormData({ ...approveFormData, guideWorkerId: value === "none" ? "" : value })
                 }
               >
                 <SelectTrigger id="approveGuideWorkerId">
                   <SelectValue placeholder="유도원 선택 (선택사항)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">선택 안 함</SelectItem>
+                  <SelectItem value="none">선택 안 함</SelectItem>
                   {guideWorkers.map((worker: any) => (
                     <SelectItem key={worker.id} value={worker.id}>
                       {worker.name}

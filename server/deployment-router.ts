@@ -30,11 +30,10 @@ export const deploymentRouter = router({
       // 역할별 자동 필터링
       if (role === "bp" && ctx.user.companyId) {
         filters.bpCompanyId = filters.bpCompanyId || ctx.user.companyId;
-      } else if (role === "ep" && ctx.user.companyId) {
-        filters.epCompanyId = filters.epCompanyId || ctx.user.companyId;
       } else if (role === "owner") {
         filters.ownerId = filters.ownerId || ctx.user.id;
       }
+      // EP와 Admin은 모든 deployment 조회 가능 (필터 없음)
 
       const deployments = await db.getDeployments(filters);
       return deployments;
