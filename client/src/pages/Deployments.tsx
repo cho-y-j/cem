@@ -681,21 +681,21 @@ export default function Deployments() {
                               {deployment.equipment?.regNum || "-"}
                               <br />
                               <span className="text-xs text-muted-foreground">
-                                {deployment.equipment?.equipType?.typeName || ""}
+                                {deployment.equipment?.equipType?.name || ""}
                               </span>
                             </TableCell>
                             <TableCell>
                               {deployment.worker?.name || "-"}
                               <br />
                               <span className="text-xs text-muted-foreground">
-                                {deployment.worker?.workerType?.typeName || ""}
+                                {deployment.worker?.workerType?.name || ""}
                               </span>
                             </TableCell>
                             <TableCell>
                               {deployment.guideWorker?.name || "-"}
                               <br />
                               <span className="text-xs text-muted-foreground">
-                                {deployment.guideWorker?.workerType?.typeName || ""}
+                                {deployment.guideWorker?.workerType?.name || ""}
                               </span>
                             </TableCell>
                             <TableCell>

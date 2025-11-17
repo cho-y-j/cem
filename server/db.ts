@@ -2794,15 +2794,10 @@ export async function getDeployments(filters?: {
 
   console.log("[Database] getDeployments called with filters:", filters);
 
-  // equipment, worker, guide_worker 정보를 JOIN하여 함께 조회
+  // 기본 deployment 정보만 조회 (equipment, worker는 별도로 조회)
   let query = supabase
     .from('deployments')
-    .select(`
-      *,
-      equipment:equipment!deployments_equipment_id_fkey(id, reg_num, equip_type:equip_types(id, type_name)),
-      worker:workers!deployments_worker_id_fkey(id, name, phone, worker_type:worker_types(id, type_name)),
-      guide_worker:workers!deployments_guide_worker_id_fkey(id, name, phone, worker_type:worker_types(id, type_name))
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (filters?.ownerId) {
@@ -2832,10 +2827,19 @@ export async function getDeployments(filters?: {
     console.log("[Database] Sample deployments (first 10):", allDeployments);
   }
 
-  // guide_worker, inspector, workZone 정보를 별도로 조회하여 추가
+  // equipment, worker, guide_worker, inspector, workZone 정보를 별도로 조회하여 추가
   const deployments = toCamelCaseArray(data || []) as Deployment[];
 
   if (deployments.length > 0) {
+    // Equipment IDs 수집
+    const equipmentIds = deployments
+      .map(d => d.equipmentId)
+      .filter((id): id is string => !!id);
+
+    // Worker IDs 수집 (worker, guide_worker, inspector)
+    const workerIds = deployments
+      .map(d => d.workerId)
+      .filter((id): id is string => !!id);
     const guideWorkerIds = deployments
       .map(d => d.guideWorkerId)
       .filter((id): id is string => !!id);
@@ -2846,7 +2850,30 @@ export async function getDeployments(filters?: {
       .map(d => d.workZoneId)
       .filter((id): id is string => !!id);
 
-    const allWorkerIds = [...new Set([...guideWorkerIds, ...inspectorIds])];
+    const allWorkerIds = [...new Set([...workerIds, ...guideWorkerIds, ...inspectorIds])];
+
+    // Equipment 조회
+    if (equipmentIds.length > 0) {
+      const { data: equipment } = await supabase
+        .from('equipment')
+        .select(`
+          id,
+          reg_num,
+          equip_type_id,
+          equip_type:equip_types!equipment_equip_type_id_fkey(id, name)
+        `)
+        .in('id', equipmentIds);
+
+      if (equipment) {
+        const equipmentMap = new Map(equipment.map((e: any) => [e.id, toCamelCase(e)]));
+
+        deployments.forEach(deployment => {
+          if (deployment.equipmentId && equipmentMap.has(deployment.equipmentId)) {
+            (deployment as any).equipment = equipmentMap.get(deployment.equipmentId);
+          }
+        });
+      }
+    }
 
     // Workers 조회
     if (allWorkerIds.length > 0) {
@@ -2855,9 +2882,10 @@ export async function getDeployments(filters?: {
         .select(`
           id,
           name,
+          phone,
           license_num,
           worker_type_id,
-          worker_type:worker_types!workers_worker_type_id_fkey(id, name, description)
+          worker_type:worker_types!workers_worker_type_id_fkey(id, name)
         `)
         .in('id', allWorkerIds);
 
@@ -2865,6 +2893,9 @@ export async function getDeployments(filters?: {
         const workerMap = new Map(workers.map((w: any) => [w.id, toCamelCase(w)]));
 
         deployments.forEach(deployment => {
+          if (deployment.workerId && workerMap.has(deployment.workerId)) {
+            (deployment as any).worker = workerMap.get(deployment.workerId);
+          }
           if (deployment.guideWorkerId && workerMap.has(deployment.guideWorkerId)) {
             (deployment as any).guideWorker = workerMap.get(deployment.guideWorkerId);
           }
