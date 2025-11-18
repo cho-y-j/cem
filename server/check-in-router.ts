@@ -78,23 +78,29 @@ export const checkInRouter = router({
       }
 
       // 2. 활성 투입(deployment) 확인 - 투입된 사람만 출근 가능
+      // 유도원은 guide_worker_id로 저장되므로 OR 조건으로 찾기
       console.log("[CheckIn] Checking deployment for worker:", worker.id);
 
-      const { data: activeDeployment, error: deploymentError } = await supabase
+      // worker_id 또는 guide_worker_id로 deployment 찾기
+      const { data: activeDeployments, error: deploymentError } = await supabase
         .from("deployments")
         .select(`
           id,
           bp_company_id,
           ep_company_id,
           equipment_id,
+          worker_id,
+          guide_worker_id,
           work_zone_id,
           status
         `)
-        .eq("worker_id", worker.id)
         .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
+
+      // worker_id 또는 guide_worker_id가 일치하는 deployment 찾기
+      const activeDeployment = activeDeployments?.find((d: any) =>
+        d.worker_id === worker.id || d.guide_worker_id === worker.id
+      ) || null;
 
       if (deploymentError) {
         console.error("[CheckIn] Error fetching deployment:", {
@@ -120,12 +126,13 @@ export const checkInRouter = router({
         // 디버깅: 모든 deployment 확인
         const { data: allDeployments, error: allDeploymentsError } = await supabase
           .from("deployments")
-          .select("id, worker_id, status, created_at")
-          .eq("worker_id", worker.id)
+          .select("id, worker_id, guide_worker_id, status, created_at")
+          .or(`worker_id.eq.${worker.id},guide_worker_id.eq.${worker.id}`)
           .order("created_at", { ascending: false })
           .limit(5);
-        
+
         console.log("[CheckIn] All deployments for worker:", {
+          workerId: worker.id,
           count: allDeployments?.length || 0,
           deployments: allDeployments,
           error: allDeploymentsError,
@@ -170,7 +177,7 @@ export const checkInRouter = router({
           within: isWithinZone,
         });
 
-        // 구역 밖이면 출근 거부
+        // 구역 밖이어도 출근 허용 (작업구역 외 출근으로 기록)
         if (!isWithinZone) {
           const { data: zone } = await supabase
             .from("work_zones")
@@ -178,10 +185,7 @@ export const checkInRouter = router({
             .eq("id", workZoneId)
             .maybeSingle();
 
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: `지정된 작업 구역(${zone?.name || "알 수 없음"}) 밖에서는 출근할 수 없습니다. 현재 거리: ${distanceFromZone?.toFixed(0)}m`,
-          });
+          console.log(`[CheckIn] ⚠️ 작업구역 외 출근: ${zone?.name || "알 수 없음"}, 거리: ${distanceFromZone?.toFixed(0)}m`);
         }
       } catch (error: any) {
         // TRPCError는 그대로 throw
@@ -414,10 +418,10 @@ export const checkInRouter = router({
       });
     }
 
-    // 권한별 필터링
+    // 권한별 필터링 (guide_worker_id도 포함)
     let deploymentQuery = supabase
       .from("deployments")
-      .select("worker_id, ep_company_id, bp_company_id, owner_id")
+      .select("worker_id, guide_worker_id, ep_company_id, bp_company_id, owner_id")
       .eq("status", "active");
 
     // EP인 경우 자신의 회사 deployment만
@@ -511,14 +515,23 @@ export const checkInRouter = router({
         return isValid;
       });
 
+      // worker_id와 guide_worker_id의 unique 개수 계산
+      const uniqueWorkerIds = new Set(
+        validDeployments.flatMap((d: any) => [
+          d.workerId || d.worker_id,
+          d.guideWorkerId || d.guide_worker_id
+        ]).filter(Boolean)
+      );
+
       console.log('[getTodayStats] ===== 출근 대상 계산 결과 =====');
       console.log('[getTodayStats] Total deployments:', activeDeployments.length);
       console.log('[getTodayStats] Valid deployments (with work zones):', validDeployments.length);
       console.log('[getTodayStats] EP Company IDs found:', epCompanyIds.length);
       console.log('[getTodayStats] Work zones found:', workZones?.length || 0);
-      console.log('[getTodayStats] Expected workers:', validDeployments.length);
+      console.log('[getTodayStats] Unique workers (including guides):', uniqueWorkerIds.size);
+      console.log('[getTodayStats] Expected workers:', uniqueWorkerIds.size);
 
-      return validDeployments.length;
+      return uniqueWorkerIds.size;
     })();
 
     // 출근 대상 worker 목록 조회
@@ -547,9 +560,14 @@ export const checkInRouter = router({
         return epCompanyId && validEpCompanyIds.has(epCompanyId);
       });
 
-      // worker_id 목록 수집
-      const workerIds = [...new Set(validDeployments.map((d: any) => d.workerId || d.worker_id).filter(Boolean))];
-      
+      // worker_id와 guide_worker_id 목록 수집
+      const workerIds = [...new Set(
+        validDeployments.flatMap((d: any) => [
+          d.workerId || d.worker_id,
+          d.guideWorkerId || d.guide_worker_id
+        ]).filter(Boolean)
+      )];
+
       if (workerIds.length === 0) return [];
 
       // worker 정보 조회
@@ -615,24 +633,33 @@ export const checkInRouter = router({
         }
       }
 
-      // deployment 정보 매핑
+      // deployment 정보 매핑 (worker_id와 guide_worker_id 모두 매핑)
       const deploymentMap = new Map();
       validDeployments.forEach((d: any) => {
+        const epCompanyId = d.epCompanyId || d.ep_company_id;
+        const bpCompanyId = d.bpCompanyId || d.bp_company_id;
+        const epCompany = epCompanyId ? companyMap.get(epCompanyId) : null;
+        const bpCompany = bpCompanyId ? companyMap.get(bpCompanyId) : null;
+
+        const deploymentInfo = {
+          id: d.id || d.deploymentId,
+          epCompanyId,
+          bpCompanyId,
+          ownerId: d.ownerId || d.owner_id,
+          epCompany: epCompany ? { id: epCompany.id, name: epCompany.name } : null,
+          bpCompany: bpCompany ? { id: bpCompany.id, name: bpCompany.name } : null,
+        };
+
+        // worker_id 매핑
         const workerId = d.workerId || d.worker_id;
         if (workerId && !deploymentMap.has(workerId)) {
-          const epCompanyId = d.epCompanyId || d.ep_company_id;
-          const bpCompanyId = d.bpCompanyId || d.bp_company_id;
-          const epCompany = epCompanyId ? companyMap.get(epCompanyId) : null;
-          const bpCompany = bpCompanyId ? companyMap.get(bpCompanyId) : null;
-          
-          deploymentMap.set(workerId, {
-            id: d.id || d.deploymentId,
-            epCompanyId,
-            bpCompanyId,
-            ownerId: d.ownerId || d.owner_id,
-            epCompany: epCompany ? { id: epCompany.id, name: epCompany.name } : null,
-            bpCompany: bpCompany ? { id: bpCompany.id, name: bpCompany.name } : null,
-          });
+          deploymentMap.set(workerId, deploymentInfo);
+        }
+
+        // guide_worker_id 매핑
+        const guideWorkerId = d.guideWorkerId || d.guide_worker_id;
+        if (guideWorkerId && !deploymentMap.has(guideWorkerId)) {
+          deploymentMap.set(guideWorkerId, deploymentInfo);
         }
       });
 
