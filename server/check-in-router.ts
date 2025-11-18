@@ -55,25 +55,60 @@ export const checkInRouter = router({
         });
       }
 
-      // 1. user_id로 worker 찾기
-      const { data: worker, error: workerError } = await supabase
-        .from("workers")
-        .select("id, name, user_id")
-        .eq("user_id", ctx.user.id)
-        .maybeSingle();
+      // 1. PIN 또는 email로 worker 찾기 (mobile-router.ts와 동일한 방식)
+      const userPin = ctx.user.pin;
+      const userEmail = ctx.user.email;
+      let worker: any = null;
 
-      if (workerError) {
-        console.error("[CheckIn] Error fetching worker:", workerError);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Worker 정보 조회 중 오류가 발생했습니다.",
-        });
+      // 먼저 PIN으로 찾기
+      if (userPin) {
+        console.log("[CheckIn] Looking for worker with PIN:", userPin);
+        try {
+          worker = await db.getWorkerByPinCode(userPin);
+          if (worker) {
+            console.log("[CheckIn] Found worker by PIN:", worker.id, worker.name);
+          }
+        } catch (error) {
+          console.error("[CheckIn] Error getting worker by PIN:", error);
+        }
+      }
+
+      // PIN으로 못 찾으면 Email로 찾기
+      if (!worker && userEmail) {
+        console.log("[CheckIn] Trying with email:", userEmail);
+        try {
+          worker = await db.getWorkerByEmail(userEmail);
+          if (worker) {
+            console.log("[CheckIn] Found worker by email:", worker.id, worker.name);
+          }
+        } catch (error) {
+          console.error("[CheckIn] Error getting worker by email:", error);
+        }
+      }
+
+      // 최후의 수단: user_id로 찾기
+      if (!worker) {
+        console.log("[CheckIn] Trying with user_id:", ctx.user.id);
+        const { data: workerData, error: workerError } = await supabase
+          .from("workers")
+          .select("id, name, user_id")
+          .eq("user_id", ctx.user.id)
+          .maybeSingle();
+
+        if (workerError) {
+          console.error("[CheckIn] Error fetching worker by user_id:", workerError);
+        }
+
+        if (workerData) {
+          worker = workerData;
+          console.log("[CheckIn] Found worker by user_id:", worker.id, worker.name);
+        }
       }
 
       if (!worker) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Worker 정보를 찾을 수 없습니다.",
+          message: "Worker 정보를 찾을 수 없습니다. PIN 또는 Email을 확인하세요.",
         });
       }
 
