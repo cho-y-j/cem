@@ -1758,22 +1758,21 @@ export default function Deployments() {
                 onValueChange={(value) =>
                   setInspectorFormData({ ...inspectorFormData, inspectorId: value })
                 }
+                disabled={!inspectors || inspectors.length === 0}
               >
                 <SelectTrigger id="inspectorId">
-                  <SelectValue placeholder="안전점검원 선택" />
+                  <SelectValue placeholder={
+                    !inspectors || inspectors.length === 0
+                      ? "안전점검원이 없습니다"
+                      : "안전점검원 선택"
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  {inspectors && inspectors.length === 0 ? (
-                    <SelectItem value="" disabled>
-                      안전점검원이 없습니다. 인력 관리에서 안전점검원을 먼저 생성해주세요.
+                  {inspectors?.map((inspector: any) => (
+                    <SelectItem key={inspector.id} value={inspector.id}>
+                      {inspector.name} {inspector.licenseNum && `(${inspector.licenseNum})`}
                     </SelectItem>
-                  ) : (
-                    inspectors?.map((inspector: any) => (
-                      <SelectItem key={inspector.id} value={inspector.id}>
-                        {inspector.name} {inspector.licenseNum && `(${inspector.licenseNum})`}
-                      </SelectItem>
-                    ))
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
               {inspectors && inspectors.length === 0 && (
