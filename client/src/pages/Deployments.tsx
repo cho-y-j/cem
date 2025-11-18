@@ -761,41 +761,47 @@ export default function Deployments() {
                                 {(deployment.status === "active" ||
                                   deployment.status === "extended") && (
                                   <>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        setSelectedDeployment(deployment);
-                                        setExtendFormData({
-                                          newEndDate: format(
-                                            new Date(deployment.plannedEndDate),
-                                            "yyyy-MM-dd"
-                                          ),
-                                          reason: "",
-                                        });
-                                        setIsExtendOpen(true);
-                                      }}
-                                    >
-                                      <Clock className="h-3 w-3 mr-1" />
-                                      연장
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        setSelectedDeployment(deployment);
-                                        setChangeWorkerFormData({
-                                          newWorkerId: "",
-                                          reason: "",
-                                        });
-                                        setIsChangeWorkerOpen(true);
-                                      }}
-                                    >
-                                      <UserCheck className="h-3 w-3 mr-1" />
-                                      운전자 교체
-                                    </Button>
-                                    {/* BP: 유도원 추가/교체 */}
-                                    {isBp && (
+                                    {/* 연장 - BP, EP, Admin */}
+                                    {(isBp || isEp || isAdmin) && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedDeployment(deployment);
+                                          setExtendFormData({
+                                            newEndDate: format(
+                                              new Date(deployment.plannedEndDate),
+                                              "yyyy-MM-dd"
+                                            ),
+                                            reason: "",
+                                          });
+                                          setIsExtendOpen(true);
+                                        }}
+                                      >
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        연장
+                                      </Button>
+                                    )}
+                                    {/* 운전자 교체 - BP, EP, Admin */}
+                                    {(isBp || isEp || isAdmin) && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedDeployment(deployment);
+                                          setChangeWorkerFormData({
+                                            newWorkerId: "",
+                                            reason: "",
+                                          });
+                                          setIsChangeWorkerOpen(true);
+                                        }}
+                                      >
+                                        <UserCheck className="h-3 w-3 mr-1" />
+                                        운전자 교체
+                                      </Button>
+                                    )}
+                                    {/* 유도원 추가/교체 - BP, EP, Admin */}
+                                    {(isBp || isEp || isAdmin) && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -811,8 +817,8 @@ export default function Deployments() {
                                         유도원 {deployment.guideWorkerId ? "교체" : "추가"}
                                       </Button>
                                     )}
-                                    {/* EP: 안전점검원 지정 */}
-                                    {isEp && (
+                                    {/* 안전점검원 지정 - EP, Admin */}
+                                    {(isEp || isAdmin) && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -828,14 +834,17 @@ export default function Deployments() {
                                         안전점검원 {deployment.inspectorId ? "변경" : "지정"}
                                       </Button>
                                     )}
-                                    <Button
-                                      size="sm"
-                                      variant="default"
-                                      onClick={() => handleComplete(deployment)}
-                                    >
-                                      <CheckCircle className="h-3 w-3 mr-1" />
-                                      종료
-                                    </Button>
+                                    {/* 종료 - BP, EP, Admin */}
+                                    {(isBp || isEp || isAdmin) && (
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        onClick={() => handleComplete(deployment)}
+                                      >
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        종료
+                                      </Button>
+                                    )}
                                   </>
                                 )}
                               </div>
