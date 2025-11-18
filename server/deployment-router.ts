@@ -41,13 +41,51 @@ export const deploymentRouter = router({
 
   /**
    * Worker 자신의 active 투입 목록 조회 (작업확인서용)
-   * users.id -> workers.user_id -> deployments.worker_id
+   * PIN/Email로 worker 찾기 -> worker_id 또는 guide_worker_id로 deployments 조회
    */
   myActiveDeployments: protectedProcedure.query(async ({ ctx }) => {
-    const deployments = await db.getDeploymentsByUserId(ctx.user.id, {
+    const userPin = ctx.user.pin;
+    const userEmail = ctx.user.email;
+    let worker: any = null;
+
+    // PIN으로 worker 찾기
+    if (userPin) {
+      try {
+        worker = await db.getWorkerByPinCode(userPin);
+      } catch (error) {
+        console.error('[myActiveDeployments] Error getting worker by PIN:', error);
+      }
+    }
+
+    // PIN으로 못 찾으면 Email로 찾기
+    if (!worker && userEmail) {
+      try {
+        worker = await db.getWorkerByEmail(userEmail);
+      } catch (error) {
+        console.error('[myActiveDeployments] Error getting worker by email:', error);
+      }
+    }
+
+    // 최후의 수단: user_id로 찾기 (기존 방식)
+    if (!worker) {
+      const deployments = await db.getDeploymentsByUserId(ctx.user.id, {
+        status: "active",
+      });
+      return deployments;
+    }
+
+    // worker를 찾았으면 worker_id 또는 guide_worker_id로 deployments 조회
+    const deployments = await db.getDeployments({
       status: "active",
     });
-    return deployments;
+
+    // worker_id 또는 guide_worker_id가 일치하는 deployment 필터링
+    const myDeployments = deployments.filter((d: any) =>
+      d.workerId === worker.id || d.guideWorkerId === worker.id
+    );
+
+    console.log('[myActiveDeployments] Found deployments:', myDeployments.length, 'for worker:', worker.id);
+    return myDeployments;
   }),
 
   /**
