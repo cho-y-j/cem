@@ -8,10 +8,11 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 
-// 관리자 전용 프로시저
+// 관리자 또는 EP 전용 프로시저
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  console.log('[Users] Admin check - email:', ctx.user?.email, 'role:', ctx.user?.role);
-  if (ctx.user?.role?.toLowerCase() !== "admin") {
+  console.log('[Users] Admin/EP check - email:', ctx.user?.email, 'role:', ctx.user?.role);
+  const userRole = ctx.user?.role?.toLowerCase();
+  if (userRole !== "admin" && userRole !== "ep") {
     throw new TRPCError({ code: "FORBIDDEN", message: "관리자 권한이 필요합니다." });
   }
   return next({ ctx });
@@ -20,13 +21,44 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
 export const usersRouter = router({
   /**
    * 사용자 목록 조회
+   * Admin: 모든 사용자
+   * EP: 자신의 회사 소속 사용자만
    */
-  list: adminProcedure.query(async () => {
-    return await db.getAllUsers();
+  list: adminProcedure.query(async ({ ctx }) => {
+    const userRole = ctx.user?.role?.toLowerCase();
+
+    // Admin은 모든 사용자 조회
+    if (userRole === "admin") {
+      return await db.getAllUsers();
+    }
+
+    // EP는 자신의 회사 사용자만 조회
+    if (userRole === "ep" && ctx.user?.companyId) {
+      const supabase = db.getSupabase();
+      if (!supabase) return [];
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('company_id', ctx.user.companyId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[Users] List error for EP:', error);
+        return [];
+      }
+
+      console.log('[Users] EP company users:', data?.length || 0);
+      return data || [];
+    }
+
+    return [];
   }),
 
   /**
-   * 사용자 생성 (Admin)
+   * 사용자 생성 (Admin 또는 EP)
+   * Admin: 모든 회사에 사용자 생성 가능
+   * EP: 자신의 회사에만 사용자 생성 가능
    */
   create: adminProcedure
     .input(
@@ -39,13 +71,34 @@ export const usersRouter = router({
         pin: z.string().length(4, "PIN은 4자리여야 합니다.").optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const supabase = db.getSupabaseAdmin();
       if (!supabase) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Supabase Admin not available",
         });
+      }
+
+      const userRole = ctx.user?.role?.toLowerCase();
+
+      // EP는 자신의 회사에만 사용자 생성 가능
+      if (userRole === "ep") {
+        if (!ctx.user?.companyId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "회사 정보가 없습니다.",
+          });
+        }
+        // EP가 지정한 companyId가 자신의 회사와 다르면 에러
+        if (input.companyId && input.companyId !== ctx.user.companyId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "다른 회사에 사용자를 생성할 수 없습니다.",
+          });
+        }
+        // EP는 항상 자신의 회사로 설정
+        input.companyId = ctx.user.companyId;
       }
 
       // 역할이 admin이 아니면 companyId 필수
@@ -119,7 +172,9 @@ export const usersRouter = router({
     }),
 
   /**
-   * 사용자 정보 수정 (Admin)
+   * 사용자 정보 수정 (Admin 또는 EP)
+   * Admin: 모든 사용자 수정 가능
+   * EP: 자신의 회사 소속 사용자만 수정 가능
    */
   update: adminProcedure
     .input(
@@ -133,7 +188,7 @@ export const usersRouter = router({
         pin: z.string().length(4, "PIN은 4자리여야 합니다.").optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const supabase = db.getSupabaseAdmin();
       if (!supabase) {
         throw new TRPCError({
@@ -142,7 +197,40 @@ export const usersRouter = router({
         });
       }
 
-      console.log(`[Users] Update attempt for user: ${input.id}`);
+      const userRole = ctx.user?.role?.toLowerCase();
+
+      console.log(`[Users] Update attempt for user: ${input.id} by ${ctx.user?.email} (${userRole})`);
+
+      // EP는 자신의 회사 사용자만 수정 가능
+      if (userRole === "ep") {
+        const { data: targetUser } = await supabase
+          .from('users')
+          .select('company_id')
+          .eq('id', input.id)
+          .single();
+
+        if (!targetUser) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "사용자를 찾을 수 없습니다.",
+          });
+        }
+
+        if (targetUser.company_id !== ctx.user?.companyId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "다른 회사의 사용자를 수정할 수 없습니다.",
+          });
+        }
+
+        // EP는 회사를 변경할 수 없음
+        if (input.companyId && input.companyId !== ctx.user.companyId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "회사를 변경할 수 없습니다.",
+          });
+        }
+      }
 
       // UUID 형식 확인 (Supabase Auth는 UUID를 사용)
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -295,27 +383,46 @@ export const usersRouter = router({
     }),
 
   /**
-   * 사용자 삭제
+   * 사용자 삭제 (Admin 또는 EP)
+   * Admin: 모든 사용자 삭제 가능
+   * EP: 자신의 회사 소속 사용자만 삭제 가능
    */
   delete: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const supabase = db.getSupabaseAdmin();
       if (!supabase) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       }
 
-      console.log(`[Users] Starting delete for user: ${input.id}`);
+      const userRole = ctx.user?.role?.toLowerCase();
+
+      console.log(`[Users] Starting delete for user: ${input.id} by ${ctx.user?.email} (${userRole})`);
 
       // 먼저 사용자 정보 조회
       const { data: user } = await supabase
         .from("users")
-        .select("email, role")
+        .select("email, role, company_id")
         .eq("id", input.id)
         .single();
 
-      if (user) {
-        console.log(`[Users] Deleting user: ${user.email} (${user.role})`);
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "사용자를 찾을 수 없습니다.",
+        });
+      }
+
+      console.log(`[Users] Deleting user: ${user.email} (${user.role})`);
+
+      // EP는 자신의 회사 사용자만 삭제 가능
+      if (userRole === "ep") {
+        if (user.company_id !== ctx.user?.companyId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "다른 회사의 사용자를 삭제할 수 없습니다.",
+          });
+        }
       }
 
       // 1. 해당 사용자가 소유한 데이터 확인

@@ -4,8 +4,9 @@
  * - 사용자 등록 기능 추가
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,7 @@ import { Plus, Loader2, UserPlus, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function AdminUsersNew() {
+  const { user: currentUser } = useAuth();
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,11 +51,23 @@ export default function AdminUsersNew() {
   const [companyId, setCompanyId] = useState("");
   const [pin, setPin] = useState("0000"); // Inspector/Worker용 PIN
 
+  const isEp = currentUser?.role?.toLowerCase() === "ep";
+  const isAdmin = currentUser?.role?.toLowerCase() === "admin";
+
+  // EP 사용자인 경우 자동으로 자신의 회사로 설정
+  useEffect(() => {
+    if (isEp && currentUser?.companyId) {
+      setCompanyId(currentUser.companyId);
+    }
+  }, [isEp, currentUser?.companyId]);
+
   // 사용자 목록 조회
   const { data: users, isLoading: loadingUsers } = trpc.users.list.useQuery();
 
-  // 회사 목록 조회
-  const { data: companies } = trpc.companies.list.useQuery();
+  // 회사 목록 조회 (Admin만 필요)
+  const { data: companies } = trpc.companies.list.useQuery(undefined, {
+    enabled: isAdmin,
+  });
 
   // 역할 변경 mutation
   const updateRoleMutation = trpc.users.updateRole.useMutation({
@@ -348,7 +362,7 @@ export default function AdminUsersNew() {
                 />
               </div>
 
-              {role !== "admin" && (
+              {role !== "admin" && isAdmin && (
                 <div>
                   <Label htmlFor="company">소속 회사 *</Label>
                   <Select value={companyId} onValueChange={setCompanyId}>
@@ -367,6 +381,17 @@ export default function AdminUsersNew() {
                     {role === "owner" && "Owner 회사만 표시됩니다."}
                     {role === "bp" && "BP 회사만 표시됩니다."}
                     {role === "ep" && "EP 회사만 표시됩니다."}
+                  </p>
+                </div>
+              )}
+              {role !== "admin" && isEp && (
+                <div>
+                  <Label>소속 회사</Label>
+                  <div className="mt-2 px-3 py-2 bg-muted rounded-md text-sm">
+                    {currentUser?.companyName || "회사 정보 없음"}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    EP는 자신의 회사에만 사용자를 생성할 수 있습니다.
                   </p>
                 </div>
               )}
