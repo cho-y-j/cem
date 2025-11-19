@@ -495,6 +495,8 @@ export const deploymentRouter = router({
    * EP가 고용한 Inspector 목록 조회
    */
   listInspectors: protectedProcedure.query(async ({ ctx }) => {
+    console.log('[listInspectors] Start - User:', ctx.user.email, 'Role:', ctx.user.role, 'CompanyId:', ctx.user.companyId);
+
     // EP 권한 확인
     if (ctx.user.role !== 'ep' && ctx.user.role !== 'admin') {
       throw new TRPCError({
@@ -513,7 +515,10 @@ export const deploymentRouter = router({
       .eq('name', '안전점검원')
       .single();
 
+    console.log('[listInspectors] Inspector Type:', inspectorType);
+
     if (!inspectorType) {
+      console.log('[listInspectors] ❌ Inspector type not found');
       return [];
     }
 
@@ -525,19 +530,23 @@ export const deploymentRouter = router({
       // 1. EP 회사의 users 조회
       const { data: epUsers, error: usersError } = await supabase
         .from('users')
-        .select('id')
+        .select('id, email, role, name')
         .eq('company_id', ctx.user.companyId);
 
+      console.log('[listInspectors] EP Company Users:', epUsers?.length || 0, epUsers);
+
       if (usersError) {
-        console.error('[Deployment] Error getting EP users:', usersError);
+        console.error('[listInspectors] ❌ Error getting EP users:', usersError);
         return [];
       }
 
       if (!epUsers || epUsers.length === 0) {
+        console.log('[listInspectors] ❌ No users found in EP company');
         return [];
       }
 
       userIds = epUsers.map((u: any) => u.id);
+      console.log('[listInspectors] User IDs to filter:', userIds);
     }
 
     // 2. Inspector 인력 조회
@@ -552,12 +561,16 @@ export const deploymentRouter = router({
     // EP 역할인 경우 해당 회사의 user_id만 필터링
     if (userIds && userIds.length > 0) {
       query = query.in('user_id', userIds);
+      console.log('[listInspectors] Filtering by user_ids:', userIds.length);
     }
 
     const { data, error } = await query;
 
+    console.log('[listInspectors] Query result - Count:', data?.length || 0, 'Error:', error);
+    console.log('[listInspectors] Inspectors:', data);
+
     if (error) {
-      console.error('[Deployment] List inspectors error:', error);
+      console.error('[listInspectors] ❌ List inspectors error:', error);
       return [];
     }
 
