@@ -168,6 +168,40 @@ export const usersRouter = router({
 
       console.log(`[Users] Created: ${input.email} (${input.role})`);
 
+      // Inspector 역할인 경우 Worker 레코드도 자동 생성
+      if (input.role === "inspector" && input.companyId) {
+        console.log(`[Users] Creating Worker record for Inspector: ${input.email}`);
+
+        // 안전점검원 worker_type 조회
+        const { data: inspectorType } = await supabase
+          .from("worker_types")
+          .select("id")
+          .eq("name", "안전점검원")
+          .single();
+
+        if (inspectorType) {
+          const { error: workerError } = await supabase.from("workers").insert({
+            id: crypto.randomUUID(),
+            name: input.name,
+            user_id: userId,
+            worker_type_id: inspectorType.id,
+            company_id: input.companyId,
+            license_num: null,
+            created_at: new Date().toISOString(),
+          });
+
+          if (workerError) {
+            console.error("[Users] Worker insert error for Inspector:", workerError);
+            // Worker 생성 실패는 경고만 하고 계속 진행 (사용자는 생성됨)
+            console.warn(`[Users] Warning: Inspector user created but worker record failed`);
+          } else {
+            console.log(`[Users] ✅ Worker record created for Inspector: ${input.email}`);
+          }
+        } else {
+          console.warn(`[Users] Warning: '안전점검원' worker type not found`);
+        }
+      }
+
       return { id: userId, success: true };
     }),
 

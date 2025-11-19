@@ -206,9 +206,17 @@ export default function Deployments() {
   const guideWorkers = workers?.filter((w: any) => w.workerTypeId === guideWorkerTypeId) || [];
   
   // Inspector 목록 조회 (EP만)
-  const { data: inspectors } = trpc.deployments.listInspectors.useQuery(undefined, {
+  const { data: inspectors, isLoading: loadingInspectors, error: inspectorsError } = trpc.deployments.listInspectors.useQuery(undefined, {
     enabled: isEp || isAdmin,
   });
+
+  // 🔍 디버깅: Inspector 목록 확인
+  console.log('[Deployments] Inspector 디버깅:');
+  console.log('- isEp:', isEp, 'isAdmin:', isAdmin);
+  console.log('- loadingInspectors:', loadingInspectors);
+  console.log('- inspectorsError:', inspectorsError);
+  console.log('- inspectors count:', inspectors?.length || 0);
+  console.log('- inspectors data:', inspectors);
 
   // Entry Request 승인 완료된 것만 필터링 (먼저 정의)
   const approvedEntryRequests = entryRequests?.filter(
