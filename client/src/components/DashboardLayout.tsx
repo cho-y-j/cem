@@ -38,9 +38,8 @@ const menuItems = [
   { icon: FileText, label: "작업 확인서", path: "/work-journal", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Map, label: "작업 구역 관리", path: "/work-zones", roles: ["ep", "admin"] },
   { icon: UserCheck, label: "출근 현황", path: "/check-in-monitoring", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: MapPin, label: "실시간 위치 추적", path: "/location-tracking", roles: ["owner", "ep", "bp", "admin"] },
   { icon: AlertTriangle, label: "긴급 알림", path: "/emergency-alerts", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: Clock, label: "작업 현황 모니터링", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: Clock, label: "작업 현황 & 위치", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin"] },
   { icon: BarChart3, label: "통계 및 리포트", path: "/statistics", roles: ["owner", "ep", "bp", "admin"] },
   { icon: UserCircle, label: "내정보", path: "/my-profile", roles: ["worker"] },
 ];
@@ -52,7 +51,6 @@ const adminMenuItems = [
   { icon: HardHat, label: "인력 유형", path: "/admin/worker-types", roles: ["admin", "ep"] },
   { icon: Shield, label: "안전점검 템플릿", path: "/admin/safety-templates", roles: ["admin", "ep"] },
   { icon: CheckCircle, label: "운전자 점검표 템플릿", path: "/admin/driver-templates", roles: ["admin", "owner"] }, // Owner 전용
-  { icon: Shield, label: "안전점검 내역", path: "/admin/safety-inspections", roles: ["admin", "ep"] },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

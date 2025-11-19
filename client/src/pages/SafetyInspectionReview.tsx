@@ -37,6 +37,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   CheckCircle,
   Clock,
   AlertCircle,
@@ -45,7 +51,8 @@ import {
   Calendar,
   User,
   Eye,
-  Loader2
+  Loader2,
+  Filter
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -56,6 +63,11 @@ export default function SafetyInspectionReview() {
   const role = user?.role?.toLowerCase();
   const isAdmin = role === "admin";
   const isEp = role === "ep";
+
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<"review" | "history">("review");
+
+  // 검토 탭 필터
   const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "reviewed">("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("");
   const [bpFilter, setBpFilter] = useState<string>("");
@@ -63,6 +75,13 @@ export default function SafetyInspectionReview() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // 전체 이력 탭 필터
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>("");
+  const [historyFrequencyFilter, setHistoryFrequencyFilter] = useState<string>("");
+  const [historyStartDate, setHistoryStartDate] = useState("");
+  const [historyEndDate, setHistoryEndDate] = useState("");
+
   const [selectedInspection, setSelectedInspection] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
@@ -95,15 +114,31 @@ export default function SafetyInspectionReview() {
     return Object.keys(payload).length > 0 ? payload : undefined;
   }, [statusFilter, ownerFilter, bpFilter, epFilter, searchTerm, startDate, endDate]);
 
-  // 제출된 점검 목록 조회
+  // 검토 탭: 제출된 점검 목록 조회
   const {
     data: inspectionsData,
     refetch,
     isLoading,
   } = trpc.safetyInspection.listSubmittedInspections.useQuery(reviewFilters, {
     keepPreviousData: true,
+    enabled: activeTab === "review",
   });
   const inspections = inspectionsData || [];
+
+  // 전체 이력 탭: 모든 점검 목록 조회
+  const {
+    data: allInspectionsData,
+    refetch: refetchAll,
+    isLoading: isLoadingAll,
+  } = trpc.safetyInspection.listInspections.useQuery({
+    status: historyStatusFilter || undefined,
+    checkFrequency: historyFrequencyFilter || undefined,
+    startDate: historyStartDate || undefined,
+    endDate: historyEndDate || undefined,
+  }, {
+    enabled: activeTab === "history",
+  });
+  const allInspections = allInspectionsData || [];
 
   const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
     { companyType: "owner" },
@@ -188,11 +223,27 @@ export default function SafetyInspectionReview() {
     <div className="container mx-auto py-6 space-y-6">
       {/* 헤더 */}
       <div>
-        <h1 className="text-3xl font-bold">안전점검 확인</h1>
+        <h1 className="text-3xl font-bold">안전점검 관리</h1>
         <p className="text-muted-foreground mt-1">
-          점검원이 제출한 안전점검을 확인하고 승인합니다
+          안전점검 검토/승인 및 전체 이력 조회
         </p>
       </div>
+
+      {/* 탭 */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "review" | "history")}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="review">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            검토 대기
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <FileText className="h-4 w-4 mr-2" />
+            전체 이력
+          </TabsTrigger>
+        </TabsList>
+
+        {/* 검토 대기 탭 */}
+        <TabsContent value="review" className="space-y-6">
 
       {/* 필터 */}
       <Card>
@@ -469,6 +520,217 @@ export default function SafetyInspectionReview() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* 전체 이력 탭 */}
+        <TabsContent value="history" className="space-y-6">
+          {/* 통계 카드 */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  전체
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-8 w-8 text-gray-500" />
+                  <div className="text-3xl font-bold">
+                    {allInspections?.length || 0}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  임시저장
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-8 w-8 text-gray-400" />
+                  <div className="text-3xl font-bold">
+                    {allInspections?.filter((i: any) => i.status === "draft").length || 0}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  제출됨
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-8 w-8 text-blue-500" />
+                  <div className="text-3xl font-bold">
+                    {allInspections?.filter((i: any) => i.status === "submitted").length || 0}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  확인완료
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                  <div className="text-3xl font-bold">
+                    {allInspections?.filter((i: any) => i.status === "reviewed").length || 0}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 필터 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                필터
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>상태</Label>
+                  <Select value={historyStatusFilter} onValueChange={setHistoryStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="전체" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">전체</SelectItem>
+                      <SelectItem value="draft">임시저장</SelectItem>
+                      <SelectItem value="submitted">제출됨</SelectItem>
+                      <SelectItem value="reviewed">확인완료</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>점검 빈도</Label>
+                  <Select value={historyFrequencyFilter} onValueChange={setHistoryFrequencyFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="전체" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">전체</SelectItem>
+                      <SelectItem value="daily">일일</SelectItem>
+                      <SelectItem value="weekly">주간</SelectItem>
+                      <SelectItem value="monthly">월간</SelectItem>
+                      <SelectItem value="as_needed">필요시</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>시작일</Label>
+                  <Input
+                    type="date"
+                    value={historyStartDate}
+                    onChange={(e) => setHistoryStartDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>종료일</Label>
+                  <Input
+                    type="date"
+                    value={historyEndDate}
+                    onChange={(e) => setHistoryEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 점검 목록 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>점검 목록</CardTitle>
+              <CardDescription>
+                등록된 모든 안전점검 내역입니다
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingAll ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  로딩 중...
+                </div>
+              ) : !allInspections || allInspections.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  점검 내역이 없습니다.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>점검일자</TableHead>
+                      <TableHead>차량번호</TableHead>
+                      <TableHead>장비명</TableHead>
+                      <TableHead>점검 빈도</TableHead>
+                      <TableHead>점검원</TableHead>
+                      <TableHead>제출일시</TableHead>
+                      <TableHead>상태</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allInspections.map((inspection: any) => (
+                      <TableRow key={inspection.id}>
+                        <TableCell>
+                          {new Date(inspection.inspectionDate).toLocaleDateString('ko-KR')}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {inspection.vehicleNumber}
+                        </TableCell>
+                        <TableCell>{inspection.equipmentName || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {inspection.checkFrequency === "daily"
+                              ? "일일"
+                              : inspection.checkFrequency === "weekly"
+                              ? "주간"
+                              : inspection.checkFrequency === "monthly"
+                              ? "월간"
+                              : "필요시"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{inspection.inspector?.name || "-"}</TableCell>
+                        <TableCell>
+                          {inspection.submittedAt
+                            ? new Date(inspection.submittedAt).toLocaleString('ko-KR')
+                            : "-"}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(inspection.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDetail(inspection)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            상세보기
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* 상세보기 다이얼로그 */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
