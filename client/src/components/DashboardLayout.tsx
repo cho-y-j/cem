@@ -46,13 +46,13 @@ const menuItems = [
 ];
 
 const adminMenuItems = [
-  { icon: Building2, label: "회사 관리", path: "/admin/companies", roles: ["admin"] },
-  { icon: Users, label: "사용자 관리", path: "/admin/users", roles: ["admin"] },
-  { icon: Truck, label: "장비 종류", path: "/admin/equip-types", roles: ["admin"] },
-  { icon: HardHat, label: "인력 유형", path: "/admin/worker-types", roles: ["admin"] },
-  { icon: Shield, label: "안전점검 템플릿", path: "/admin/safety-templates", roles: ["admin"] },
-  { icon: CheckCircle, label: "운전자 점검표 템플릿", path: "/admin/driver-templates", roles: ["admin"] },
-  { icon: Shield, label: "안전점검 내역", path: "/admin/safety-inspections", roles: ["admin"] },
+  { icon: Building2, label: "회사 관리", path: "/admin/companies", roles: ["admin", "ep"] },
+  { icon: Users, label: "사용자 관리", path: "/admin/users", roles: ["admin", "ep"] },
+  { icon: Truck, label: "장비 종류", path: "/admin/equip-types", roles: ["admin", "ep"] },
+  { icon: HardHat, label: "인력 유형", path: "/admin/worker-types", roles: ["admin", "ep"] },
+  { icon: Shield, label: "안전점검 템플릿", path: "/admin/safety-templates", roles: ["admin", "ep"] },
+  { icon: CheckCircle, label: "운전자 점검표 템플릿", path: "/admin/driver-templates", roles: ["admin", "owner"] }, // Owner 전용
+  { icon: Shield, label: "안전점검 내역", path: "/admin/safety-inspections", roles: ["admin", "ep"] },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

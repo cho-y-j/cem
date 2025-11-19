@@ -49,7 +49,9 @@
       "Bash(git checkout:*)",
       "Bash(temp_original.tsx)",
       "Bash(npx tsx:*)",
-      "Bash(pnpm drizzle-kit:*)"
+      "Bash(pnpm drizzle-kit:*)",
+      "Bash(rm:*)",
+      "Bash(timeout /t 5)"
     ],
     "deny": [],
     "ask": []
