@@ -19,8 +19,8 @@ WHERE name = '안전점검원';
 -- 3. Inspector의 Worker 레코드 확인
 SELECT
   '3. Inspector Worker Record' as step,
-  w.id, w.name, w.user_id, w.worker_type_id, w.license_num, w.company_id,
-  u.email, u.name as user_name
+  w.id, w.name, w.user_id, w.worker_type_id, w.license_num,
+  u.email, u.name as user_name, u.company_id
 FROM workers w
 LEFT JOIN users u ON w.user_id = u.id
 WHERE u.email = 'inspector@test.com';
@@ -28,7 +28,7 @@ WHERE u.email = 'inspector@test.com';
 -- 4. 모든 안전점검원 workers 확인
 SELECT
   '4. All Inspector Workers' as step,
-  w.id, w.name, w.user_id, w.license_num, w.company_id,
+  w.id, w.name, w.user_id, w.license_num,
   u.email, u.name as user_name, u.company_id as user_company_id,
   wt.name as worker_type_name
 FROM workers w
@@ -45,13 +45,16 @@ WHERE wt.name = '안전점검원';
 -- 먼저 필요한 ID들을 확인
 -- (inspector user_id와 안전점검원 worker_type_id, company_id)
 
--- Inspector Worker 레코드 생성 (아래 값들을 실제 값으로 교체)
+-- Inspector Worker 레코드 생성
+-- 참고: create-inspector-worker.sql 사용을 권장합니다
+--
 -- INSERT INTO workers (
 --   id,
 --   name,
 --   user_id,
 --   worker_type_id,
---   company_id,
+--   owner_id,
+--   owner_company_id,
 --   license_num,
 --   created_at
 -- )
@@ -60,7 +63,8 @@ WHERE wt.name = '안전점검원';
 --   u.name,                                                     -- name
 --   u.id,                                                       -- user_id
 --   (SELECT id FROM worker_types WHERE name = '안전점검원'),    -- worker_type_id
---   u.company_id,                                               -- company_id
+--   NULL,                                                       -- owner_id (Inspector는 Owner 없음)
+--   NULL,                                                       -- owner_company_id (EP 소속)
 --   NULL,                                                       -- license_num
 --   NOW()                                                       -- created_at
 -- FROM users u
@@ -69,8 +73,8 @@ WHERE wt.name = '안전점검원';
 -- 생성 후 확인
 -- SELECT
 --   '5. Created Inspector Worker' as step,
---   w.id, w.name, w.user_id, w.worker_type_id, w.company_id,
---   u.email, wt.name as worker_type_name
+--   w.id, w.name, w.user_id, w.worker_type_id,
+--   u.email, u.company_id, wt.name as worker_type_name
 -- FROM workers w
 -- JOIN users u ON w.user_id = u.id
 -- JOIN worker_types wt ON w.worker_type_id = wt.id

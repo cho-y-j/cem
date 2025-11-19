@@ -21,7 +21,8 @@ INSERT INTO workers (
   name,
   user_id,
   worker_type_id,
-  company_id,
+  owner_id,
+  owner_company_id,
   license_num,
   created_at
 )
@@ -30,7 +31,8 @@ SELECT
   u.name,                                                     -- name
   u.id,                                                       -- user_id
   (SELECT id FROM worker_types WHERE name = '안전점검원'),    -- worker_type_id
-  u.company_id,                                               -- company_id
+  NULL,                                                       -- owner_id (Inspector는 Owner 없음)
+  NULL,                                                       -- owner_company_id (Inspector는 EP 소속)
   NULL,                                                       -- license_num
   NOW()                                                       -- created_at
 FROM users u
@@ -43,8 +45,8 @@ WHERE u.email = 'inspector@test.com'
 -- 생성 결과 확인
 SELECT
   'Created Inspector Worker' as step,
-  w.id, w.name, w.user_id, w.worker_type_id, w.company_id,
-  u.email, u.name as user_name,
+  w.id, w.name, w.user_id, w.worker_type_id,
+  u.email, u.name as user_name, u.company_id,
   wt.name as worker_type_name
 FROM workers w
 JOIN users u ON w.user_id = u.id
@@ -54,12 +56,12 @@ WHERE u.email = 'inspector@test.com';
 -- EP 회사의 모든 안전점검원 확인
 SELECT
   'All EP Company Inspectors' as step,
-  w.id, w.name, w.user_id, w.company_id,
-  u.email, u.name as user_name,
+  w.id, w.name, w.user_id,
+  u.email, u.name as user_name, u.company_id,
   c.name as company_name
 FROM workers w
 JOIN users u ON w.user_id = u.id
 JOIN worker_types wt ON w.worker_type_id = wt.id
-LEFT JOIN companies c ON w.company_id = c.id
+LEFT JOIN companies c ON u.company_id = c.id
 WHERE wt.name = '안전점검원'
-  AND w.company_id = (SELECT company_id FROM users WHERE email = 'ep@test.com');
+  AND u.company_id = (SELECT company_id FROM users WHERE email = 'ep@test.com');

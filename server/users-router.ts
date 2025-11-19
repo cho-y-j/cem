@@ -185,7 +185,8 @@ export const usersRouter = router({
             name: input.name,
             user_id: userId,
             worker_type_id: inspectorType.id,
-            company_id: input.companyId,
+            owner_id: null,  // Inspector는 Owner 없음
+            owner_company_id: null,  // Inspector는 EP 소속 (users.company_id로 관리)
             license_num: null,
             created_at: new Date().toISOString(),
           });
