@@ -266,8 +266,10 @@ export const deploymentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const userRole = ctx.user.role?.toLowerCase();
+
       // BP 권한 확인
-      if (ctx.user.role !== 'bp' && ctx.user.role !== 'admin') {
+      if (userRole !== 'bp' && userRole !== 'admin') {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "유도원 추가 권한이 없습니다.",
@@ -289,7 +291,7 @@ export const deploymentRouter = router({
       }
 
       // BP 권한 확인 (자신의 회사 deployment만)
-      if (ctx.user.role === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
+      if (userRole === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "해당 투입에 유도원을 추가할 권한이 없습니다.",
@@ -333,8 +335,10 @@ export const deploymentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const userRole = ctx.user.role?.toLowerCase();
+
       // BP 권한 확인
-      if (ctx.user.role !== 'bp' && ctx.user.role !== 'admin') {
+      if (userRole !== 'bp' && userRole !== 'admin') {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "투입 승인 권한이 없습니다.",
@@ -364,7 +368,7 @@ export const deploymentRouter = router({
       }
 
       // BP 권한 확인 (자신의 회사 deployment만)
-      if (ctx.user.role === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
+      if (userRole === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "해당 투입을 승인할 권한이 없습니다.",
@@ -443,8 +447,12 @@ export const deploymentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const userRole = ctx.user.role?.toLowerCase();
+
+      console.log('[assignInspector] User:', ctx.user.email, 'Role:', userRole, 'CompanyId:', ctx.user.companyId);
+
       // EP 권한 확인
-      if (ctx.user.role !== 'ep' && ctx.user.role !== 'admin') {
+      if (userRole !== 'ep' && userRole !== 'admin') {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "안전점검원 지정 권한이 없습니다.",
@@ -461,12 +469,15 @@ export const deploymentRouter = router({
         .eq('id', input.deploymentId)
         .single();
 
+      console.log('[assignInspector] Deployment:', deployment?.id, 'EP Company:', deployment?.ep_company_id);
+
       if (!deployment) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        throw new TRPCError({ code: "NOT_FOUND", message: "투입 정보를 찾을 수 없습니다." });
       }
 
       // EP 권한 확인 (자신의 회사 deployment만)
-      if (ctx.user.role === 'ep' && deployment.ep_company_id !== ctx.user.companyId) {
+      if (userRole === 'ep' && deployment.ep_company_id !== ctx.user.companyId) {
+        console.log('[assignInspector] ❌ Permission denied - EP company mismatch');
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "해당 투입에 안전점검원을 지정할 권한이 없습니다.",
@@ -495,10 +506,12 @@ export const deploymentRouter = router({
    * EP가 고용한 Inspector 목록 조회
    */
   listInspectors: protectedProcedure.query(async ({ ctx }) => {
-    console.log('[listInspectors] Start - User:', ctx.user.email, 'Role:', ctx.user.role, 'CompanyId:', ctx.user.companyId);
+    const userRole = ctx.user.role?.toLowerCase();
+
+    console.log('[listInspectors] Start - User:', ctx.user.email, 'Role:', userRole, 'CompanyId:', ctx.user.companyId);
 
     // EP 권한 확인
-    if (ctx.user.role !== 'ep' && ctx.user.role !== 'admin') {
+    if (userRole !== 'ep' && userRole !== 'admin') {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Inspector 목록 조회 권한이 없습니다.",
@@ -526,7 +539,7 @@ export const deploymentRouter = router({
     let userIds: string[] | null = null;
 
     // EP 역할인 경우 자신의 회사 Inspector만 필터링
-    if (ctx.user.role === 'ep' && ctx.user.companyId) {
+    if (userRole === 'ep' && ctx.user.companyId) {
       // 1. EP 회사의 users 조회
       const { data: epUsers, error: usersError } = await supabase
         .from('users')
@@ -581,8 +594,10 @@ export const deploymentRouter = router({
    * BP 승인 대기 중인 투입 목록 조회 (status = 'pending_bp')
    */
   getPendingApprovals: protectedProcedure.query(async ({ ctx }) => {
+    const userRole = ctx.user.role?.toLowerCase();
+
     // BP 권한 확인
-    if (ctx.user.role !== 'bp' && ctx.user.role !== 'admin') {
+    if (userRole !== 'bp' && userRole !== 'admin') {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "승인 대기 목록 조회 권한이 없습니다.",
@@ -594,7 +609,7 @@ export const deploymentRouter = router({
     };
 
     // BP인 경우 자신의 회사 deployment만
-    if (ctx.user.role === 'bp' && ctx.user.companyId) {
+    if (userRole === 'bp' && ctx.user.companyId) {
       filters.bpCompanyId = ctx.user.companyId;
     }
 
@@ -613,8 +628,10 @@ export const deploymentRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const userRole = ctx.user.role?.toLowerCase();
+
       // BP 권한 확인
-      if (ctx.user.role !== 'bp' && ctx.user.role !== 'admin') {
+      if (userRole !== 'bp' && userRole !== 'admin') {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "투입 거부 권한이 없습니다.",
@@ -644,7 +661,7 @@ export const deploymentRouter = router({
       }
 
       // BP 권한 확인 (자신의 회사 deployment만)
-      if (ctx.user.role === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
+      if (userRole === 'bp' && deployment.bp_company_id !== ctx.user.companyId) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "해당 투입을 거부할 권한이 없습니다.",
