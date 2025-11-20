@@ -4154,9 +4154,10 @@ export async function getEpDashboardData(filters?: {
   const epCompanyId = filters?.epCompanyId;
 
   // 1. 투입 현황 (Deployments)
+  // Note: Selecting only non-FK columns to avoid Supabase auto-embedding
   let deploymentsQuery = supabase
     .from('deployments')
-    .select('*, equipment:equipment(id, reg_num), worker:workers(id, name)');
+    .select('id, entry_request_id, equipment_id, owner_id, bp_company_id, ep_company_id, work_zone_id, start_date, planned_end_date, actual_end_date, status, created_at, updated_at');
 
   if (epCompanyId) {
     deploymentsQuery = deploymentsQuery.eq('ep_company_id', epCompanyId);
