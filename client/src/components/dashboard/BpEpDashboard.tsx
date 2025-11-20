@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import EntryRequestApprovalDialog from "@/components/EntryRequestApprovalDialog";
 import EntryRequestDetailDialog from "@/components/EntryRequestDetailDialog";
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  FileText, 
-  HardHat, 
+import EpEnhancedDashboard from "./EpEnhancedDashboard";
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  FileText,
+  HardHat,
   Truck,
   Shield,
   Activity
@@ -22,6 +23,10 @@ interface BpEpDashboardProps {
 }
 
 export default function BpEpDashboard({ role }: BpEpDashboardProps) {
+  // EP일 경우 새로운 통합 대시보드 표시
+  if (role === "ep") {
+    return <EpEnhancedDashboard />;
+  }
   const { user } = useAuth();
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);

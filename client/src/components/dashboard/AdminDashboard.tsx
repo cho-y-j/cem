@@ -1,13 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  FileText, 
-  HardHat, 
-  Truck, 
-  Users, 
+import EpEnhancedDashboard from "./EpEnhancedDashboard";
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  FileText,
+  HardHat,
+  Truck,
+  Users,
   Activity,
   TrendingUp,
   Shield
@@ -15,6 +16,8 @@ import {
 import { Link } from "wouter";
 
 export default function AdminDashboard() {
+  // Admin도 EP와 동일한 통합 대시보드 사용 (전체 데이터 조회)
+  return <EpEnhancedDashboard />;
   const { data: equipmentList } = trpc.equipment.list.useQuery();
   const { data: workersList } = trpc.workers.list.useQuery();
   const { data: expiringDocs } = trpc.docsCompliance.getExpiring.useQuery({ daysAhead: 30 });

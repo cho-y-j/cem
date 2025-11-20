@@ -4141,6 +4141,235 @@ export async function getSafetyInspectionStatistics(filters?: {
 }
 
 /**
+ * EP 대시보드 통합 데이터 조회
+ */
+export async function getEpDashboardData(filters?: {
+  epCompanyId?: string;
+}) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return null;
+  }
+
+  const epCompanyId = filters?.epCompanyId;
+
+  // 1. 투입 현황 (Deployments)
+  let deploymentsQuery = supabase
+    .from('deployments')
+    .select('*, equipment:equipments(id, reg_num), worker:workers(id, name)');
+
+  if (epCompanyId) {
+    deploymentsQuery = deploymentsQuery.eq('ep_company_id', epCompanyId);
+  }
+
+  const { data: deployments, error: deploymentError } = await deploymentsQuery;
+
+  if (deploymentError) {
+    console.error('[DB] Error fetching deployments:', deploymentError);
+    return null;
+  }
+
+  const activeDeployments = deployments?.filter(d =>
+    d.status === 'active' || d.status === 'extended'
+  ) || [];
+
+  const today = new Date();
+  const sevenDaysLater = new Date(today);
+  sevenDaysLater.setDate(today.getDate() + 7);
+
+  const endingSoon = activeDeployments.filter(d => {
+    if (!d.planned_end_date) return false;
+    const endDate = new Date(d.planned_end_date);
+    return endDate >= today && endDate <= sevenDaysLater;
+  }).length;
+
+  // 2. 반입 심사 대기 (Entry Requests)
+  let entryRequestsQuery = supabase
+    .from('entry_requests')
+    .select('id, status')
+    .in('status', ['bp_approved', 'ep_reviewing']);
+
+  if (epCompanyId) {
+    entryRequestsQuery = entryRequestsQuery.eq('ep_company_id', epCompanyId);
+  }
+
+  const { data: pendingEntryRequests } = await entryRequestsQuery;
+
+  // 3. 인력 통계 (활성 Deployment 기준)
+  const activeWorkerIds = activeDeployments
+    .map(d => d.worker_id)
+    .filter((id): id is string => id !== null && id !== undefined);
+
+  const uniqueActiveWorkerIds = [...new Set(activeWorkerIds)];
+
+  // 4. 장비 통계 (활성 Deployment 기준)
+  const activeEquipmentIds = activeDeployments
+    .map(d => d.equipment_id)
+    .filter((id): id is string => id !== null && id !== undefined);
+
+  const uniqueActiveEquipmentIds = [...new Set(activeEquipmentIds)];
+
+  // 전체 장비 수 (EP 회사 기준)
+  let totalEquipmentQuery = supabase
+    .from('equipments')
+    .select('id, status', { count: 'exact' });
+
+  if (epCompanyId) {
+    // EP 회사와 연결된 장비를 deployments를 통해 조회
+    const { data: epEquipments } = await supabase
+      .from('deployments')
+      .select('equipment_id')
+      .eq('ep_company_id', epCompanyId);
+
+    const epEquipmentIds = epEquipments?.map(d => d.equipment_id).filter(Boolean) || [];
+    if (epEquipmentIds.length > 0) {
+      totalEquipmentQuery = totalEquipmentQuery.in('id', epEquipmentIds);
+    }
+  }
+
+  const { count: totalEquipment } = await totalEquipmentQuery;
+
+  // 5. 안전점검 통계 (이미 구현된 함수 재사용)
+  const safetyStats = await getSafetyInspectionStatistics(filters);
+
+  // 6. 컴플라이언스 (서류 만료)
+  const thirtyDaysLater = new Date(today);
+  thirtyDaysLater.setDate(today.getDate() + 30);
+
+  const { data: expiringDocs } = await supabase
+    .from('docs_compliance')
+    .select('id, expiry_date')
+    .not('expiry_date', 'is', null)
+    .lte('expiry_date', thirtyDaysLater.toISOString())
+    .gte('expiry_date', today.toISOString());
+
+  const docsExpiring7Days = expiringDocs?.filter(doc => {
+    if (!doc.expiry_date) return false;
+    const expiryDate = new Date(doc.expiry_date);
+    const sevenDays = new Date(today);
+    sevenDays.setDate(today.getDate() + 7);
+    return expiryDate <= sevenDays;
+  }).length || 0;
+
+  // 7. Alert 생성
+  const alerts = [];
+
+  // 안전점검 지연 (3일 이상)
+  const threeDaysAgo = new Date(today);
+  threeDaysAgo.setDate(today.getDate() - 3);
+  const { data: delayedInspections } = await supabase
+    .from('safety_inspections')
+    .select('id')
+    .in('equipment_id', uniqueActiveEquipmentIds)
+    .lt('inspection_date', threeDaysAgo.toISOString())
+    .eq('status', 'draft');
+
+  if (delayedInspections && delayedInspections.length > 0) {
+    alerts.push({
+      severity: 'critical' as const,
+      category: 'safety',
+      message: `안전점검 3일 이상 지연`,
+      count: delayedInspections.length,
+      actionLink: '/safety-inspection-review'
+    });
+  }
+
+  // 서류 만료 임박 (7일 이내)
+  if (docsExpiring7Days > 0) {
+    alerts.push({
+      severity: (docsExpiring7Days >= 5 ? 'critical' : 'urgent') as const,
+      category: 'compliance',
+      message: '서류 만료 7일 이내',
+      count: docsExpiring7Days,
+      actionLink: '/documents'
+    });
+  }
+
+  // 승인 대기 (2일 이상)
+  const twoDaysAgo = new Date(today);
+  twoDaysAgo.setDate(today.getDate() - 2);
+  const oldPendingRequests = pendingEntryRequests?.filter(r => {
+    // created_at 또는 updated_at이 2일 이전인 것
+    return true; // 일단 전체 카운트
+  }).length || 0;
+
+  if (oldPendingRequests > 0) {
+    alerts.push({
+      severity: 'urgent' as const,
+      category: 'approval',
+      message: '승인 대기 중',
+      count: oldPendingRequests,
+      actionLink: '/entry-requests'
+    });
+  }
+
+  return {
+    // 인력 관리
+    workforce: {
+      total: uniqueActiveWorkerIds.length,  // 활성 투입 인력
+      // attended, working, resting, left는 attendance 데이터 필요 (추후 구현)
+      attended: 0,
+      working: uniqueActiveWorkerIds.length,
+      resting: 0,
+      left: 0
+    },
+
+    // 장비 관리
+    equipment: {
+      total: totalEquipment || 0,
+      operating: uniqueActiveEquipmentIds.length,  // 활성 투입 장비
+      idle: (totalEquipment || 0) - uniqueActiveEquipmentIds.length,
+      maintenance: 0,  // equipments 테이블의 status로 조회 필요
+      broken: 0
+    },
+
+    // 안전 관리
+    safety: {
+      todayTargets: safetyStats.todayTargets,
+      completed: safetyStats.completed,
+      delayed: safetyStats.pending,
+      issuesFound: 0,  // safety_inspections에서 이슈 발견 건수 조회 필요
+      passRate: safetyStats.completionRate
+    },
+
+    // 반입 심사
+    entryRequests: {
+      pendingApprovals: pendingEntryRequests?.length || 0
+    },
+
+    // 투입 관리
+    deployment: {
+      activeDeployments: activeDeployments.length,
+      endingSoon: endingSoon,
+      extensionRequests: 0,  // deployment_extensions 테이블 조회 필요
+      totalWorkers: uniqueActiveWorkerIds.length
+    },
+
+    // 컴플라이언스
+    compliance: {
+      docsExpiring7Days: docsExpiring7Days,
+      licenseExpiring30Days: 0,  // workers 테이블에서 면허 만료 조회 필요
+      insuranceExpiring: 0,
+      docsPendingApproval: 0,
+      inspectionExpiring: 0
+    },
+
+    // Alert Zone
+    alerts: alerts,
+
+    // 추세 데이터 (추후 구현)
+    trends: {
+      hourlyAttendance: [],
+      equipmentUtilization: [],
+      inspectionProgress: {
+        completed: safetyStats.completed,
+        total: safetyStats.todayTargets
+      }
+    }
+  };
+}
+
+/**
  * 차량번호로 장비 검색 (뒷번호 부분 매칭)
  */
 export async function searchEquipmentByVehicleNumber(partialNumber: string) {

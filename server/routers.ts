@@ -25,6 +25,7 @@ import { driverInspectionRouter } from "./driver-inspection-router";
 import { workZoneRouter } from "./work-zone-router";
 import { checkInRouter } from "./check-in-router";
 import { webauthnRouter } from "./webauthn-router";
+import { epDashboardRouter } from "./ep-dashboard-router";
 import { imageToPdf, createEntryRequestPdf } from "./pdf-utils";
 
 // ============================================================
@@ -1238,6 +1239,12 @@ export const appRouter = router({
   // ============================================================
 
   driverInspection: driverInspectionRouter,
+
+  // ============================================================
+  // EP 통합 대시보드
+  // ============================================================
+
+  epDashboard: epDashboardRouter,
 
   // ============================================================
   // 반입 요청 관리 (Owner → BP → EP) - V2 올바른 프로세스
