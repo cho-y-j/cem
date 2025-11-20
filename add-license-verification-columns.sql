@@ -49,3 +49,4 @@ COMMENT ON COLUMN docs_compliance.verification_error IS '검증 실패 시 에�
 
 
 
+

@@ -51,7 +51,8 @@
       "Bash(npx tsx:*)",
       "Bash(pnpm drizzle-kit:*)",
       "Bash(rm:*)",
-      "Bash(timeout /t 5)"
+      "Bash(timeout /t 5)",
+      "Bash(timeout /t 3)"
     ],
     "deny": [],
     "ask": []
