@@ -1473,90 +1473,9 @@ export const appRouter = router({
   }),
 
   // ============================================================
-  // 긴급 신고 및 위치 추적
+  // 긴급 신고 및 위치 추적 (기존 router는 emergency-router.ts로 이동됨)
   // ============================================================
-
-  emergency: router({
-    // 긴급 신고 제출
-    report: protectedProcedure
-      .input(
-        z.object({
-          type: z.enum(["accident", "equipment_failure", "safety_hazard", "fire", "other"]),
-          description: z.string(),
-          location: z.object({
-            lat: z.number(),
-            lng: z.number(),
-            address: z.string().optional(),
-          }),
-          photos: z.array(z.string()).optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const reportId = nanoid();
-        const report: EmergencyReport = {
-          id: reportId,
-          userId: ctx.user.id,
-          userName: ctx.user.name || "사용자",
-          type: input.type,
-          description: input.description,
-          location: input.location,
-          photos: input.photos,
-          timestamp: new Date(),
-          status: "reported",
-        };
-
-        // TODO: 데이터베이스에 저장
-        
-        // 이메일 알림 발송
-        await sendEmergencyNotification(report);
-
-        return { id: reportId, success: true };
-      }),
-
-    // 위치 정보 전송
-    trackLocation: protectedProcedure
-      .input(
-        z.object({
-          location: z.object({
-            lat: z.number(),
-            lng: z.number(),
-          }),
-          workStatus: z.enum(["working", "resting", "overtime"]),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const tracking: LocationTracking = {
-          userId: ctx.user.id,
-          userName: ctx.user.name || "사용자",
-          location: input.location,
-          timestamp: new Date(),
-          workStatus: input.workStatus,
-        };
-
-        await saveLocationTracking(tracking);
-
-        return { success: true };
-      }),
-
-    // 긴급 신고 목록 조회
-    list: protectedProcedure.query(async () => {
-      // TODO: 데이터베이스에서 조회
-      return [];
-    }),
-
-    // 긴급 신고 상태 업데이트
-    updateStatus: protectedProcedure
-      .input(
-        z.object({
-          id: z.string(),
-          status: z.enum(["reported", "acknowledged", "responding", "resolved"]),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        // TODO: 데이터베이스 업데이트
-        return { success: true };
-      }),
-  }),
+  // emergency router는 라인 1276에서 이미 정의됨
 
   // ============================================================
   // PDF 생성 및 변환

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,17 +7,61 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, MapPin, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import GoogleMap from "@/components/GoogleMap";
+import { APIProvider, Map, AdvancedMarker, InfoWindow } from "@vis.gl/react-google-maps";
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 export default function EmergencyAlerts() {
   const [selectedAlert, setSelectedAlert] = useState<any>(null);
   const [resolutionNote, setResolutionNote] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "resolved" | "false_alarm" | undefined>("active");
+  const [highlightedAlertId, setHighlightedAlertId] = useState<string | null>(null);
+  const [openInfoWindowId, setOpenInfoWindowId] = useState<string | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapZoom, setMapZoom] = useState<number>(12);
+  const previousAlertCountRef = useRef<number>(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const utils = trpc.useUtils();
 
-  // 긴급 알림 목록 조회
-  const { data: alerts, isLoading } = trpc.emergency.list.useQuery({ status: statusFilter });
+  // 긴급 알림 목록 조회 (5초마다 자동 갱신)
+  const { data: alerts, isLoading } = trpc.emergency.list.useQuery(
+    { status: statusFilter },
+    {
+      refetchInterval: 5000, // 5초마다 자동 갱신
+      refetchOnWindowFocus: true, // 창 포커스시 갱신
+      refetchOnMount: true, // 마운트시 갱신
+    }
+  );
+
+  // 새 긴급 알림 감지 및 알림
+  useEffect(() => {
+    if (!alerts) return;
+
+    const activeAlerts = alerts.filter((a: any) => a.status === "active");
+    const currentCount = activeAlerts.length;
+
+    // 첫 로드가 아니고, 활성 알림이 증가했을 때만 알림
+    if (previousAlertCountRef.current > 0 && currentCount > previousAlertCountRef.current) {
+      const newAlertCount = currentCount - previousAlertCountRef.current;
+
+      // 경고음 재생
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/alert-sound.mp3');
+      }
+      audioRef.current.play().catch((err) => {
+        console.warn('Alert sound failed to play:', err);
+      });
+
+      // Toast 알림
+      toast.error(`🚨 새로운 긴급 알림 ${newAlertCount}건 발생!`, {
+        description: "긴급 상황이 발생했습니다. 즉시 확인하세요.",
+        duration: 10000, // 10초 동안 표시
+      });
+    }
+
+    previousAlertCountRef.current = currentCount;
+  }, [alerts]);
 
   // 긴급 알림 해결
   const resolveMutation = trpc.emergency.resolve.useMutation({
@@ -75,22 +119,58 @@ export default function EmergencyAlerts() {
     );
   };
 
+  // 긴급 유형별 마커 색상
+  const getAlertTypeColor = (alertType: string) => {
+    const colorMap: Record<string, string> = {
+      "사고": "#EF4444", // red-500
+      "고장": "#F59E0B", // orange-500
+      "안전위험": "#EAB308", // yellow-500
+      "기타": "#3B82F6", // blue-500
+    };
+    return colorMap[alertType] || colorMap["기타"];
+  };
+
+  // 목록에서 알림 클릭시 지도로 이동
+  const handleAlertClick = (alert: any) => {
+    if (alert.latitude && alert.longitude) {
+      setHighlightedAlertId(alert.id);
+      setOpenInfoWindowId(alert.id);
+      setMapCenter({
+        lat: parseFloat(alert.latitude),
+        lng: parseFloat(alert.longitude),
+      });
+      setMapZoom(16);
+
+      // 지도 섹션으로 스크롤
+      const mapSection = document.getElementById('emergency-map-section');
+      if (mapSection) {
+        mapSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  };
+
   // 지도 마커 데이터
   const mapMarkers = alerts
-    ?.filter((alert: any) => alert.latitude && alert.longitude)
-    .map((alert: any) => ({
+    ?.filter((alert: any) => alert.latitude && alert.longitude && alert.status === "active")
+    .map((alert: any, index: number) => ({
       id: alert.id,
+      index: index + 1, // 1부터 시작하는 번호
       position: {
         lat: parseFloat(alert.latitude),
         lng: parseFloat(alert.longitude),
       },
       title: `${alert.workers?.name || "Unknown"} - ${alert.alert_type}`,
-      info: `
-        <strong>${alert.alert_type}</strong><br/>
-        ${alert.description || ""}<br/>
-        시간: ${new Date(alert.created_at).toLocaleString("ko-KR")}
-      `,
+      alertType: alert.alert_type,
+      description: alert.description,
+      createdAt: alert.created_at,
+      workerName: alert.workers?.name || "Unknown",
+      equipmentRegNum: alert.equipment?.reg_num || "미배정",
     })) || [];
+
+  // 지도 초기 중심 좌표
+  const initialMapCenter = mapMarkers.length > 0
+    ? mapMarkers[0].position
+    : { lat: 37.5665, lng: 126.9780 }; // 서울 시청
 
   if (isLoading) {
     return (
@@ -156,20 +236,95 @@ export default function EmergencyAlerts() {
       </Card>
 
       {/* 지도 */}
-      {mapMarkers.length > 0 && statusFilter === "active" && (
-        <Card>
+      {mapMarkers.length > 0 && statusFilter === "active" && GOOGLE_MAPS_API_KEY && (
+        <Card id="emergency-map-section">
           <CardHeader>
             <CardTitle>긴급 위치 지도</CardTitle>
             <CardDescription>
-              활성 긴급 알림의 위치를 지도에서 확인합니다.
+              활성 긴급 알림 {mapMarkers.length}건의 위치를 지도에서 확인합니다. 목록을 클릭하면 해당 위치로 이동합니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <GoogleMap
-              markers={mapMarkers}
-              zoom={12}
-              className="w-full h-[400px] rounded-lg"
-            />
+            <div className="w-full h-[500px] rounded-lg overflow-hidden border">
+              <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+                <Map
+                  defaultCenter={initialMapCenter}
+                  center={mapCenter || undefined}
+                  zoom={mapZoom}
+                  mapId="emergency-alerts-map"
+                  gestureHandling="greedy"
+                  disableDefaultUI={false}
+                  mapTypeControl={true}
+                  fullscreenControl={true}
+                >
+                  {mapMarkers.map((marker) => {
+                    const isHighlighted = highlightedAlertId === marker.id;
+                    const markerColor = getAlertTypeColor(marker.alertType);
+
+                    return (
+                      <div key={marker.id}>
+                        <AdvancedMarker
+                          position={marker.position}
+                          title={marker.title}
+                          onClick={() => {
+                            setOpenInfoWindowId(marker.id);
+                            setHighlightedAlertId(marker.id);
+                          }}
+                        >
+                          <div
+                            className={`relative flex items-center justify-center rounded-full shadow-lg transition-all ${
+                              isHighlighted ? 'scale-125' : 'scale-100'
+                            }`}
+                            style={{
+                              backgroundColor: markerColor,
+                              width: isHighlighted ? '48px' : '40px',
+                              height: isHighlighted ? '48px' : '40px',
+                              border: '3px solid white',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span className="text-white font-bold text-sm">
+                              {marker.index}
+                            </span>
+                            {isHighlighted && (
+                              <div
+                                className="absolute -top-1 -right-1 bg-white rounded-full p-0.5"
+                                style={{ animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite' }}
+                              >
+                                <AlertTriangle className="h-3 w-3 text-red-600" />
+                              </div>
+                            )}
+                          </div>
+                        </AdvancedMarker>
+
+                        {openInfoWindowId === marker.id && (
+                          <InfoWindow
+                            position={marker.position}
+                            onCloseClick={() => setOpenInfoWindowId(null)}
+                          >
+                            <div className="p-2 min-w-[200px]">
+                              <div className="font-bold text-base mb-2">
+                                #{marker.index} {marker.alertType}
+                              </div>
+                              <div className="text-sm space-y-1">
+                                <div><strong>작업자:</strong> {marker.workerName}</div>
+                                <div><strong>장비:</strong> {marker.equipmentRegNum}</div>
+                                {marker.description && (
+                                  <div><strong>상세:</strong> {marker.description}</div>
+                                )}
+                                <div className="text-gray-600 text-xs mt-2">
+                                  {new Date(marker.createdAt).toLocaleString("ko-KR")}
+                                </div>
+                              </div>
+                            </div>
+                          </InfoWindow>
+                        )}
+                      </div>
+                    );
+                  })}
+                </Map>
+              </APIProvider>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -196,16 +351,36 @@ export default function EmergencyAlerts() {
             </div>
           ) : (
             <div className="space-y-4">
-              {alerts.map((alert: any) => (
-                <div
-                  key={alert.id}
-                  className={`p-4 border rounded-lg hover:bg-accent transition-colors ${
-                    alert.status === "active" ? "border-red-300 bg-red-50" : ""
-                  }`}
-                >
+              {alerts.map((alert: any, index: number) => {
+                const isHighlighted = highlightedAlertId === alert.id;
+                const hasLocation = alert.latitude && alert.longitude && alert.status === "active";
+
+                return (
+                  <div
+                    key={alert.id}
+                    className={`p-4 border rounded-lg transition-all cursor-pointer ${
+                      alert.status === "active"
+                        ? isHighlighted
+                          ? "border-red-500 bg-red-100 shadow-lg"
+                          : "border-red-300 bg-red-50 hover:bg-red-100"
+                        : "hover:bg-accent"
+                    }`}
+                    onClick={() => hasLocation && handleAlertClick(alert)}
+                  >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
+                        {hasLocation && (
+                          <Badge
+                            className="font-bold"
+                            style={{
+                              backgroundColor: getAlertTypeColor(alert.alert_type),
+                              color: 'white'
+                            }}
+                          >
+                            #{index + 1}
+                          </Badge>
+                        )}
                         {getStatusBadge(alert.status)}
                         {getAlertTypeBadge(alert.alert_type)}
                         <span className="text-sm text-muted-foreground">
@@ -227,9 +402,9 @@ export default function EmergencyAlerts() {
                           </p>
                         )}
                         {alert.latitude && alert.longitude && (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-blue-600 font-medium">
                             <MapPin className="h-3 w-3 inline mr-1" />
-                            위치: {parseFloat(alert.latitude).toFixed(6)}, {parseFloat(alert.longitude).toFixed(6)}
+                            지도에서 보기 (클릭)
                           </p>
                         )}
                         {alert.resolved_at && (
@@ -246,14 +421,18 @@ export default function EmergencyAlerts() {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={() => setSelectedAlert(alert)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAlert(alert);
+                        }}
                       >
                         해결 처리
                       </Button>
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </CardContent>

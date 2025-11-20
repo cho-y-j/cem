@@ -2728,23 +2728,63 @@ export async function getEmergencyAlerts(status?: string): Promise<any[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
 
+  // 1. 긴급 알림 조회 (외래 키 제약조건 없이)
   let query = supabase
     .from('emergency_alerts')
-    .select(`
-      *,
-      workers:worker_id (id, name, phone),
-      equipment:equipment_id (id, reg_num)
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (status) {
     query = query.eq('status', status);
   }
 
-  const { data, error } = await query;
+  const { data: alerts, error } = await query;
 
-  if (error) return [];
-  return data || [];
+  if (error) {
+    console.error('[getEmergencyAlerts] Error:', error);
+    return [];
+  }
+
+  if (!alerts || alerts.length === 0) {
+    return [];
+  }
+
+  // 2. 필요한 worker_id와 equipment_id 수집
+  const workerIds = [...new Set(alerts.map(a => a.worker_id).filter(Boolean))];
+  const equipmentIds = [...new Set(alerts.map(a => a.equipment_id).filter(Boolean))];
+
+  // 3. Workers 정보 조회
+  const workersMap = new Map();
+  if (workerIds.length > 0) {
+    const { data: workers } = await supabase
+      .from('workers')
+      .select('id, name, phone')
+      .in('id', workerIds);
+
+    if (workers) {
+      workers.forEach(w => workersMap.set(w.id, w));
+    }
+  }
+
+  // 4. Equipment 정보 조회
+  const equipmentMap = new Map();
+  if (equipmentIds.length > 0) {
+    const { data: equipment } = await supabase
+      .from('equipment')
+      .select('id, reg_num')
+      .in('id', equipmentIds);
+
+    if (equipment) {
+      equipment.forEach(e => equipmentMap.set(e.id, e));
+    }
+  }
+
+  // 5. 데이터 조합
+  return alerts.map(alert => ({
+    ...alert,
+    workers: workersMap.get(alert.worker_id) || null,
+    equipment: equipmentMap.get(alert.equipment_id) || null,
+  }));
 }
 
 export async function resolveEmergencyAlert(id: string, resolvedBy: string, resolutionNote?: string): Promise<void> {
