@@ -4196,17 +4196,34 @@ export async function getEpDashboardData(filters?: {
 
   const { data: pendingEntryRequests } = await entryRequestsQuery;
 
-  // 3-5. 인력/장비 통계 - activeDeployments 길이로 직접 계산
-  // Note: Supabase FK 관계 충돌 회피를 위해 간소화
-  // TODO: 실제 unique worker/equipment 수는 추후 RPC 함수로 구현 필요
-  const activeDeploymentCount = activeDeployments.length;
-  const uniqueActiveWorkerIds: string[] = [];  // 임시: 빈 배열
-  const uniqueActiveEquipmentIds: string[] = []; // 임시: 빈 배열
+  // 3. 활성 배치의 worker_id 조회 (별도 쿼리로 FK 충돌 회피)
+  const activeDeploymentIds = activeDeployments.map(d => d.id);
 
-  // 전체 장비 수 (EP 회사 기준)
+  let workerIdsData: string[] = [];
+  if (activeDeploymentIds.length > 0) {
+    const { data: workerIds } = await supabase
+      .from('deployments')
+      .select('worker_id')
+      .in('id', activeDeploymentIds);
+
+    workerIdsData = workerIds
+      ?.map(d => d.worker_id)
+      .filter((id): id is string => id !== null && id !== undefined) || [];
+  }
+
+  const uniqueActiveWorkerIds = [...new Set(workerIdsData)];
+
+  // 4. 활성 배치의 equipment_id는 이미 activeDeployments에 있음
+  const equipmentIdsData = activeDeployments
+    .map(d => d.equipment_id)
+    .filter((id): id is string => id !== null && id !== undefined);
+
+  const uniqueActiveEquipmentIds = [...new Set(equipmentIdsData)];
+
+  // 5. 전체 장비 수 및 상태별 통계 (EP 회사 기준)
   let totalEquipmentQuery = supabase
     .from('equipment')
-    .select('id, status', { count: 'exact' });
+    .select('id, status');
 
   if (epCompanyId) {
     // EP 회사와 연결된 장비를 deployments를 통해 조회
@@ -4221,7 +4238,14 @@ export async function getEpDashboardData(filters?: {
     }
   }
 
-  const { count: totalEquipment } = await totalEquipmentQuery;
+  const { data: allEquipments } = await totalEquipmentQuery;
+  const totalEquipment = allEquipments?.length || 0;
+
+  // 상태별 장비 수 집계
+  const equipmentByStatus = {
+    maintenance: allEquipments?.filter(e => e.status === 'maintenance').length || 0,
+    broken: allEquipments?.filter(e => e.status === 'broken').length || 0,
+  };
 
   // 5. 안전점검 통계 (이미 구현된 함수 재사용)
   const safetyStats = await getSafetyInspectionStatistics(filters);
@@ -4310,11 +4334,11 @@ export async function getEpDashboardData(filters?: {
 
     // 장비 관리
     equipment: {
-      total: totalEquipment || 0,
+      total: totalEquipment,
       operating: uniqueActiveEquipmentIds.length,  // 활성 투입 장비
-      idle: (totalEquipment || 0) - uniqueActiveEquipmentIds.length,
-      maintenance: 0,  // equipments 테이블의 status로 조회 필요
-      broken: 0
+      idle: totalEquipment - uniqueActiveEquipmentIds.length - equipmentByStatus.maintenance - equipmentByStatus.broken,
+      maintenance: equipmentByStatus.maintenance,
+      broken: equipmentByStatus.broken
     },
 
     // 안전 관리
