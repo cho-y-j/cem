@@ -63,6 +63,8 @@ export default function SafetyInspectionReview() {
   const [ownerFilter, setOwnerFilter] = useState<string>("");
   const [bpFilter, setBpFilter] = useState<string>("");
   const [epFilter, setEpFilter] = useState<string>("");
+  const [inspectorFilter, setInspectorFilter] = useState<string>("");
+  const [showTodayOnly, setShowTodayOnly] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -86,6 +88,9 @@ export default function SafetyInspectionReview() {
     if (epFilter) {
       payload.epCompanyId = epFilter;
     }
+    if (inspectorFilter) {
+      payload.inspectorId = inspectorFilter;
+    }
     const trimmedSearch = searchTerm.trim();
     if (trimmedSearch) {
       payload.search = trimmedSearch;
@@ -97,7 +102,15 @@ export default function SafetyInspectionReview() {
       payload.endDate = endDate;
     }
     return Object.keys(payload).length > 0 ? payload : undefined;
-  }, [statusFilter, ownerFilter, bpFilter, epFilter, searchTerm, startDate, endDate]);
+  }, [statusFilter, ownerFilter, bpFilter, epFilter, inspectorFilter, searchTerm, startDate, endDate]);
+
+  // 통계 조회
+  const { data: statistics } = trpc.safetyInspection.getStatistics.useQuery(
+    inspectorFilter ? { inspectorId: inspectorFilter } : undefined
+  );
+
+  // 점검원 목록 조회
+  const { data: inspectors = [] } = trpc.safetyInspection.listInspectors.useQuery();
 
   // 제출된 점검 목록 조회
   const {
@@ -107,7 +120,22 @@ export default function SafetyInspectionReview() {
   } = trpc.safetyInspection.listSubmittedInspections.useQuery(reviewFilters, {
     keepPreviousData: true,
   });
-  const inspections = inspectionsData || [];
+  const rawInspections = inspectionsData || [];
+
+  // 오늘 점검 대상만 필터링
+  const inspections = useMemo(() => {
+    if (!showTodayOnly) return rawInspections;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    return rawInspections.filter((inspection: any) => {
+      const inspectionDate = new Date(inspection.inspectionDate);
+      const inspectionDateStr = inspectionDate.toISOString().split('T')[0];
+      return inspectionDateStr === todayStr;
+    });
+  }, [rawInspections, showTodayOnly]);
 
   const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
     { companyType: "owner" },
@@ -194,8 +222,63 @@ export default function SafetyInspectionReview() {
       <div>
         <h1 className="text-3xl font-bold">안전점검 관리</h1>
         <p className="text-muted-foreground mt-1">
-          안전점검 검토/승인 및 전체 이력 조회
+          안전점검 검토/승인 및 오늘의 점검 현황 통계
         </p>
+      </div>
+
+      {/* 통계 카드 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              오늘 점검 대상
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{statistics?.todayTargets || 0}건</div>
+            <p className="text-xs text-muted-foreground mt-1">활성 장비 기준</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              완료된 점검
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">{statistics?.completed || 0}건</div>
+            <p className="text-xs text-muted-foreground mt-1">제출 + 확인 완료</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Clock className="h-4 w-4 text-blue-500" />
+              점검율
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-600">{statistics?.completionRate || 0}%</div>
+            <p className="text-xs text-muted-foreground mt-1">오늘 진행률</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+              미점검 항목
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-600">{statistics?.pending || 0}건</div>
+            <p className="text-xs text-muted-foreground mt-1">점검 필요</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* 안전점검 목록 */}
@@ -319,8 +402,36 @@ export default function SafetyInspectionReview() {
                 </Select>
               </div>
             )}
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">점검원</Label>
+              <Select
+                value={inspectorFilter || "all"}
+                onValueChange={(value) => setInspectorFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {inspectors.map((inspector: any) => (
+                    <SelectItem key={inspector.id} value={inspector.id}>
+                      {inspector.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="mt-4 flex items-center justify-end gap-2">
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showTodayOnly}
+                onChange={(e) => setShowTodayOnly(e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm font-medium">오늘 점검 대상만 보기</span>
+            </label>
             <Button
               variant="outline"
               onClick={() => {
@@ -328,9 +439,11 @@ export default function SafetyInspectionReview() {
                 setOwnerFilter("");
                 setBpFilter("");
                 setEpFilter("");
+                setInspectorFilter("");
                 setSearchTerm("");
                 setStartDate("");
                 setEndDate("");
+                setShowTodayOnly(false);
                 refetch();
               }}
             >

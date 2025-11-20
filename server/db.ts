@@ -4062,6 +4062,85 @@ export async function reviewSafetyInspection(
 }
 
 /**
+ * 안전점검 통계 조회 (오늘 기준)
+ */
+export async function getSafetyInspectionStatistics(filters?: {
+  epCompanyId?: string;
+  inspectorId?: string;
+}) {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return {
+      todayTargets: 0,
+      completed: 0,
+      completionRate: 0,
+      pending: 0,
+    };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  // 1. EP 회사의 active deployments 조회
+  let deploymentsQuery = supabase
+    .from('deployments')
+    .select('id, equipment_id, inspector_id, ep_company_id')
+    .in('status', ['active', 'extended']);
+
+  if (filters?.epCompanyId) {
+    deploymentsQuery = deploymentsQuery.eq('ep_company_id', filters.epCompanyId);
+  }
+
+  if (filters?.inspectorId) {
+    deploymentsQuery = deploymentsQuery.eq('inspector_id', filters.inspectorId);
+  }
+
+  const { data: deployments, error: deploymentError } = await deploymentsQuery;
+
+  if (deploymentError || !deployments || deployments.length === 0) {
+    console.error('[Database] Error getting deployments for statistics:', deploymentError);
+    return {
+      todayTargets: 0,
+      completed: 0,
+      completionRate: 0,
+      pending: 0,
+    };
+  }
+
+  const equipmentIds = deployments.map(d => d.equipment_id).filter(Boolean);
+
+  // 2. 오늘 점검 대상 계산 (일일 점검 템플릿 기준)
+  const todayTargets = equipmentIds.length;
+
+  // 3. 오늘 완료된 점검 수 (submitted + reviewed)
+  let completedQuery = supabase
+    .from('safety_inspections')
+    .select('id', { count: 'exact' })
+    .in('equipment_id', equipmentIds)
+    .gte('inspection_date', todayStr)
+    .in('status', ['submitted', 'reviewed']);
+
+  if (filters?.inspectorId) {
+    completedQuery = completedQuery.eq('inspector_id', filters.inspectorId);
+  }
+
+  const { count: completedCount } = await completedQuery;
+  const completed = completedCount || 0;
+
+  // 4. 점검율 및 미점검 수 계산
+  const completionRate = todayTargets > 0 ? Math.round((completed / todayTargets) * 100) : 0;
+  const pending = Math.max(0, todayTargets - completed);
+
+  return {
+    todayTargets,
+    completed,
+    completionRate,
+    pending,
+  };
+}
+
+/**
  * 차량번호로 장비 검색 (뒷번호 부분 매칭)
  */
 export async function searchEquipmentByVehicleNumber(partialNumber: string) {

@@ -484,4 +484,73 @@ export const safetyInspectionRouter = router({
 
       return await db.getSafetyInspectionsForReview(filters);
     }),
+
+  /**
+   * 점검원 목록 조회 (필터용)
+   */
+  listInspectors: protectedProcedure
+    .query(async ({ ctx }) => {
+      const userRole = ctx.user.role?.toLowerCase();
+      if (userRole !== "ep" && userRole !== "admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "EP 또는 Admin만 조회할 수 있습니다.",
+        });
+      }
+
+      const supabase = db.getSupabase();
+      if (!supabase) return [];
+
+      // EP 회사의 점검원만 조회
+      let query = supabase
+        .from('users')
+        .select('id, name, email')
+        .eq('role', 'inspector');
+
+      if (userRole === 'ep' && ctx.user.companyId) {
+        query = query.eq('company_id', ctx.user.companyId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('[SafetyInspection] Error listing inspectors:', error);
+        return [];
+      }
+
+      return data || [];
+    }),
+
+  /**
+   * 안전점검 통계 조회 (EP용)
+   */
+  getStatistics: protectedProcedure
+    .input(
+      z.object({
+        inspectorId: z.string().optional(),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const userRole = ctx.user.role?.toLowerCase();
+      if (userRole !== "ep" && userRole !== "admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "EP 또는 Admin만 조회할 수 있습니다.",
+        });
+      }
+
+      const filters: { epCompanyId?: string; inspectorId?: string } = {};
+
+      // EP는 자신의 회사만 조회
+      if (userRole === "ep" && ctx.user.companyId) {
+        filters.epCompanyId = ctx.user.companyId;
+      }
+
+      // 점검원 필터
+      if (input?.inspectorId) {
+        filters.inspectorId = input.inspectorId;
+      }
+
+      return await db.getSafetyInspectionStatistics(filters);
+    }),
 });
