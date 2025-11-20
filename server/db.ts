@@ -4156,7 +4156,7 @@ export async function getEpDashboardData(filters?: {
   // 1. 투입 현황 (Deployments)
   let deploymentsQuery = supabase
     .from('deployments')
-    .select('*, equipment:equipments(id, reg_num), worker:workers(id, name)');
+    .select('*, equipment:equipment(id, reg_num), worker:workers(id, name)');
 
   if (epCompanyId) {
     deploymentsQuery = deploymentsQuery.eq('ep_company_id', epCompanyId);
@@ -4211,7 +4211,7 @@ export async function getEpDashboardData(filters?: {
 
   // 전체 장비 수 (EP 회사 기준)
   let totalEquipmentQuery = supabase
-    .from('equipments')
+    .from('equipment')
     .select('id, status', { count: 'exact' });
 
   if (epCompanyId) {
