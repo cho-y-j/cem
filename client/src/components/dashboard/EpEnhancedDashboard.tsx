@@ -186,6 +186,18 @@ export default function EpEnhancedDashboard() {
     { refetchInterval: 30000 }
   );
 
+  // 긴급 알림 조회 (5초마다 자동 갱신)
+  const { data: emergencyAlerts } = trpc.emergency.list.useQuery(
+    { status: "active" },
+    {
+      refetchInterval: 5000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+    }
+  );
+
+  const activeEmergencies = emergencyAlerts?.filter((a: any) => a.status === "active") || [];
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -229,11 +241,76 @@ export default function EpEnhancedDashboard() {
             실시간 현장 모니터링 및 관리
           </p>
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <Activity className="h-4 w-4 mr-2" />
-          새로고침
-        </Button>
+        <div className="flex items-center gap-3">
+          {activeEmergencies.length > 0 && (
+            <Link href="/emergency-alerts">
+              <div className="flex items-center gap-2 px-4 py-2 bg-red-100 border-2 border-red-500 rounded-lg animate-pulse cursor-pointer hover:bg-red-200 transition-colors">
+                <AlertTriangle className="h-5 w-5 text-red-600 animate-bounce" />
+                <span className="font-bold text-red-700">
+                  긴급 상황 {activeEmergencies.length}건
+                </span>
+              </div>
+            </Link>
+          )}
+          <Button variant="outline" onClick={() => refetch()}>
+            <Activity className="h-4 w-4 mr-2" />
+            새로고침
+          </Button>
+        </div>
       </div>
+
+      {/* 🚨 긴급 알림 섹션 */}
+      {activeEmergencies.length > 0 && (
+        <Card className="border-red-500 border-2 bg-red-50 shadow-lg">
+          <CardHeader className="bg-red-100">
+            <CardTitle className="flex items-center gap-2 text-red-800">
+              <AlertTriangle className="h-6 w-6 animate-pulse" />
+              🚨 긴급 상황 발생 - 즉시 확인 필요
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              {activeEmergencies.slice(0, 3).map((alert: any) => (
+                <Link key={alert.id} href="/emergency-alerts">
+                  <div className="p-4 bg-white rounded-lg border-l-4 border-red-500 hover:shadow-md transition-shadow cursor-pointer">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">
+                            {alert.alert_type}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            {new Date(alert.created_at).toLocaleString("ko-KR")}
+                          </span>
+                        </div>
+                        <p className="font-semibold text-gray-900">
+                          작업자: {alert.workers?.name || "Unknown"}
+                        </p>
+                        {alert.description && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            {alert.description}
+                          </p>
+                        )}
+                      </div>
+                      <Button size="sm" variant="destructive">
+                        확인 →
+                      </Button>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              {activeEmergencies.length > 3 && (
+                <Link href="/emergency-alerts">
+                  <div className="text-center py-2 text-sm text-red-600 font-semibold hover:underline cursor-pointer">
+                    외 {activeEmergencies.length - 3}건 더 보기 →
+                  </div>
+                </Link>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ⚠️ Alert Zone */}
       {data.alerts.length > 0 && (

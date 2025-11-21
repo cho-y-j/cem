@@ -8,26 +8,34 @@ import * as db from "./db";
  */
 export const epDashboardRouter = router({
   /**
-   * EP 통합 대시보드 데이터 조회
+   * 통합 대시보드 데이터 조회
+   * Admin, EP, BP, Owner 모두 접근 가능 (역할별 필터링)
    */
   getDashboard: protectedProcedure.query(async ({ ctx }) => {
     const userRole = ctx.user.role?.toLowerCase();
 
-    // EP 또는 Admin만 접근 가능
-    if (userRole !== "ep" && userRole !== "admin") {
+    // 허용된 역할 확인
+    const allowedRoles = ["admin", "ep", "bp", "owner"];
+    if (!allowedRoles.includes(userRole || "")) {
       throw new TRPCError({
         code: "FORBIDDEN",
-        message: "EP 또는 Admin만 조회할 수 있습니다.",
+        message: "접근 권한이 없습니다.",
       });
     }
 
-    const filters: { epCompanyId?: string } = {};
+    const filters: { epCompanyId?: string; bpCompanyId?: string; ownerUserId?: string } = {};
 
-    // EP는 자신의 회사만 조회
+    // 역할별 필터링
     if (userRole === "ep" && ctx.user.companyId) {
+      // EP는 자신의 회사가 관리하는 프로젝트만
       filters.epCompanyId = ctx.user.companyId;
+    } else if (userRole === "bp" && ctx.user.companyId) {
+      // BP는 자신의 회사가 참여한 프로젝트만
+      filters.bpCompanyId = ctx.user.companyId;
+    } else if (userRole === "owner") {
+      // Owner는 자신이 소유한 장비/인력만
+      filters.ownerUserId = ctx.user.id;
     }
-
     // Admin은 전체 조회 (filters 없음)
 
     const dashboardData = await db.getEpDashboardData(filters);

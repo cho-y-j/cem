@@ -4185,13 +4185,15 @@ export async function getSafetyInspectionStatistics(filters?: {
  */
 export async function getEpDashboardData(filters?: {
   epCompanyId?: string;
+  bpCompanyId?: string;
+  ownerUserId?: string;
 }) {
   const supabase = getSupabase();
   if (!supabase) {
     return null;
   }
 
-  const epCompanyId = filters?.epCompanyId;
+  const { epCompanyId, bpCompanyId, ownerUserId } = filters || {};
 
   // 1. 투입 현황 (Deployments)
   // Note: Selecting only non-FK columns to avoid Supabase auto-embedding
@@ -4199,8 +4201,13 @@ export async function getEpDashboardData(filters?: {
     .from('deployments')
     .select('id, entry_request_id, equipment_id, owner_id, bp_company_id, ep_company_id, work_zone_id, start_date, planned_end_date, actual_end_date, status, created_at, updated_at');
 
+  // 역할별 필터링
   if (epCompanyId) {
     deploymentsQuery = deploymentsQuery.eq('ep_company_id', epCompanyId);
+  } else if (bpCompanyId) {
+    deploymentsQuery = deploymentsQuery.eq('bp_company_id', bpCompanyId);
+  } else if (ownerUserId) {
+    deploymentsQuery = deploymentsQuery.eq('owner_id', ownerUserId);
   }
 
   const { data: deployments, error: deploymentError } = await deploymentsQuery;
@@ -4230,8 +4237,13 @@ export async function getEpDashboardData(filters?: {
     .select('id, status')
     .in('status', ['bp_approved', 'ep_reviewing']);
 
+  // 역할별 필터링
   if (epCompanyId) {
     entryRequestsQuery = entryRequestsQuery.eq('ep_company_id', epCompanyId);
+  } else if (bpCompanyId) {
+    entryRequestsQuery = entryRequestsQuery.eq('bp_company_id', bpCompanyId);
+  } else if (ownerUserId) {
+    entryRequestsQuery = entryRequestsQuery.eq('requested_by', ownerUserId);
   }
 
   const { data: pendingEntryRequests } = await entryRequestsQuery;
@@ -4260,22 +4272,31 @@ export async function getEpDashboardData(filters?: {
 
   const uniqueActiveEquipmentIds = [...new Set(equipmentIdsData)];
 
-  // 5. 전체 장비 수 및 상태별 통계 (EP 회사 기준)
+  // 5. 전체 장비 수 및 상태별 통계 (역할별 필터링)
   let totalEquipmentQuery = supabase
     .from('equipment')
     .select('id, status');
 
-  if (epCompanyId) {
-    // EP 회사와 연결된 장비를 deployments를 통해 조회
-    const { data: epEquipments } = await supabase
+  if (epCompanyId || bpCompanyId) {
+    // EP/BP 회사와 연결된 장비를 deployments를 통해 조회
+    let companyDeploymentsQuery = supabase
       .from('deployments')
-      .select('equipment_id')
-      .eq('ep_company_id', epCompanyId);
+      .select('equipment_id');
 
-    const epEquipmentIds = epEquipments?.map(d => d.equipment_id).filter(Boolean) || [];
-    if (epEquipmentIds.length > 0) {
-      totalEquipmentQuery = totalEquipmentQuery.in('id', epEquipmentIds);
+    if (epCompanyId) {
+      companyDeploymentsQuery = companyDeploymentsQuery.eq('ep_company_id', epCompanyId);
+    } else if (bpCompanyId) {
+      companyDeploymentsQuery = companyDeploymentsQuery.eq('bp_company_id', bpCompanyId);
     }
+
+    const { data: companyEquipments } = await companyDeploymentsQuery;
+    const companyEquipmentIds = companyEquipments?.map(d => d.equipment_id).filter(Boolean) || [];
+    if (companyEquipmentIds.length > 0) {
+      totalEquipmentQuery = totalEquipmentQuery.in('id', companyEquipmentIds);
+    }
+  } else if (ownerUserId) {
+    // Owner는 자신이 소유한 장비만
+    totalEquipmentQuery = totalEquipmentQuery.eq('owner_id', ownerUserId);
   }
 
   const { data: allEquipments } = await totalEquipmentQuery;
@@ -4309,8 +4330,25 @@ export async function getEpDashboardData(filters?: {
     return expiryDate <= sevenDays;
   }).length || 0;
 
-  // 7. Alert 생성
+  // 7. 긴급 알림 조회 (최우선 순위)
+  const { data: activeEmergencyAlerts } = await supabase
+    .from('emergency_alerts')
+    .select('id, alert_type')
+    .eq('status', 'active');
+
+  // 8. Alert 생성
   const alerts = [];
+
+  // 🚨 긴급 알림 (최우선 순위)
+  if (activeEmergencyAlerts && activeEmergencyAlerts.length > 0) {
+    alerts.push({
+      severity: 'critical' as const,
+      category: 'emergency',
+      message: '긴급 상황 발생',
+      count: activeEmergencyAlerts.length,
+      actionLink: '/emergency-alerts'
+    });
+  }
 
   // 안전점검 지연 (3일 이상)
   const threeDaysAgo = new Date(today);
