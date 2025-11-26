@@ -1,12 +1,14 @@
 /**
  * 운전면허증 OCR Hook
  * 
- * 이미지에서 면허 정보를 자동으로 추출합니다.
+ * Google Cloud Vision API를 사용하여 이미지에서 면허 정보를 자동으로 추출합니다.
  * Admin/Owner 및 Worker 모두 사용 가능
+ * 
+ * 변경사항: Tesseract.js → Google Cloud Vision API (서버 사이드)
  */
 
 import { useState } from 'react';
-import Tesseract from 'tesseract.js';
+import { trpc } from '@/lib/trpc';
 
 export interface LicenseInfo {
   licenseNum: string;        // 면허번호 (12자리)
@@ -18,6 +20,12 @@ export interface LicenseInfo {
   residentNumber?: string;   // 주민등록번호 (선택, 뒷자리 마스킹)
   confidence: number;        // 신뢰도 (0-100)
   rawText: string;           // 원본 OCR 텍스트 (디버깅용)
+  residentNumberBounds?: {   // 주민번호 위치 정보 (마스킹용)
+    x: number;               // X 좌표 (이미지 너비 기준 0-1)
+    y: number;               // Y 좌표 (이미지 높이 기준 0-1)
+    width: number;           // 너비 (이미지 너비 기준 0-1)
+    height: number;          // 높이 (이미지 높이 기준 0-1)
+  };
 }
 
 export interface UseLicenseOCRResult {
@@ -29,12 +37,15 @@ export interface UseLicenseOCRResult {
 }
 
 /**
- * 운전면허증 정보 추출 Hook
+ * 운전면허증 정보 추출 Hook (Google Cloud Vision API 사용)
  */
 export function useLicenseOCR(): UseLicenseOCRResult {
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedInfo, setExtractedInfo] = useState<LicenseInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // tRPC mutation
+  const extractMutation = trpc.workers.extractLicenseInfo.useMutation();
 
   const processImage = async (file: File): Promise<LicenseInfo | null> => {
     setIsProcessing(true);
@@ -42,34 +53,26 @@ export function useLicenseOCR(): UseLicenseOCRResult {
     setExtractedInfo(null);
 
     try {
-      // Tesseract.js Worker 생성
-      const worker = await Tesseract.createWorker('kor', 1, {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`);
-          }
-        },
+      // 파일을 base64로 변환
+      const base64 = await fileToBase64(file);
+      
+      console.log('[OCR] Processing image with Google Cloud Vision API...');
+      console.log('[OCR] File:', file.name, 'Size:', file.size, 'bytes');
+
+      // 서버 API 호출
+      const info = await extractMutation.mutateAsync({
+        imageData: base64,
       });
 
-      // OCR 실행
-      const { data: { text } } = await worker.recognize(file);
-      await worker.terminate();
-
-      // 디버깅: 원본 텍스트 출력
-      console.log('========================================');
-      console.log('[OCR] Raw text (원본):', text);
-      console.log('========================================');
-
-      // 면허 정보 추출
-      const info = extractLicenseInfo(text);
-      
       // 디버깅: 추출된 정보 출력
-      console.log('[OCR] 추출된 정보:');
+      console.log('========================================');
+      console.log('[OCR] 추출된 정보 (Google Vision API):');
       console.log('  - 이름:', info.name || '(추출 실패)');
       console.log('  - 면허번호:', info.licenseNum || '(추출 실패)');
       console.log('  - 생년월일:', info.birthDate || '(추출 실패)');
       console.log('  - 면허종별:', info.licenseTypeName || '(추출 실패)');
       console.log('  - 신뢰도:', info.confidence + '%');
+      console.log('  - 원본 텍스트:', info.rawText.substring(0, 200) + '...');
       console.log('========================================');
       
       setExtractedInfo(info);
@@ -77,7 +80,8 @@ export function useLicenseOCR(): UseLicenseOCRResult {
       return info;
     } catch (err: any) {
       console.error('[OCR] Error:', err);
-      setError(err.message || 'OCR 처리 중 오류가 발생했습니다');
+      const errorMessage = err.message || 'OCR 처리 중 오류가 발생했습니다';
+      setError(errorMessage);
       return null;
     } finally {
       setIsProcessing(false);
@@ -100,9 +104,31 @@ export function useLicenseOCR(): UseLicenseOCRResult {
 }
 
 /**
- * OCR 텍스트에서 면허 정보 추출
+ * File을 base64 문자열로 변환
  */
-function extractLicenseInfo(ocrText: string): LicenseInfo {
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result);
+    };
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * OCR 텍스트에서 면허 정보 추출
+ * 
+ * ⚠️ 이 함수는 더 이상 사용되지 않습니다.
+ * 서버에서 Google Vision API를 사용하여 처리합니다.
+ * 
+ * @deprecated 서버 사이드 처리로 이동됨
+ */
+function extractLicenseInfo_DEPRECATED(ocrText: string): LicenseInfo {
   // 공백 및 줄바꿈 정규화
   const normalizedText = ocrText.replace(/\s+/g, ' ').trim();
   

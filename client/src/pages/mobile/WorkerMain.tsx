@@ -4,10 +4,6 @@ import MobileLayout from "@/components/mobile/MobileLayout";
 import MobileBottomNav, { getWorkerNavItems } from "@/components/mobile/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import {
   Play,
@@ -15,6 +11,7 @@ import {
   Coffee,
   Clock,
   AlertTriangle,
+  AlertCircle,
   Truck,
   MapPin,
   Building2,
@@ -46,9 +43,6 @@ export default function WorkerMain() {
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isSendingLocation, setIsSendingLocation] = useState(false);
-  const [emergencyDialogOpen, setEmergencyDialogOpen] = useState(false);
-  const [emergencyType, setEmergencyType] = useState<string>("");
-  const [emergencyDescription, setEmergencyDescription] = useState<string>("");
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState<string>("");
   const [isMounted, setIsMounted] = useState(false);
@@ -567,67 +561,6 @@ export default function WorkerMain() {
     };
 
     return <Badge className={`${status.className} text-sm px-3 py-1`}>{status.label}</Badge>;
-  };
-
-  // 긴급 버튼 클릭
-  const handleEmergencyClick = () => {
-    if (!assignedEquipment) {
-      toast.error("배정된 장비가 없습니다.");
-      return;
-    }
-    setEmergencyDialogOpen(true);
-  };
-
-  // 긴급 상황 제출
-  const handleEmergencySubmit = () => {
-    if (!assignedEquipment) return;
-    if (!emergencyType || !emergencyDescription.trim()) {
-      toast.error("유형과 설명을 모두 입력해주세요.");
-      return;
-    }
-
-    const alertTypeMap: Record<string, string> = {
-      "accident": "사고",
-      "equipment_failure": "고장",
-      "safety_hazard": "안전위험",
-      "other": "기타",
-    };
-
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          sendEmergencyMutation.mutate({
-            equipmentId: assignedEquipment.id,
-            alertType: alertTypeMap[emergencyType] || "기타",
-            description: emergencyDescription,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-          setEmergencyDialogOpen(false);
-          setEmergencyType("");
-          setEmergencyDescription("");
-        },
-        () => {
-          sendEmergencyMutation.mutate({
-            equipmentId: assignedEquipment.id,
-            alertType: alertTypeMap[emergencyType] || "기타",
-            description: emergencyDescription,
-          });
-          setEmergencyDialogOpen(false);
-          setEmergencyType("");
-          setEmergencyDescription("");
-        }
-      );
-    } else {
-      sendEmergencyMutation.mutate({
-        equipmentId: assignedEquipment.id,
-        alertType: alertTypeMap[emergencyType] || "기타",
-        description: emergencyDescription,
-      });
-      setEmergencyDialogOpen(false);
-      setEmergencyType("");
-      setEmergencyDescription("");
-    }
   };
 
   // 출근 체크 핸들러 (PIN)
@@ -1311,74 +1244,204 @@ export default function WorkerMain() {
           </Button>
         </div>
 
-        {/* 긴급 상황 버튼 */}
+        {/* 긴급 상황 버튼 (4개 큰 버튼 - 한 번 탭으로 즉시 신고) */}
         <div className="px-4 mt-6">
-          <Button
-            size="lg"
-            variant="destructive"
-            className="w-full h-16 text-lg font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg active:scale-95 transition-transform"
-            onClick={handleEmergencyClick}
-            disabled={!assignedEquipment || sendEmergencyMutation.isPending}
-          >
-            <AlertTriangle className="mr-2 h-6 w-6" />
-            긴급 상황 발생
-          </Button>
-        </div>
+          <div className="text-base font-bold text-red-600 mb-3 text-center">
+            🚨 긴급 상황 신고 (즉시 전송)
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {/* 사고 발생 */}
+            <Button
+              size="lg"
+              className="h-24 text-base font-bold bg-gradient-to-br from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white shadow-xl border-2 border-red-900 active:scale-95 transition-transform"
+              onClick={() => {
+                if (!assignedEquipment) {
+                  toast.error("배정된 장비가 없습니다.");
+                  return;
+                }
+                if (confirm("🚨 사고 발생을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
+                  if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "사고",
+                          description: "사고 발생 - 작업자가 긴급 신고",
+                          latitude: position.coords.latitude,
+                          longitude: position.coords.longitude,
+                        });
+                      },
+                      () => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "사고",
+                          description: "사고 발생 - 작업자가 긴급 신고",
+                        });
+                      }
+                    );
+                  } else {
+                    sendEmergencyMutation.mutate({
+                      equipmentId: assignedEquipment.id,
+                      alertType: "사고",
+                      description: "사고 발생 - 작업자가 긴급 신고",
+                    });
+                  }
+                }
+              }}
+              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <AlertTriangle className="h-8 w-8" />
+                <div className="text-lg">사고 발생</div>
+                <div className="text-xs opacity-90">즉시 신고</div>
+              </div>
+            </Button>
 
-        {/* 긴급 상황 다이얼로그 */}
-        <Dialog open={emergencyDialogOpen} onOpenChange={setEmergencyDialogOpen}>
-          <DialogContent className="max-w-md mx-auto">
-            <DialogHeader>
-              <DialogTitle>긴급 상황 신고</DialogTitle>
-              <DialogDescription>
-                긴급 상황 유형과 상세 설명을 입력해주세요.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="emergency-type">상황 유형</Label>
-                <Select value={emergencyType} onValueChange={setEmergencyType}>
-                  <SelectTrigger id="emergency-type">
-                    <SelectValue placeholder="유형 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="accident">사고</SelectItem>
-                    <SelectItem value="equipment_failure">고장</SelectItem>
-                    <SelectItem value="safety_hazard">안전위험</SelectItem>
-                    <SelectItem value="other">기타</SelectItem>
-                  </SelectContent>
-                </Select>
+            {/* 장비 고장 */}
+            <Button
+              size="lg"
+              className="h-24 text-base font-bold bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-xl border-2 border-orange-800 active:scale-95 transition-transform"
+              onClick={() => {
+                if (!assignedEquipment) {
+                  toast.error("배정된 장비가 없습니다.");
+                  return;
+                }
+                if (confirm("⚠️ 장비 고장을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
+                  if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "고장",
+                          description: "장비 고장 - 작업자가 긴급 신고",
+                          latitude: position.coords.latitude,
+                          longitude: position.coords.longitude,
+                        });
+                      },
+                      () => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "고장",
+                          description: "장비 고장 - 작업자가 긴급 신고",
+                        });
+                      }
+                    );
+                  } else {
+                    sendEmergencyMutation.mutate({
+                      equipmentId: assignedEquipment.id,
+                      alertType: "고장",
+                      description: "장비 고장 - 작업자가 긴급 신고",
+                    });
+                  }
+                }
+              }}
+              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Truck className="h-8 w-8" />
+                <div className="text-lg">장비 고장</div>
+                <div className="text-xs opacity-90">즉시 신고</div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="emergency-description">상세 설명</Label>
-                <Input
-                  id="emergency-description"
-                  placeholder="상세 설명을 입력하세요"
-                  value={emergencyDescription}
-                  onChange={(e) => setEmergencyDescription(e.target.value)}
-                />
+            </Button>
+
+            {/* 안전 위험 */}
+            <Button
+              size="lg"
+              className="h-24 text-base font-bold bg-gradient-to-br from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white shadow-xl border-2 border-yellow-800 active:scale-95 transition-transform"
+              onClick={() => {
+                if (!assignedEquipment) {
+                  toast.error("배정된 장비가 없습니다.");
+                  return;
+                }
+                if (confirm("⚠️ 안전 위험을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
+                  if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "안전위험",
+                          description: "안전 위험 발견 - 작업자가 긴급 신고",
+                          latitude: position.coords.latitude,
+                          longitude: position.coords.longitude,
+                        });
+                      },
+                      () => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "안전위험",
+                          description: "안전 위험 발견 - 작업자가 긴급 신고",
+                        });
+                      }
+                    );
+                  } else {
+                    sendEmergencyMutation.mutate({
+                      equipmentId: assignedEquipment.id,
+                      alertType: "안전위험",
+                      description: "안전 위험 발견 - 작업자가 긴급 신고",
+                    });
+                  }
+                }
+              }}
+              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <AlertCircle className="h-8 w-8" />
+                <div className="text-lg">안전 위험</div>
+                <div className="text-xs opacity-90">즉시 신고</div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEmergencyDialogOpen(false);
-                  setEmergencyType("");
-                  setEmergencyDescription("");
-                }}
-              >
-                취소
-              </Button>
-              <Button
-                onClick={handleEmergencySubmit}
-                disabled={!emergencyType || !emergencyDescription.trim() || sendEmergencyMutation.isPending}
-              >
-                {sendEmergencyMutation.isPending ? "전송 중..." : "신고하기"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </Button>
+
+            {/* 기타 긴급 */}
+            <Button
+              size="lg"
+              className="h-24 text-base font-bold bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-xl border-2 border-purple-800 active:scale-95 transition-transform"
+              onClick={() => {
+                if (!assignedEquipment) {
+                  toast.error("배정된 장비가 없습니다.");
+                  return;
+                }
+                if (confirm("❗ 기타 긴급 상황을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
+                  if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "기타",
+                          description: "기타 긴급 상황 - 작업자가 긴급 신고",
+                          latitude: position.coords.latitude,
+                          longitude: position.coords.longitude,
+                        });
+                      },
+                      () => {
+                        sendEmergencyMutation.mutate({
+                          equipmentId: assignedEquipment.id,
+                          alertType: "기타",
+                          description: "기타 긴급 상황 - 작업자가 긴급 신고",
+                        });
+                      }
+                    );
+                  } else {
+                    sendEmergencyMutation.mutate({
+                      equipmentId: assignedEquipment.id,
+                      alertType: "기타",
+                      description: "기타 긴급 상황 - 작업자가 긴급 신고",
+                    });
+                  }
+                }
+              }}
+              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <AlertTriangle className="h-8 w-8" />
+                <div className="text-lg">기타 긴급</div>
+                <div className="text-xs opacity-90">즉시 신고</div>
+              </div>
+            </Button>
+          </div>
+          <div className="text-xs text-gray-500 mt-2 text-center">
+            버튼 클릭 시 관리자에게 즉시 알림이 전송됩니다
+          </div>
+        </div>
 
       </div>
 

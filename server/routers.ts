@@ -719,6 +719,41 @@ export const appRouter = router({
         }
       }),
 
+    // OCR API (Google Vision API 사용)
+    extractLicenseInfo: protectedProcedure
+      .input(
+        z.object({
+          imageData: z.string(), // base64 인코딩된 이미지
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const { extractLicenseInfo } = await import('./_core/vision-api');
+          
+          // base64 디코딩
+          const base64Data = input.imageData.replace(/^data:image\/\w+;base64,/, '');
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+          
+          console.log('[OCR] Processing image with Google Vision API...');
+          
+          const result = await extractLicenseInfo(imageBuffer);
+          
+          console.log('[OCR] Extracted info:', {
+            name: result.name,
+            licenseNum: result.licenseNum,
+            confidence: result.confidence + '%',
+          });
+          
+          return result;
+        } catch (error: any) {
+          console.error('[OCR] Error:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error.message || 'OCR 처리에 실패했습니다',
+          });
+        }
+      }),
+
     create: protectedProcedure
       .input(
         z.object({

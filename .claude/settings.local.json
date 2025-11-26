@@ -52,7 +52,8 @@
       "Bash(pnpm drizzle-kit:*)",
       "Bash(rm:*)",
       "Bash(timeout /t 5)",
-      "Bash(timeout /t 3)"
+      "Bash(timeout /t 3)",
+      "Bash(timeout /t 10)"
     ],
     "deny": [],
     "ask": []

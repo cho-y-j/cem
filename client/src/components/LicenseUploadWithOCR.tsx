@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { maskResidentNumberPrecise, base64ToFile } from '@/utils/imageMasking';
 
 export interface LicenseUploadProps {
   // 자동 채워질 폼 데이터
@@ -38,6 +39,9 @@ export interface LicenseUploadProps {
   // 인증 성공 콜백
   onVerificationSuccess?: () => void;
   
+  // 마스킹된 이미지 파일 업로드 콜백 (새로 추가)
+  onImageUploaded?: (file: File) => void;
+  
   // 모바일 여부 (카메라 촬영 활성화)
   isMobile?: boolean;
 }
@@ -47,6 +51,7 @@ export function LicenseUploadWithOCR({
   formData,
   onFormChange,
   onVerificationSuccess,
+  onImageUploaded,
   isMobile = false,
 }: LicenseUploadProps) {
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
@@ -63,21 +68,43 @@ export function LicenseUploadWithOCR({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 이미지 미리보기
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setImagePreview(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    setUploadedImage(file);
     setVerificationStatus('idle');
 
-    // OCR 실행
+    // OCR 실행 (원본 이미지로)
+    // 정규화 기능은 현재 개발 중 (OpenCV.js 모서리 감지 개선 필요)
     toast.info('면허증 정보를 추출하는 중...');
     const info = await processImage(file);
 
     if (info) {
+      // OCR 후 주민번호 위치를 알 수 있으므로 정확한 마스킹 적용
+      try {
+        const maskedImageBase64 = await maskResidentNumberPrecise(file, info);
+        
+        // 마스킹된 이미지를 미리보기로 표시
+        setImagePreview(maskedImageBase64);
+        
+        // 마스킹된 이미지를 File 객체로 변환하여 저장
+        const maskedFile = await base64ToFile(maskedImageBase64, file.name);
+        setUploadedImage(maskedFile); // 마스킹된 파일 저장
+        
+        // 부모 컴포넌트에 마스킹된 파일 전달
+        if (onImageUploaded) {
+          onImageUploaded(maskedFile);
+        }
+        
+        console.log('[LicenseUpload] 이미지 마스킹 완료 - 주민번호 뒷자리 숨김 처리됨');
+      } catch (maskError) {
+        console.error('[LicenseUpload] 마스킹 실패:', maskError);
+        // 마스킹 실패 시 원본 이미지 사용
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setImagePreview(event.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+        setUploadedImage(file);
+        toast.warning('이미지 마스킹에 실패했습니다. 원본 이미지가 사용됩니다.');
+      }
+      
       // 폼 자동 채우기
       onOCRComplete(info);
       
@@ -87,6 +114,33 @@ export function LicenseUploadWithOCR({
         toast.warning(`신뢰도가 낮습니다 (${info.confidence}%). 정보를 확인하고 수정해주세요.`);
       }
     } else {
+      // OCR 실패 시에도 일반 마스킹 적용
+      try {
+        const { maskResidentNumber } = await import('@/utils/imageMasking');
+        const maskedImageBase64 = await maskResidentNumber(file);
+        setImagePreview(maskedImageBase64);
+        const maskedFile = await base64ToFile(maskedImageBase64, file.name);
+        setUploadedImage(maskedFile);
+        
+        // 부모 컴포넌트에 마스킹된 파일 전달
+        if (onImageUploaded) {
+          onImageUploaded(maskedFile);
+        }
+      } catch (maskError) {
+        console.error('[LicenseUpload] 마스킹 실패:', maskError);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setImagePreview(event.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+        setUploadedImage(file);
+        
+        // 마스킹 실패 시에도 원본 파일 전달
+        if (onImageUploaded) {
+          onImageUploaded(file);
+        }
+      }
+      
       toast.error('면허증 정보를 추출하지 못했습니다. 수동으로 입력해주세요.');
     }
   };

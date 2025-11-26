@@ -644,6 +644,16 @@ export default function Workers() {
                       console.log('[Workers] License verification successful');
                       setLicenseVerified(true);
                     }}
+                    onImageUploaded={(maskedFile: File) => {
+                      // 마스킹된 면허증 이미지를 docFiles의 "운전면허증" 항목에 자동 연결
+                      const licenseDoc = docFiles.find(
+                        (doc) => doc.docName.includes('운전면허') || doc.docName.includes('면허증')
+                      );
+                      if (licenseDoc) {
+                        handleFileChange(licenseDoc.docTypeId, maskedFile);
+                        console.log('[Workers] 마스킹된 면허증 이미지가 자동으로 연결되었습니다.');
+                      }
+                    }}
                     isMobile={false} // Admin/Owner는 데스크톱
                   />
                 )}
