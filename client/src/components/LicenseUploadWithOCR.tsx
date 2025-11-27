@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Camera, Upload, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Camera, Upload, Loader2, CheckCircle2, XCircle, AlertCircle, Crop } from 'lucide-react';
 import { useLicenseOCR, LicenseInfo, LICENSE_TYPES } from '@/hooks/useLicenseOCR';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { maskResidentNumberPrecise, base64ToFile } from '@/utils/imageMasking';
+import { ImageCropModal } from './ImageCropModal';
 
 export interface LicenseUploadProps {
   // 자동 채워질 폼 데이터
@@ -59,55 +60,71 @@ export function LicenseUploadWithOCR({
   const [verificationStatus, setVerificationStatus] = useState<'idle' | 'loading' | 'success' | 'failure'>('idle');
   const [verificationMessage, setVerificationMessage] = useState('');
 
+  // 크롭 모달 상태
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
+
   const { isProcessing, extractedInfo, error: ocrError, processImage, reset: resetOCR } = useLicenseOCR();
   
   const verifyLicenseMutation = trpc.workers.verifyLicense.useMutation();
 
-  // 이미지 업로드 핸들러
+  // 이미지 업로드 핸들러 - 크롭 모달 먼저 표시
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setVerificationStatus('idle');
 
-    // OCR 실행 (원본 이미지로)
-    // 정규화 기능은 현재 개발 중 (OpenCV.js 모서리 감지 개선 필요)
+    // 파일을 base64로 변환하여 크롭 모달에 전달
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageSrc = event.target?.result as string;
+      setOriginalImageSrc(imageSrc);
+      setShowCropModal(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 크롭 완료 후 OCR 및 마스킹 처리
+  const handleCropComplete = async (croppedImageBase64: string) => {
+    setShowCropModal(false);
+
+    // base64를 File로 변환
+    const croppedFile = await base64ToFile(croppedImageBase64, 'license_cropped.jpg');
+
+    // OCR 실행 (크롭된 이미지로)
     toast.info('면허증 정보를 추출하는 중...');
-    const info = await processImage(file);
+    const info = await processImage(croppedFile);
 
     if (info) {
       // OCR 후 주민번호 위치를 알 수 있으므로 정확한 마스킹 적용
       try {
-        const maskedImageBase64 = await maskResidentNumberPrecise(file, info);
-        
+        const maskedImageBase64 = await maskResidentNumberPrecise(croppedFile, info);
+
         // 마스킹된 이미지를 미리보기로 표시
         setImagePreview(maskedImageBase64);
-        
+
         // 마스킹된 이미지를 File 객체로 변환하여 저장
-        const maskedFile = await base64ToFile(maskedImageBase64, file.name);
+        const maskedFile = await base64ToFile(maskedImageBase64, 'license_masked.jpg');
         setUploadedImage(maskedFile); // 마스킹된 파일 저장
-        
+
         // 부모 컴포넌트에 마스킹된 파일 전달
         if (onImageUploaded) {
           onImageUploaded(maskedFile);
         }
-        
+
         console.log('[LicenseUpload] 이미지 마스킹 완료 - 주민번호 뒷자리 숨김 처리됨');
       } catch (maskError) {
         console.error('[LicenseUpload] 마스킹 실패:', maskError);
-        // 마스킹 실패 시 원본 이미지 사용
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setImagePreview(event.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-        setUploadedImage(file);
-        toast.warning('이미지 마스킹에 실패했습니다. 원본 이미지가 사용됩니다.');
+        // 마스킹 실패 시 크롭된 이미지 사용
+        setImagePreview(croppedImageBase64);
+        setUploadedImage(croppedFile);
+        toast.warning('이미지 마스킹에 실패했습니다. 크롭된 이미지가 사용됩니다.');
       }
-      
+
       // 폼 자동 채우기
       onOCRComplete(info);
-      
+
       if (info.confidence >= 60) {
         toast.success(`면허증 정보가 추출되었습니다 (신뢰도: ${info.confidence}%)`);
       } else {
@@ -117,30 +134,26 @@ export function LicenseUploadWithOCR({
       // OCR 실패 시에도 일반 마스킹 적용
       try {
         const { maskResidentNumber } = await import('@/utils/imageMasking');
-        const maskedImageBase64 = await maskResidentNumber(file);
+        const maskedImageBase64 = await maskResidentNumber(croppedFile);
         setImagePreview(maskedImageBase64);
-        const maskedFile = await base64ToFile(maskedImageBase64, file.name);
+        const maskedFile = await base64ToFile(maskedImageBase64, 'license_masked.jpg');
         setUploadedImage(maskedFile);
-        
+
         // 부모 컴포넌트에 마스킹된 파일 전달
         if (onImageUploaded) {
           onImageUploaded(maskedFile);
         }
       } catch (maskError) {
         console.error('[LicenseUpload] 마스킹 실패:', maskError);
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setImagePreview(event.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-        setUploadedImage(file);
-        
-        // 마스킹 실패 시에도 원본 파일 전달
+        setImagePreview(croppedImageBase64);
+        setUploadedImage(croppedFile);
+
+        // 마스킹 실패 시에도 크롭된 파일 전달
         if (onImageUploaded) {
-          onImageUploaded(file);
+          onImageUploaded(croppedFile);
         }
       }
-      
+
       toast.error('면허증 정보를 추출하지 못했습니다. 수동으로 입력해주세요.');
     }
   };
@@ -202,6 +215,8 @@ export function LicenseUploadWithOCR({
     setImagePreview(null);
     setVerificationStatus('idle');
     setVerificationMessage('');
+    setOriginalImageSrc(null);
+    setShowCropModal(false);
     resetOCR();
   };
 
@@ -213,9 +228,13 @@ export function LicenseUploadWithOCR({
           <div>
             <Label className="text-base font-semibold">📸 운전면허증 자동 인식</Label>
             <p className="text-sm text-muted-foreground mt-1">
-              {isMobile 
-                ? '면허증 사진을 촬영하거나 업로드하면 자동으로 정보를 추출합니다'
-                : '면허증 사진을 업로드하면 자동으로 정보를 추출합니다'}
+              {isMobile
+                ? '면허증 사진을 촬영하거나 업로드 후 영역을 선택하세요'
+                : '면허증 사진을 업로드 후 영역을 선택하면 자동으로 정보를 추출합니다'}
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              <Crop className="inline h-3 w-3 mr-1" />
+              사진 업로드 후 면허증 영역만 선택할 수 있습니다 (회전/크롭 지원)
             </p>
           </div>
           {uploadedImage && (
@@ -412,6 +431,19 @@ export function LicenseUploadWithOCR({
           </Alert>
         )}
       </div>
+
+      {/* 이미지 크롭 모달 */}
+      {originalImageSrc && (
+        <ImageCropModal
+          isOpen={showCropModal}
+          onClose={() => {
+            setShowCropModal(false);
+            setOriginalImageSrc(null);
+          }}
+          imageSrc={originalImageSrc}
+          onCropComplete={handleCropComplete}
+        />
+      )}
     </div>
   );
 }

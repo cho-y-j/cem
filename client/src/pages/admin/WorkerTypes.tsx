@@ -68,17 +68,23 @@ export default function AdminWorkerTypes() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) { 
-      updateMutation.mutate({ 
-        id: editingId, 
+
+    // 중복 제출 방지
+    if (createMutation.isPending || updateMutation.isPending) {
+      return;
+    }
+
+    if (editingId) {
+      updateMutation.mutate({
+        id: editingId,
         ...formData,
-        requiredDocs 
-      }); 
-    } else { 
+        requiredDocs
+      });
+    } else {
       createMutation.mutate({
         ...formData,
         requiredDocs
-      }); 
+      });
     }
   };
 
@@ -354,15 +360,21 @@ export default function AdminWorkerTypes() {
             </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setIsDialogOpen(false)}
+                disabled={createMutation.isPending || updateMutation.isPending}
               >
                 취소
               </Button>
-              <Button type="submit">
-                {editingId ? "수정" : "추가"}
+              <Button
+                type="submit"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {createMutation.isPending || updateMutation.isPending
+                  ? "저장 중..."
+                  : editingId ? "수정" : "추가"}
               </Button>
             </DialogFooter>
           </form>

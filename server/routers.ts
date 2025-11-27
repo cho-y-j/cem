@@ -272,10 +272,26 @@ export const appRouter = router({
         const id = nanoid();
         const { requiredDocs, ...workerTypeData } = input;
         await db.createWorkerType({ id, ...workerTypeData });
-        
+
+        // 면허인증 필수인 경우, "운전면허증" 서류 자동 추가
+        const allDocs = [...(requiredDocs || [])];
+        if (workerTypeData.licenseRequired) {
+          // 이미 "운전면허증"이 있는지 확인
+          const hasLicenseDoc = allDocs.some(d =>
+            d.docName === '운전면허증' || d.docName.includes('면허증')
+          );
+          if (!hasLicenseDoc) {
+            allDocs.unshift({
+              docName: '운전면허증',
+              isMandatory: true,
+              hasExpiry: false, // 면허 유효성은 RIMS에서 확인
+            });
+          }
+        }
+
         // 필수 서류 등록
-        if (requiredDocs && requiredDocs.length > 0) {
-          for (const doc of requiredDocs) {
+        if (allDocs.length > 0) {
+          for (const doc of allDocs) {
             await db.createWorkerDoc({
               id: nanoid(),
               workerTypeId: id,
@@ -283,7 +299,7 @@ export const appRouter = router({
             });
           }
         }
-        
+
         return { id };
       }),
 
@@ -303,16 +319,48 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const { id, requiredDocs, ...data } = input;
+
+        console.log('[WorkerTypes.update] Input:', { id, requiredDocs: requiredDocs?.length, data });
+
+        // 기존 worker type 정보 가져오기 (licenseRequired 확인용)
+        const existingWorkerType = await db.getWorkerTypeById(id);
+        console.log('[WorkerTypes.update] Existing worker type:', existingWorkerType?.name, 'licenseRequired:', existingWorkerType?.licenseRequired);
+
         await db.updateWorkerType(id, data);
-        
+
         // 기존 필수 서류 삭제 후 재등록
         if (requiredDocs !== undefined) {
           const existingDocs = await db.getWorkerDocsByWorkerType(id);
+          console.log('[WorkerTypes.update] Deleting existing docs:', existingDocs.length);
           for (const doc of existingDocs) {
             await db.deleteWorkerDoc(doc.id);
           }
-          
-          for (const doc of requiredDocs) {
+
+          // 현재 licenseRequired 값 (업데이트된 값이 있으면 사용, 없으면 기존 값)
+          const effectiveLicenseRequired = data.licenseRequired !== undefined
+            ? data.licenseRequired
+            : existingWorkerType?.licenseRequired;
+
+          console.log('[WorkerTypes.update] effectiveLicenseRequired:', effectiveLicenseRequired);
+
+          // 면허인증 필수인 경우, "운전면허증" 서류 자동 추가
+          const allDocs = [...requiredDocs];
+          if (effectiveLicenseRequired) {
+            // 이미 "운전면허증"이 있는지 확인
+            const hasLicenseDoc = allDocs.some(d =>
+              d.docName === '운전면허증' || d.docName.includes('면허증')
+            );
+            if (!hasLicenseDoc) {
+              allDocs.unshift({
+                docName: '운전면허증',
+                isMandatory: true,
+                hasExpiry: false,
+              });
+            }
+          }
+
+          console.log('[WorkerTypes.update] Creating docs:', allDocs.map(d => d.docName));
+          for (const doc of allDocs) {
             await db.createWorkerDoc({
               id: nanoid(),
               workerTypeId: id,
@@ -320,7 +368,7 @@ export const appRouter = router({
             });
           }
         }
-        
+
         return { success: true };
       }),
 

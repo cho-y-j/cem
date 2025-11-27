@@ -77,6 +77,7 @@ export default function Workers() {
   });
   const [docFiles, setDocFiles] = useState<DocFile[]>([]);
   const [licenseVerified, setLicenseVerified] = useState(false); // 면허 인증 완료 여부
+  const [licenseImageFile, setLicenseImageFile] = useState<File | null>(null); // 마스킹된 면허증 이미지
   const [searchTerm, setSearchTerm] = useState("");
   const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("");
   const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("");
@@ -155,17 +156,34 @@ export default function Workers() {
   useEffect(() => {
     if (formData.workerTypeId && selectedWorkerType) {
       console.log('[Workers] Selected worker type:', selectedWorkerType.name, 'licenseRequired:', selectedWorkerType.licenseRequired);
+      console.log('[Workers] workerDocs from API:', workerDocs);
     }
-  }, [formData.workerTypeId, selectedWorkerType]);
+  }, [formData.workerTypeId, selectedWorkerType, workerDocs]);
+
+  // 운전면허증 서류 ID (면허인증 필수일 때 자동 연결용)
+  const licenseDocId = workerDocs?.find(
+    (doc) => doc.docName === '운전면허증' || doc.docName.includes('면허증')
+  )?.id;
 
   // 인력 유형 변경 시 필수 서류 목록 및 면허 검증 상태 초기화
   useEffect(() => {
     // 인력유형이 변경되면 면허 검증 상태 초기화
     setLicenseVerified(false);
-    
+
+    console.log('[Workers] useEffect - workerDocs:', workerDocs, 'isLicenseRequired:', isLicenseRequired);
+
     if (workerDocs && workerDocs.length > 0) {
+      // 면허인증 필수인 경우, "운전면허증" 서류는 목록에서 제외 (OCR에서 자동 연결됨)
+      const filteredDocs = isLicenseRequired
+        ? workerDocs.filter(
+            (doc) => doc.docName !== '운전면허증' && !doc.docName.includes('면허증')
+          )
+        : workerDocs;
+
+      console.log('[Workers] filteredDocs:', filteredDocs);
+
       setDocFiles(
-        workerDocs.map((doc) => ({
+        filteredDocs.map((doc) => ({
           docTypeId: doc.id,
           docName: doc.docName,
           file: null,
@@ -176,7 +194,7 @@ export default function Workers() {
     } else {
       setDocFiles([]);
     }
-  }, [workerDocs]);
+  }, [workerDocs, isLicenseRequired]);
 
   const createWithDocsMutation = trpc.workers.createWithDocs.useMutation({
     onSuccess: () => {
@@ -229,14 +247,21 @@ export default function Workers() {
     setEditingId(null);
     setDocFiles([]);
     setLicenseVerified(false); // 인증 상태도 초기화
+    setLicenseImageFile(null); // 면허증 이미지도 초기화
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...formData });
     } else {
+      // 필수 필드 검증
+      if (!formData.password || formData.password.length < 6) {
+        toast.error("비밀번호는 최소 6자 이상이어야 합니다.");
+        return;
+      }
+
       // 면허 인증 체크 (licenseRequired가 true이고 면허번호가 있는 경우에만)
       // 유도원 등 licenseRequired가 false인 경우에는 면허 인증을 요구하지 않음
       if (isLicenseRequired && formData.licenseNum && !licenseVerified) {
@@ -267,6 +292,7 @@ export default function Workers() {
       }
       
       try {
+        // 일반 필수 서류 처리
         const docs = await Promise.all(
           docFiles
             .filter((doc) => doc.file)
@@ -280,6 +306,21 @@ export default function Workers() {
               expiryDate: doc.expiryDate,
             }))
         );
+
+        // 면허인증 필수이고 마스킹된 면허증 이미지가 있으면 자동 추가
+        if (isLicenseRequired && licenseImageFile && licenseDocId) {
+          const licenseDoc = {
+            docTypeId: licenseDocId,
+            docName: '운전면허증',
+            fileData: await fileToBase64(licenseImageFile),
+            fileName: licenseImageFile.name,
+            mimeType: licenseImageFile.type,
+            issueDate: undefined,
+            expiryDate: undefined, // 면허 유효성은 RIMS에서 확인하므로 만료일 불필요
+          };
+          docs.push(licenseDoc);
+          console.log('[Workers] 마스킹된 면허증 이미지가 서류로 자동 추가됨');
+        }
 
         createWithDocsMutation.mutate({
           ...formData,
@@ -645,14 +686,9 @@ export default function Workers() {
                       setLicenseVerified(true);
                     }}
                     onImageUploaded={(maskedFile: File) => {
-                      // 마스킹된 면허증 이미지를 docFiles의 "운전면허증" 항목에 자동 연결
-                      const licenseDoc = docFiles.find(
-                        (doc) => doc.docName.includes('운전면허') || doc.docName.includes('면허증')
-                      );
-                      if (licenseDoc) {
-                        handleFileChange(licenseDoc.docTypeId, maskedFile);
-                        console.log('[Workers] 마스킹된 면허증 이미지가 자동으로 연결되었습니다.');
-                      }
+                      // 마스킹된 면허증 이미지를 별도 상태로 저장 (submit 시 자동 추가됨)
+                      setLicenseImageFile(maskedFile);
+                      console.log('[Workers] 마스킹된 면허증 이미지가 저장되었습니다.');
                     }}
                     isMobile={false} // Admin/Owner는 데스크톱
                   />
