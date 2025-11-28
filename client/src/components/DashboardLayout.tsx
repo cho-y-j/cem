@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/sidebar";
 import { APP_LOGO, APP_TITLE, getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Building2, CheckCircle, ClipboardCheck, FileText, HardHat, LayoutDashboard, LogOut, PanelLeft, Truck, Users, ArrowRightLeft, BarChart3, MapPin, AlertTriangle, Clock, PackageCheck, Shield, UserCircle, Map, UserCheck } from "lucide-react";
+import { Building2, CheckCircle, ClipboardCheck, FileText, HardHat, LayoutDashboard, LogOut, PanelLeft, Truck, Users, ArrowRightLeft, BarChart3, MapPin, AlertTriangle, Clock, PackageCheck, Shield, UserCircle, Map, UserCheck, Bell } from "lucide-react";
+import { NotificationDropdown } from "./NotificationDropdown";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -38,6 +39,7 @@ const menuItems = [
   { icon: FileText, label: "작업 확인서", path: "/work-journal", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Map, label: "작업 구역 관리", path: "/work-zones", roles: ["ep", "admin"] },
   { icon: UserCheck, label: "출근 현황", path: "/check-in-monitoring", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: Bell, label: "알림 관리", path: "/notifications", roles: ["owner", "ep", "bp", "admin"] },
   { icon: AlertTriangle, label: "긴급 알림", path: "/emergency-alerts", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Clock, label: "작업 현황 & 위치", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin"] },
   { icon: BarChart3, label: "통계 및 리포트", path: "/statistics", roles: ["owner", "ep", "bp", "admin"] },
@@ -358,6 +360,16 @@ function DashboardLayoutContent({
                   </span>
                 </div>
               </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <NotificationDropdown />
+            </div>
+          </div>
+        )}
+        {!isMobile && (
+          <div className="flex border-b h-14 items-center justify-end bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+            <div className="flex items-center gap-2">
+              <NotificationDropdown />
             </div>
           </div>
         )}

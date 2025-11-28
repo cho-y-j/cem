@@ -41,6 +41,22 @@ export const entryRequestStatusEnum = pgEnum("entry_request_status", [
 export const entryRequestItemTypeEnum = pgEnum("entry_request_item_type", ["equipment", "worker"]);
 export const documentStatusEnum = pgEnum("document_status", ["valid", "warning", "expired", "missing", "pending"]);
 
+// 알림 관련 Enums
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "announcement",     // 공지사항
+  "document_expiry",  // 서류 만료
+  "emergency",        // 긴급 (날씨, 휴무)
+  "task",             // 작업 지시
+  "system"            // 시스템 자동 알림
+]);
+
+export const notificationPriorityEnum = pgEnum("notification_priority", [
+  "low",      // 일반 공지
+  "normal",   // 기본
+  "high",     // 중요
+  "urgent"    // 긴급 (빨간색 표시)
+]);
+
 // ============================================================
 // 사용자 및 권한 관리
 // ============================================================
@@ -58,6 +74,9 @@ export const users = pgTable("users", {
   companyId: varchar("company_id", { length: 64 }),
   createdAt: timestamp("created_at").defaultNow(),
   lastSignedIn: timestamp("last_signed_in").defaultNow(),
+  // FCM 푸시 알림용
+  fcmToken: text("fcm_token"),
+  fcmTokenUpdatedAt: timestamp("fcm_token_updated_at", { withTimezone: true }),
 });
 
 export type User = typeof users.$inferSelect;
@@ -880,4 +899,58 @@ export const webauthnCredentials = pgTable("webauthn_credentials", {
 
 export type WebauthnCredential = typeof webauthnCredentials.$inferSelect;
 export type InsertWebauthnCredential = typeof webauthnCredentials.$inferInsert;
+
+// ============================================================
+// 알림 시스템 (Notification System)
+// ============================================================
+
+/**
+ * 알림
+ * 공지사항, 서류 만료, 긴급 알림, 작업 지시 등
+ */
+export const notifications = pgTable("notifications", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+
+  // 발송 대상
+  targetType: varchar("target_type", { length: 20 }).notNull().default("user"), // 'all', 'company', 'role', 'user'
+  targetId: varchar("target_id", { length: 64 }), // company_id, user_id 등
+
+  // 내용
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  type: notificationTypeEnum("type").notNull(),
+  priority: notificationPriorityEnum("priority").default("normal"),
+
+  // 발송자
+  senderId: varchar("sender_id", { length: 64 }),
+  senderCompanyId: varchar("sender_company_id", { length: 64 }),
+
+  // 관련 링크 (선택)
+  linkType: varchar("link_type", { length: 50 }), // 'document', 'deployment', 'entry_request'
+  linkId: varchar("link_id", { length: 64 }),
+
+  // 메타
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+
+  // 긴급 알림용 SMS 발송 여부
+  sendSms: boolean("send_sms").default(false),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+/**
+ * 알림 읽음 기록
+ * 각 사용자별 알림 읽음 상태 관리
+ */
+export const notificationReads = pgTable("notification_reads", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  notificationId: varchar("notification_id", { length: 64 }).notNull(),
+  userId: varchar("user_id", { length: 64 }).notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }).defaultNow(),
+});
+
+export type NotificationRead = typeof notificationReads.$inferSelect;
+export type InsertNotificationRead = typeof notificationReads.$inferInsert;
 

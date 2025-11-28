@@ -29,11 +29,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter, ShieldCheck, CheckSquare } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter, ShieldCheck, CheckSquare, Bell } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useLocation } from "wouter";
 
 interface DocFile {
   docTypeId: string;
@@ -61,6 +62,7 @@ const fileToBase64 = (file: File): Promise<string> => {
 
 export default function Workers() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const role = user?.role?.toLowerCase();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -701,6 +703,34 @@ export default function Workers() {
                     서류 검증
                   </>
                 )}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  if (selectedWorkerIds.size === 0) {
+                    setLocation("/notifications/send");
+                  } else {
+                    // 선택된 인력의 userId와 이름을 쿼리 파라미터로 전달
+                    const selectedWorkers = filteredWorkersList
+                      ?.filter((w) => selectedWorkerIds.has(w.id))
+                      .map((w) => ({ userId: w.userId, name: w.name, workerId: w.id }))
+                      .filter((w) => w.userId) || [];
+
+                    if (selectedWorkers.length === 0) {
+                      toast.error("선택된 인력 중 알림을 받을 수 있는 사용자가 없습니다.");
+                      return;
+                    }
+
+                    const params = new URLSearchParams();
+                    params.set("userIds", selectedWorkers.map(w => w.userId).join(","));
+                    params.set("names", selectedWorkers.map(w => w.name).join(","));
+                    setLocation(`/notifications/send?${params.toString()}`);
+                  }
+                }}
+              >
+                <Bell className="mr-1 h-4 w-4" />
+                알림 보내기
               </Button>
             </div>
           </div>

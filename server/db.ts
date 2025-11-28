@@ -935,8 +935,48 @@ export async function assignNfcTagToEquipment(equipmentId: string, nfcTagId: str
 
 export async function deleteEquipment(id: string) {
   const supabase = getSupabase();
-  if (!supabase) return;
+  if (!supabase) {
+    throw new Error("Supabase not available");
+  }
 
+  console.log(`[Database] Checking equipment before delete: ${id}`);
+
+  // 1. 활성 투입(deployment) 확인 - 종료되지 않은 투입이 있으면 삭제 불가
+  const { data: activeDeployments } = await supabase
+    .from('deployments')
+    .select('id, status')
+    .eq('equipment_id', id)
+    .is('actual_end_date', null); // 실제 종료일이 없으면 아직 활성
+
+  if (activeDeployments && activeDeployments.length > 0) {
+    throw new Error(`이 장비는 현재 투입 중입니다. 투입을 먼저 종료해주세요. (활성 투입: ${activeDeployments.length}건)`);
+  }
+
+  // 2. 진행 중인 반입 요청 확인
+  const { data: pendingEntryItems } = await supabase
+    .from('entry_request_items')
+    .select(`
+      id,
+      entry_request:entry_requests!inner(id, status)
+    `)
+    .eq('equipment_id', id)
+    .not('entry_request.status', 'in', '("rejected","completed","cancelled")');
+
+  if (pendingEntryItems && pendingEntryItems.length > 0) {
+    throw new Error(`이 장비는 진행 중인 반입 요청이 있습니다. 반입 요청을 먼저 완료하거나 취소해주세요.`);
+  }
+
+  // 3. 작업일지 확인 (이력이 있으면 경고만 하고 삭제는 허용)
+  const { data: workJournals } = await supabase
+    .from('work_journal')
+    .select('id')
+    .eq('equipment_id', id);
+
+  if (workJournals && workJournals.length > 0) {
+    console.log(`[Database] Warning: Equipment has ${workJournals.length} work journal entries. They will be orphaned.`);
+  }
+
+  // 4. equipment 테이블에서 삭제
   const { error } = await supabase
     .from('equipment')
     .delete()
@@ -944,7 +984,10 @@ export async function deleteEquipment(id: string) {
 
   if (error) {
     console.error("[Database] Error deleting equipment:", error);
+    throw new Error(`장비 삭제 중 오류: ${error.message}`);
   }
+
+  console.log(`[Database] Successfully deleted equipment: ${id}`);
 }
 
 // ============================================================
@@ -1301,23 +1344,45 @@ export async function getWorkerByEmail(email: string): Promise<Worker | undefine
 
 export async function deleteWorker(id: string) {
   const supabase = getSupabase();
+  const supabaseAdmin = getSupabaseAdmin();
   if (!supabase) {
     throw new Error("Supabase not available");
   }
 
-  // 1. 관련 entry_request_items에서 paired_worker_id를 NULL로 설정
-  const { error: entryItemsError } = await supabase
-    .from('entry_request_items')
-    .update({ paired_worker_id: null })
-    .eq('paired_worker_id', id);
+  // 0. Worker 정보 조회 (연결된 user_id 확인)
+  const { data: worker } = await supabase
+    .from('workers')
+    .select('user_id, name')
+    .eq('id', id)
+    .single();
 
-  if (entryItemsError) {
-    console.error("[Database] Error clearing entry_request_items references:", entryItemsError);
-    throw new Error(`관련 반입 요청 항목 정리 중 오류: ${entryItemsError.message}`);
+  const userId = worker?.user_id;
+  console.log(`[Database] Checking worker before delete: ${id}, name: ${worker?.name}`);
+
+  // 1. 활성 투입(deployment) 확인 - 종료되지 않은 투입이 있으면 삭제 불가
+  const { data: activeDeployments } = await supabase
+    .from('deployments')
+    .select('id, status')
+    .eq('worker_id', id)
+    .is('actual_end_date', null); // 실제 종료일이 없으면 아직 활성
+
+  if (activeDeployments && activeDeployments.length > 0) {
+    throw new Error(`이 인력은 현재 투입 중입니다. 투입을 먼저 종료해주세요. (활성 투입: ${activeDeployments.length}건)`);
   }
 
-  // 2. 관련 deployments 확인 (선택적: deployment는 이력이므로 삭제하지 않음)
-  // deployment의 worker_id는 이력 보존을 위해 그대로 둠
+  // 2. 진행 중인 반입 요청 확인
+  const { data: pendingEntryItems } = await supabase
+    .from('entry_request_items')
+    .select(`
+      id,
+      entry_request:entry_requests!inner(id, status)
+    `)
+    .eq('paired_worker_id', id)
+    .not('entry_request.status', 'in', '("rejected","completed","cancelled")');
+
+  if (pendingEntryItems && pendingEntryItems.length > 0) {
+    throw new Error(`이 인력은 진행 중인 반입 요청이 있습니다. 반입 요청을 먼저 완료하거나 취소해주세요.`);
+  }
 
   // 3. workers 테이블에서 삭제
   const { error: deleteError } = await supabase
@@ -1327,10 +1392,38 @@ export async function deleteWorker(id: string) {
 
   if (deleteError) {
     console.error("[Database] Error deleting worker:", deleteError);
-    throw new Error(`Worker 삭제 중 오류: ${deleteError.message}`);
+    throw new Error(`인력 삭제 중 오류: ${deleteError.message}`);
   }
 
   console.log(`[Database] Successfully deleted worker: ${id}`);
+
+  // 4. 연결된 user가 있으면 users 테이블에서도 삭제
+  if (userId && supabaseAdmin) {
+    console.log(`[Database] Deleting linked user: ${userId}`);
+
+    // 4-1. Supabase Auth에서 삭제
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(userId)) {
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (authError) {
+        console.warn(`[Database] Auth delete failed (continuing): ${authError.message}`);
+      } else {
+        console.log(`[Database] Successfully deleted from Auth: ${userId}`);
+      }
+    }
+
+    // 4-2. users 테이블에서 삭제
+    const { error: userDeleteError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId);
+
+    if (userDeleteError) {
+      console.warn(`[Database] User delete warning: ${userDeleteError.message}`);
+    } else {
+      console.log(`[Database] Successfully deleted user: ${userId}`);
+    }
+  }
 }
 
 // ============================================================
@@ -5940,5 +6033,583 @@ export async function getGpsTrackingInterval(): Promise<number> {
   }
   // 기본값: 5분
   return 5;
+}
+
+// ============================================================
+// 알림 시스템 (Notification System)
+// ============================================================
+
+import type { Notification, InsertNotification, NotificationRead, InsertNotificationRead } from "../drizzle/schema";
+
+/**
+ * 알림 생성
+ */
+export async function createNotification(data: InsertNotification): Promise<Notification | null> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not available");
+
+  const { data: result, error } = await supabase
+    .from('notifications')
+    .insert(toSnakeCase(data))
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[Database] Error creating notification:", error);
+    throw error;
+  }
+
+  return toCamelCase(result) as Notification;
+}
+
+/**
+ * 알림 목록 조회 (사용자용)
+ * - targetType이 'user'이고 targetId가 userId인 알림
+ * - targetType이 'all'인 전체 알림
+ * - targetType이 'role'이고 targetId가 userRole인 알림
+ * - targetType이 'company'이고 targetId가 userCompanyId인 알림
+ */
+export async function getNotificationsForUser(params: {
+  userId: string;
+  userRole?: string;
+  userCompanyId?: string;
+  limit?: number;
+  offset?: number;
+  unreadOnly?: boolean;
+}): Promise<{ notifications: any[]; total: number; unreadCount: number }> {
+  const supabase = getSupabase();
+  if (!supabase) return { notifications: [], total: 0, unreadCount: 0 };
+
+  const { userId, userRole, userCompanyId, limit = 20, offset = 0, unreadOnly = false } = params;
+
+  // 만료되지 않은 알림만 조회
+  const now = new Date().toISOString();
+
+  // 1. 해당 사용자가 볼 수 있는 모든 알림 ID 조회
+  let query = supabase
+    .from('notifications')
+    .select('*', { count: 'exact' })
+    .or(`target_type.eq.all,and(target_type.eq.user,target_id.eq.${userId})${userRole ? `,and(target_type.eq.role,target_id.eq.${userRole})` : ''}${userCompanyId ? `,and(target_type.eq.company,target_id.eq.${userCompanyId})` : ''}`)
+    .or(`expires_at.is.null,expires_at.gt.${now}`)
+    .order('created_at', { ascending: false });
+
+  const { data: allNotifications, count: totalCount, error: allError } = await query;
+
+  if (allError) {
+    console.error("[Database] Error getting notifications:", allError);
+    return { notifications: [], total: 0, unreadCount: 0 };
+  }
+
+  // 2. 읽음 기록 조회
+  const notificationIds = (allNotifications || []).map((n: any) => n.id);
+
+  let readNotificationIds: Set<string> = new Set();
+  if (notificationIds.length > 0) {
+    const { data: reads } = await supabase
+      .from('notification_reads')
+      .select('notification_id')
+      .eq('user_id', userId)
+      .in('notification_id', notificationIds);
+
+    readNotificationIds = new Set((reads || []).map((r: any) => r.notification_id));
+  }
+
+  // 3. 읽지 않은 알림 수 계산
+  const unreadCount = notificationIds.filter((id: string) => !readNotificationIds.has(id)).length;
+
+  // 4. 필터링 및 페이지네이션
+  let filteredNotifications = allNotifications || [];
+  if (unreadOnly) {
+    filteredNotifications = filteredNotifications.filter((n: any) => !readNotificationIds.has(n.id));
+  }
+
+  const paginatedNotifications = filteredNotifications.slice(offset, offset + limit);
+
+  // 5. 발신자 정보 조회
+  const senderIds = [...new Set(paginatedNotifications.map((n: any) => n.sender_id).filter(Boolean))];
+  let senderMap: Record<string, string> = {};
+  if (senderIds.length > 0) {
+    const { data: senders } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .in('id', senderIds);
+    senderMap = (senders || []).reduce((acc: Record<string, string>, s: any) => {
+      acc[s.id] = s.name || s.email || '알 수 없음';
+      return acc;
+    }, {});
+  }
+
+  // 6. 대상 이름 조회 (user, company, role)
+  const targetUserIds = paginatedNotifications
+    .filter((n: any) => n.target_type === 'user' && n.target_id)
+    .map((n: any) => n.target_id);
+  const targetCompanyIds = paginatedNotifications
+    .filter((n: any) => n.target_type === 'company' && n.target_id)
+    .map((n: any) => n.target_id);
+
+  let targetUserMap: Record<string, string> = {};
+  let targetCompanyMap: Record<string, string> = {};
+
+  if (targetUserIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .in('id', targetUserIds);
+    targetUserMap = (users || []).reduce((acc: Record<string, string>, u: any) => {
+      acc[u.id] = u.name || u.email || '';
+      return acc;
+    }, {});
+  }
+
+  if (targetCompanyIds.length > 0) {
+    const { data: companies } = await supabase
+      .from('companies')
+      .select('id, name')
+      .in('id', targetCompanyIds);
+    targetCompanyMap = (companies || []).reduce((acc: Record<string, string>, c: any) => {
+      acc[c.id] = c.name || '';
+      return acc;
+    }, {});
+  }
+
+  const roleLabels: Record<string, string> = {
+    worker: '작업자',
+    inspector: '안전점검원',
+    owner: '오너사',
+    bp: '협력사(BP)',
+    ep: '발주사(EP)',
+    admin: '관리자',
+  };
+
+  // 7. 읽음 여부 및 발신자/대상 정보 추가
+  const notificationsWithReadStatus = paginatedNotifications.map((n: any) => {
+    let targetName = '';
+    if (n.target_type === 'user' && n.target_id) {
+      targetName = targetUserMap[n.target_id] || '';
+    } else if (n.target_type === 'company' && n.target_id) {
+      targetName = targetCompanyMap[n.target_id] || '';
+    } else if (n.target_type === 'role' && n.target_id) {
+      targetName = roleLabels[n.target_id] || n.target_id;
+    }
+
+    return {
+      ...toCamelCase(n),
+      isRead: readNotificationIds.has(n.id),
+      senderName: n.sender_id ? senderMap[n.sender_id] : null,
+      targetName,
+    };
+  });
+
+  return {
+    notifications: notificationsWithReadStatus,
+    total: unreadOnly ? filteredNotifications.length : (totalCount || 0),
+    unreadCount,
+  };
+}
+
+/**
+ * 읽지 않은 알림 수 조회
+ */
+export async function getUnreadNotificationCount(params: {
+  userId: string;
+  userRole?: string;
+  userCompanyId?: string;
+}): Promise<number> {
+  const result = await getNotificationsForUser({ ...params, limit: 0 });
+  return result.unreadCount;
+}
+
+/**
+ * 알림 읽음 처리
+ */
+export async function markNotificationAsRead(notificationId: string, userId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not available");
+
+  // 이미 읽음 처리되었는지 확인
+  const { data: existing } = await supabase
+    .from('notification_reads')
+    .select('id')
+    .eq('notification_id', notificationId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing) {
+    return; // 이미 읽음 처리됨
+  }
+
+  const id = nanoid();
+  const { error } = await supabase
+    .from('notification_reads')
+    .insert({
+      id,
+      notification_id: notificationId,
+      user_id: userId,
+      read_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    console.error("[Database] Error marking notification as read:", error);
+    throw error;
+  }
+}
+
+/**
+ * 모든 알림 읽음 처리
+ */
+export async function markAllNotificationsAsRead(params: {
+  userId: string;
+  userRole?: string;
+  userCompanyId?: string;
+}): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not available");
+
+  const { userId, userRole, userCompanyId } = params;
+
+  // 해당 사용자가 볼 수 있는 모든 알림 조회
+  const now = new Date().toISOString();
+
+  let query = supabase
+    .from('notifications')
+    .select('id')
+    .or(`target_type.eq.all,and(target_type.eq.user,target_id.eq.${userId})${userRole ? `,and(target_type.eq.role,target_id.eq.${userRole})` : ''}${userCompanyId ? `,and(target_type.eq.company,target_id.eq.${userCompanyId})` : ''}`)
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
+
+  const { data: notifications } = await query;
+  if (!notifications || notifications.length === 0) return;
+
+  // 이미 읽음 처리된 알림 ID 조회
+  const notificationIds = notifications.map((n: any) => n.id);
+  const { data: existingReads } = await supabase
+    .from('notification_reads')
+    .select('notification_id')
+    .eq('user_id', userId)
+    .in('notification_id', notificationIds);
+
+  const existingReadIds = new Set((existingReads || []).map((r: any) => r.notification_id));
+
+  // 읽지 않은 알림에 대해 읽음 처리
+  const unreadIds = notificationIds.filter((id: string) => !existingReadIds.has(id));
+
+  if (unreadIds.length === 0) return;
+
+  const reads = unreadIds.map((notificationId: string) => ({
+    id: nanoid(),
+    notification_id: notificationId,
+    user_id: userId,
+    read_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from('notification_reads')
+    .insert(reads);
+
+  if (error) {
+    console.error("[Database] Error marking all notifications as read:", error);
+    throw error;
+  }
+}
+
+/**
+ * 알림 삭제 (관리자용)
+ */
+export async function deleteNotification(notificationId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not available");
+
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notificationId);
+
+  if (error) {
+    console.error("[Database] Error deleting notification:", error);
+    throw error;
+  }
+}
+
+/**
+ * 알림 목록 조회 (관리자용)
+ */
+export async function getAllNotifications(params: {
+  type?: string;
+  priority?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ notifications: Notification[]; total: number }> {
+  const supabase = getSupabase();
+  if (!supabase) return { notifications: [], total: 0 };
+
+  const { type, priority, limit = 50, offset = 0 } = params;
+
+  let query = supabase
+    .from('notifications')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false });
+
+  if (type) {
+    query = query.eq('type', type);
+  }
+  if (priority) {
+    query = query.eq('priority', priority);
+  }
+
+  const { data, count, error } = await query.range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error("[Database] Error getting all notifications:", error);
+    return { notifications: [], total: 0 };
+  }
+
+  return {
+    notifications: toCamelCaseArray(data || []) as Notification[],
+    total: count || 0,
+  };
+}
+
+/**
+ * FCM 토큰 업데이트
+ */
+export async function updateUserFcmToken(userId: string, fcmToken: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not available");
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      fcm_token: fcmToken,
+      fcm_token_updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.error("[Database] Error updating FCM token:", error);
+    throw error;
+  }
+}
+
+/**
+ * FCM 토큰으로 사용자 조회
+ */
+export async function getUsersByFcmToken(targetType: string, targetId?: string): Promise<{ userId: string; fcmToken: string }[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from('users')
+    .select('id, fcm_token, role, company_id')
+    .not('fcm_token', 'is', null);
+
+  if (targetType === 'user' && targetId) {
+    query = query.eq('id', targetId);
+  } else if (targetType === 'role' && targetId) {
+    query = query.eq('role', targetId);
+  } else if (targetType === 'company' && targetId) {
+    query = query.eq('company_id', targetId);
+  }
+  // targetType === 'all' 이면 필터 없이 전체 조회
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[Database] Error getting users by FCM token:", error);
+    return [];
+  }
+
+  return (data || [])
+    .filter((u: any) => u.fcm_token)
+    .map((u: any) => ({
+      userId: u.id,
+      fcmToken: u.fcm_token,
+    }));
+}
+
+/**
+ * 만료 예정 서류 알림 생성 (Cron Job용)
+ * D-30, D-14, D-7, D-3, D-day에 알림 생성
+ */
+export async function createDocumentExpiryNotifications(): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+
+  const today = new Date();
+  const checkDays = [30, 14, 7, 3, 0]; // D-30, D-14, D-7, D-3, D-day
+  let createdCount = 0;
+
+  for (const daysAhead of checkDays) {
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + daysAhead);
+    const targetDateStr = targetDate.toISOString().split('T')[0];
+
+    // 해당 날짜에 만료되는 서류 조회
+    const { data: expiringDocs } = await supabase
+      .from('docs_compliance')
+      .select('*, target_type, target_id')
+      .gte('expiry_date', `${targetDateStr}T00:00:00`)
+      .lt('expiry_date', `${targetDateStr}T23:59:59`);
+
+    if (!expiringDocs || expiringDocs.length === 0) continue;
+
+    for (const doc of expiringDocs) {
+      // 대상 (worker 또는 equipment)의 소유자 찾기
+      let ownerId: string | null = null;
+      let targetName: string = '';
+
+      if (doc.target_type === 'worker') {
+        const { data: worker } = await supabase
+          .from('workers')
+          .select('id, name, user_id, owner_id')
+          .eq('id', doc.target_id)
+          .single();
+
+        if (worker) {
+          targetName = worker.name || '작업자';
+          // Worker 본인에게 알림
+          if (worker.user_id) {
+            const notification: InsertNotification = {
+              id: nanoid(),
+              targetType: 'user',
+              targetId: worker.user_id,
+              title: `서류 만료 ${daysAhead === 0 ? '당일' : `${daysAhead}일 전`}`,
+              content: `${doc.doc_type} 서류가 ${daysAhead === 0 ? '오늘' : `${daysAhead}일 후`} 만료됩니다. 갱신해주세요.`,
+              type: 'document_expiry',
+              priority: daysAhead <= 3 ? 'high' : 'normal',
+              linkType: 'document',
+              linkId: doc.id,
+            };
+            await createNotification(notification);
+            createdCount++;
+          }
+          ownerId = worker.owner_id;
+        }
+      } else if (doc.target_type === 'equipment') {
+        const { data: equipment } = await supabase
+          .from('equipment')
+          .select('id, reg_num, owner_id')
+          .eq('id', doc.target_id)
+          .single();
+
+        if (equipment) {
+          targetName = equipment.reg_num || '장비';
+          ownerId = equipment.owner_id;
+        }
+      }
+
+      // Owner에게도 알림 (있는 경우)
+      if (ownerId) {
+        const notification: InsertNotification = {
+          id: nanoid(),
+          targetType: 'user',
+          targetId: ownerId,
+          title: `서류 만료 ${daysAhead === 0 ? '당일' : `${daysAhead}일 전`}`,
+          content: `${targetName}의 ${doc.doc_type} 서류가 ${daysAhead === 0 ? '오늘' : `${daysAhead}일 후`} 만료됩니다.`,
+          type: 'document_expiry',
+          priority: daysAhead <= 3 ? 'high' : 'normal',
+          linkType: 'document',
+          linkId: doc.id,
+        };
+        await createNotification(notification);
+        createdCount++;
+      }
+    }
+  }
+
+  console.log(`[Database] Created ${createdCount} document expiry notifications`);
+  return createdCount;
+}
+
+/**
+ * 발송한 알림 목록 조회 (발송함)
+ * - 본인이 발송한 알림 목록
+ */
+export async function getSentNotifications(params: {
+  senderId: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ notifications: any[]; total: number }> {
+  const supabase = getSupabase();
+  if (!supabase) return { notifications: [], total: 0 };
+
+  const { senderId, limit = 20, offset = 0 } = params;
+
+  // 본인이 발송한 알림 조회
+  const { data, count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact' })
+    .eq('sender_id', senderId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error("[Database] Error getting sent notifications:", error);
+    return { notifications: [], total: 0 };
+  }
+
+  // 대상 이름 조회
+  const targetUserIds = (data || [])
+    .filter((n: any) => n.target_type === 'user' && n.target_id)
+    .map((n: any) => n.target_id);
+  const targetCompanyIds = (data || [])
+    .filter((n: any) => n.target_type === 'company' && n.target_id)
+    .map((n: any) => n.target_id);
+
+  let targetUserMap: Record<string, string> = {};
+  let targetCompanyMap: Record<string, string> = {};
+
+  if (targetUserIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .in('id', targetUserIds);
+    targetUserMap = (users || []).reduce((acc: Record<string, string>, u: any) => {
+      acc[u.id] = u.name || u.email || '';
+      return acc;
+    }, {});
+  }
+
+  if (targetCompanyIds.length > 0) {
+    const { data: companies } = await supabase
+      .from('companies')
+      .select('id, name')
+      .in('id', targetCompanyIds);
+    targetCompanyMap = (companies || []).reduce((acc: Record<string, string>, c: any) => {
+      acc[c.id] = c.name || '';
+      return acc;
+    }, {});
+  }
+
+  const roleLabels: Record<string, string> = {
+    worker: '작업자',
+    inspector: '안전점검원',
+    owner: '오너사',
+    bp: '협력사(BP)',
+    ep: '발주사(EP)',
+    admin: '관리자',
+  };
+
+  // 대상 이름 매핑
+  const notificationsWithTargetName = (data || []).map((n: any) => {
+    let targetName = '';
+    if (n.target_type === 'user' && n.target_id) {
+      targetName = targetUserMap[n.target_id] || '';
+    } else if (n.target_type === 'company' && n.target_id) {
+      targetName = targetCompanyMap[n.target_id] || '';
+    } else if (n.target_type === 'role' && n.target_id) {
+      targetName = roleLabels[n.target_id] || n.target_id;
+    } else if (n.target_type === 'all') {
+      targetName = '전체';
+    }
+
+    return {
+      ...toCamelCase(n),
+      targetName,
+    };
+  });
+
+  return {
+    notifications: notificationsWithTargetName,
+    total: count || 0,
+  };
 }
 

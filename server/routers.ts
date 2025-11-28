@@ -27,6 +27,7 @@ import { checkInRouter } from "./check-in-router";
 import { webauthnRouter } from "./webauthn-router";
 import { epDashboardRouter } from "./ep-dashboard-router";
 import { imageToPdf, createEntryRequestPdf } from "./pdf-utils";
+import { notificationRouter } from "./notification-router";
 
 // ============================================================
 // 관리자 전용 프로시저
@@ -1475,6 +1476,9 @@ export const appRouter = router({
 
   // WebAuthn 생체 인증 API (지문/얼굴 인식)
   webauthn: webauthnRouter,
+
+  // 알림 시스템 API
+  notifications: notificationRouter,
 
   // 기존 entryRequests 라우터 (백업용 - 삭제 예정)
   entryRequestsOld: router({

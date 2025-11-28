@@ -58,6 +58,9 @@ import MobileLoginCompare from "./pages/mobile/LoginCompare";
 import BiometricSetup from "./pages/mobile/BiometricSetup";
 import WorkZones from "./pages/WorkZones";
 import CheckInMonitoring from "./pages/CheckInMonitoring";
+import Notifications from "./pages/Notifications";
+import NotificationSend from "./pages/NotificationSend";
+import NotificationsMobile from "./pages/mobile/NotificationsMobile";
 
 function Router() {
   return (
@@ -91,6 +94,8 @@ function Router() {
         <Route path="/work-monitoring" component={WorkMonitoring} />
         <Route path="/work-zones" component={WorkZones} />
         <Route path="/check-in-monitoring" component={CheckInMonitoring} />
+        <Route path="/notifications" component={Notifications} />
+        <Route path="/notifications/send" component={NotificationSend} />
         <Route path="/my-profile" component={MyProfile} />
 
         <Route path="/mobile/worker" component={WorkerMain} />
@@ -107,6 +112,7 @@ function Router() {
         <Route path="/mobile/driver-inspection" component={DriverInspection} />
         <Route path="/mobile/driver-inspection/:id/perform" component={DriverInspectionPerform} />
         <Route path="/mobile/driver-inspection/history" component={DriverInspectionHistory} />
+        <Route path="/mobile/notifications" component={NotificationsMobile} />
         <Route path="/admin/users" component={AdminUsersNew} />
         <Route path="/admin/users-old" component={AdminUsers} />
         <Route path="/admin/companies" component={AdminCompanies} />
