@@ -6428,6 +6428,7 @@ export async function getUsersByFcmToken(targetType: string, targetId?: string):
 /**
  * 만료 예정 서류 알림 생성 (Cron Job용)
  * D-30, D-14, D-7, D-3, D-day에 알림 생성
+ * 이미 만료된 서류도 포함 (D+N)
  */
 export async function createDocumentExpiryNotifications(): Promise<number> {
   const supabase = getSupabase();
@@ -6437,6 +6438,7 @@ export async function createDocumentExpiryNotifications(): Promise<number> {
   const checkDays = [30, 14, 7, 3, 0]; // D-30, D-14, D-7, D-3, D-day
   let createdCount = 0;
 
+  // 1. 예정된 만료일 체크 (기존 로직)
   for (const daysAhead of checkDays) {
     const targetDate = new Date(today);
     targetDate.setDate(today.getDate() + daysAhead);
@@ -6452,71 +6454,267 @@ export async function createDocumentExpiryNotifications(): Promise<number> {
     if (!expiringDocs || expiringDocs.length === 0) continue;
 
     for (const doc of expiringDocs) {
-      // 대상 (worker 또는 equipment)의 소유자 찾기
-      let ownerId: string | null = null;
-      let targetName: string = '';
+      await sendDocumentExpiryNotification(supabase, doc, daysAhead);
+      createdCount++;
+    }
+  }
 
-      if (doc.target_type === 'worker') {
-        const { data: worker } = await supabase
-          .from('workers')
-          .select('id, name, user_id, owner_id')
-          .eq('id', doc.target_id)
-          .single();
+  // 2. 이미 만료된 서류 체크 (신규)
+  const { data: expiredDocs } = await supabase
+    .from('docs_compliance')
+    .select('*, target_type, target_id')
+    .lt('expiry_date', today.toISOString());
 
-        if (worker) {
-          targetName = worker.name || '작업자';
-          // Worker 본인에게 알림
-          if (worker.user_id) {
-            const notification: InsertNotification = {
-              id: nanoid(),
-              targetType: 'user',
-              targetId: worker.user_id,
-              title: `서류 만료 ${daysAhead === 0 ? '당일' : `${daysAhead}일 전`}`,
-              content: `${doc.doc_type} 서류가 ${daysAhead === 0 ? '오늘' : `${daysAhead}일 후`} 만료됩니다. 갱신해주세요.`,
-              type: 'document_expiry',
-              priority: daysAhead <= 3 ? 'high' : 'normal',
-              linkType: 'document',
-              linkId: doc.id,
-            };
-            await createNotification(notification);
-            createdCount++;
-          }
-          ownerId = worker.owner_id;
-        }
-      } else if (doc.target_type === 'equipment') {
-        const { data: equipment } = await supabase
-          .from('equipment')
-          .select('id, reg_num, owner_id')
-          .eq('id', doc.target_id)
-          .single();
-
-        if (equipment) {
-          targetName = equipment.reg_num || '장비';
-          ownerId = equipment.owner_id;
-        }
-      }
-
-      // Owner에게도 알림 (있는 경우)
-      if (ownerId) {
-        const notification: InsertNotification = {
-          id: nanoid(),
-          targetType: 'user',
-          targetId: ownerId,
-          title: `서류 만료 ${daysAhead === 0 ? '당일' : `${daysAhead}일 전`}`,
-          content: `${targetName}의 ${doc.doc_type} 서류가 ${daysAhead === 0 ? '오늘' : `${daysAhead}일 후`} 만료됩니다.`,
-          type: 'document_expiry',
-          priority: daysAhead <= 3 ? 'high' : 'normal',
-          linkType: 'document',
-          linkId: doc.id,
-        };
-        await createNotification(notification);
-        createdCount++;
-      }
+  if (expiredDocs && expiredDocs.length > 0) {
+    for (const doc of expiredDocs) {
+      const expiryDate = new Date(doc.expiry_date);
+      const daysOverdue = Math.floor((today.getTime() - expiryDate.getTime()) / (1000 * 60 * 60 * 24));
+      await sendDocumentExpiryNotification(supabase, doc, -daysOverdue); // 음수로 전달
+      createdCount++;
     }
   }
 
   console.log(`[Database] Created ${createdCount} document expiry notifications`);
   return createdCount;
+}
+
+/**
+ * 개별 서류 만료 알림 발송 헬퍼
+ */
+async function sendDocumentExpiryNotification(
+  supabase: any,
+  doc: any,
+  daysOffset: number // 양수: 만료 전, 0: 당일, 음수: 만료 후
+): Promise<void> {
+  let ownerId: string | null = null;
+  let targetName: string = '';
+
+  if (doc.target_type === 'worker') {
+    const { data: worker } = await supabase
+      .from('workers')
+      .select('id, name, user_id, owner_id')
+      .eq('id', doc.target_id)
+      .single();
+
+    if (worker) {
+      targetName = worker.name || '작업자';
+      // Worker 본인에게 알림
+      if (worker.user_id) {
+        const notification: InsertNotification = {
+          id: nanoid(),
+          targetType: 'user',
+          targetId: worker.user_id,
+          title: getExpiryTitle(daysOffset),
+          content: `${doc.doc_type} 서류가 ${getExpiryMessage(daysOffset)}. 갱신해주세요.`,
+          type: 'document_expiry',
+          priority: daysOffset <= 3 ? 'high' : 'normal',
+          linkType: 'document',
+          linkId: doc.id,
+        };
+        const createdNotification = await createNotification(notification);
+        
+        // FCM 푸시 알림 발송 (모바일 앱 사용자만)
+        if (createdNotification) {
+          try {
+            const recipients = await getUsersByFcmToken('user', worker.user_id);
+            if (recipients.length > 0) {
+              const { sendFcmNotifications } = await import('./_core/fcm');
+              await sendFcmNotifications(recipients, {
+                title: createdNotification.title,
+                body: createdNotification.content,
+                data: {
+                  notificationId: createdNotification.id,
+                  type: 'document_expiry',
+                  linkType: 'document',
+                  linkId: doc.id,
+                },
+              });
+            }
+          } catch (error) {
+            console.error('[Database] FCM push failed for document expiry:', error);
+            // FCM 실패해도 알림 생성은 성공
+          }
+        }
+      }
+      ownerId = worker.owner_id;
+    }
+  } else if (doc.target_type === 'equipment') {
+    const { data: equipment } = await supabase
+      .from('equipment')
+      .select('id, reg_num, owner_id')
+      .eq('id', doc.target_id)
+      .single();
+
+    if (equipment) {
+      targetName = equipment.reg_num || '장비';
+      ownerId = equipment.owner_id;
+    }
+  }
+
+  // Owner에게도 알림 (있는 경우)
+  if (ownerId) {
+    const notification: InsertNotification = {
+      id: nanoid(),
+      targetType: 'user',
+      targetId: ownerId,
+      title: getExpiryTitle(daysOffset),
+      content: `${targetName}의 ${doc.doc_type} 서류가 ${getExpiryMessage(daysOffset)}.`,
+      type: 'document_expiry',
+      priority: daysOffset <= 3 ? 'high' : 'normal',
+      linkType: 'document',
+      linkId: doc.id,
+    };
+    const createdNotification = await createNotification(notification);
+    
+    // FCM 푸시 알림 발송 (모바일 앱 사용자만)
+    if (createdNotification) {
+      try {
+        const recipients = await getUsersByFcmToken('user', ownerId);
+        if (recipients.length > 0) {
+          const { sendFcmNotifications } = await import('./_core/fcm');
+          await sendFcmNotifications(recipients, {
+            title: createdNotification.title,
+            body: createdNotification.content,
+            data: {
+              notificationId: createdNotification.id,
+              type: 'document_expiry',
+              linkType: 'document',
+              linkId: doc.id,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('[Database] FCM push failed for document expiry:', error);
+        // FCM 실패해도 알림 생성은 성공
+      }
+    }
+  }
+}
+
+function getExpiryTitle(daysOffset: number): string {
+  if (daysOffset < 0) {
+    return `서류 만료됨 (${Math.abs(daysOffset)}일 경과)`;
+  } else if (daysOffset === 0) {
+    return '서류 만료 당일';
+  } else {
+    return `서류 만료 ${daysOffset}일 전`;
+  }
+}
+
+function getExpiryMessage(daysOffset: number): string {
+  if (daysOffset < 0) {
+    return `${Math.abs(daysOffset)}일 전에 만료되었습니다`;
+  } else if (daysOffset === 0) {
+    return '오늘 만료됩니다';
+  } else {
+    return `${daysOffset}일 후 만료됩니다`;
+  }
+}
+
+/**
+ * 만료 예정/만료된 서류 목록 조회
+ */
+export async function getExpiringDocuments(params: {
+  userId?: string;
+  userRole?: string;
+  companyId?: string;
+  daysAhead?: number; // 며칠 전까지 조회 (기본 30일)
+  includeExpired?: boolean; // 이미 만료된 서류 포함
+}): Promise<any[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  const { daysAhead = 30, includeExpired = true } = params;
+  const today = new Date();
+  const futureDate = new Date(today);
+  futureDate.setDate(today.getDate() + daysAhead);
+
+  let query = supabase
+    .from('docs_compliance')
+    .select(`
+      id,
+      target_type,
+      target_id,
+      doc_type,
+      doc_type_id,
+      expiry_date,
+      file_name,
+      file_url,
+      status
+    `)
+    .not('expiry_date', 'is', null);
+
+  if (includeExpired) {
+    // 이미 만료된 것 + 만료 예정인 것 모두 조회
+    query = query.lte('expiry_date', futureDate.toISOString());
+  } else {
+    // 만료 예정인 것만 (오늘 이후)
+    query = query
+      .gte('expiry_date', today.toISOString())
+      .lte('expiry_date', futureDate.toISOString());
+  }
+
+  query = query.order('expiry_date', { ascending: true });
+
+  const { data: docs, error } = await query;
+
+  if (error || !docs) {
+    console.error('[getExpiringDocuments] Error:', error);
+    return [];
+  }
+
+  // target 정보 추가
+  const workerIds = docs.filter(d => d.target_type === 'worker').map(d => d.target_id);
+  const equipmentIds = docs.filter(d => d.target_type === 'equipment').map(d => d.target_id);
+
+  const workerMap = new Map();
+  const equipmentMap = new Map();
+
+  if (workerIds.length > 0) {
+    const { data: workers } = await supabase
+      .from('workers')
+      .select('id, name, owner_id')
+      .in('id', workerIds);
+    workers?.forEach((w: any) => workerMap.set(w.id, w));
+  }
+
+  if (equipmentIds.length > 0) {
+    const { data: equipment } = await supabase
+      .from('equipment')
+      .select('id, reg_num, owner_id')
+      .in('id', equipmentIds);
+    equipment?.forEach((e: any) => equipmentMap.set(e.id, e));
+  }
+
+  // 결과 가공
+  return docs.map(doc => {
+    const expiryDate = new Date(doc.expiry_date);
+    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    let targetName = '';
+    let ownerId = null;
+
+    if (doc.target_type === 'worker') {
+      const worker = workerMap.get(doc.target_id);
+      targetName = worker?.name || '알 수 없음';
+      ownerId = worker?.owner_id;
+    } else {
+      const equipment = equipmentMap.get(doc.target_id);
+      targetName = equipment?.reg_num || '알 수 없음';
+      ownerId = equipment?.owner_id;
+    }
+
+    return {
+      ...toCamelCase(doc),
+      targetName,
+      ownerId,
+      daysUntilExpiry,
+      isExpired: daysUntilExpiry < 0,
+      urgencyLevel: daysUntilExpiry < 0 ? 'expired' :
+                    daysUntilExpiry <= 3 ? 'urgent' :
+                    daysUntilExpiry <= 7 ? 'warning' : 'normal',
+    };
+  });
 }
 
 /**

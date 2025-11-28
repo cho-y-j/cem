@@ -142,10 +142,28 @@ export const notificationRouter = router({
 
       const result = await db.createNotification(notification);
 
-      // TODO: FCM 푸시 알림 발송
-      // if (result) {
-      //   await sendFcmNotification(result);
-      // }
+      // FCM 푸시 알림 발송 (모바일 앱 사용자만)
+      try {
+        const recipients = await db.getUsersByFcmToken(input.targetType, input.targetId);
+        if (recipients.length > 0) {
+          const { sendFcmNotifications } = await import('./_core/fcm');
+          await sendFcmNotifications(recipients, {
+            title: input.title || result.title || '',
+            body: input.content || result.content || '',
+            data: {
+              notificationId: result.id,
+              type: input.type,
+              ...(result.linkType && result.linkId ? {
+                linkType: result.linkType,
+                linkId: result.linkId,
+              } : {}),
+            },
+          });
+        }
+      } catch (error) {
+        console.error('[Notification] FCM push failed:', error);
+        // FCM 실패해도 알림 생성은 성공 (웹 사용자는 여전히 알림 받음)
+      }
 
       return result;
     }),
@@ -197,13 +215,44 @@ export const notificationRouter = router({
     }),
 
   /**
-   * 서류 만료 알림 수동 실행 (관리자용)
-   * Cron Job 테스트용
+   * 서류 만료 알림 수동 실행 (admin, owner, bp, ep 가능)
+   * 자동 스케줄러와 별도로 수동 트리거 가능
    */
-  triggerDocumentExpiryNotifications: adminProcedure.mutation(async () => {
+  triggerDocumentExpiryNotifications: protectedProcedure.mutation(async ({ ctx }) => {
+    const userRole = ctx.user.role?.toLowerCase();
+
+    // admin, owner, bp, ep만 수동 알림 트리거 가능
+    if (!["admin", "owner", "bp", "ep"].includes(userRole || "")) {
+      throw new Error("서류 만료 알림 발송 권한이 없습니다.");
+    }
+
     const count = await db.createDocumentExpiryNotifications();
     return { success: true, createdCount: count };
   }),
+
+  /**
+   * 만료 예정/만료된 서류 목록 조회
+   * - 만료 임박: 30일 이내
+   * - 이미 만료됨: 만료일 지난 서류
+   */
+  getExpiringDocuments: protectedProcedure
+    .input(
+      z.object({
+        daysAhead: z.number().min(1).max(90).default(30),
+        includeExpired: z.boolean().default(true),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const { daysAhead = 30, includeExpired = true } = input || {};
+
+      return db.getExpiringDocuments({
+        userId: ctx.user.id,
+        userRole: ctx.user.role?.toLowerCase(),
+        companyId: ctx.user.companyId || undefined,
+        daysAhead,
+        includeExpired,
+      });
+    }),
 
   /**
    * 대상 선택을 위한 데이터 조회 (사용자 목록, 회사 목록 등)

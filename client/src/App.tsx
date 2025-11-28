@@ -61,6 +61,7 @@ import CheckInMonitoring from "./pages/CheckInMonitoring";
 import Notifications from "./pages/Notifications";
 import NotificationSend from "./pages/NotificationSend";
 import NotificationsMobile from "./pages/mobile/NotificationsMobile";
+import ExpiringDocuments from "./pages/ExpiringDocuments";
 
 function Router() {
   return (
@@ -96,6 +97,7 @@ function Router() {
         <Route path="/check-in-monitoring" component={CheckInMonitoring} />
         <Route path="/notifications" component={Notifications} />
         <Route path="/notifications/send" component={NotificationSend} />
+        <Route path="/expiring-documents" component={ExpiringDocuments} />
         <Route path="/my-profile" component={MyProfile} />
 
         <Route path="/mobile/worker" component={WorkerMain} />

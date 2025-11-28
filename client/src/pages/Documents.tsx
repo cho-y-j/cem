@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Download, Eye, Search, Loader2, Truck, HardHat, Trash2, Pencil } from "lucide-react";
+import { Plus, FileText, Download, Eye, Search, Loader2, Truck, HardHat, Trash2, Pencil, AlertTriangle } from "lucide-react";
+import { Link } from "wouter";
 import { toast } from "sonner";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { EnhancedPdfViewer } from "@/components/EnhancedPdfViewer";
@@ -52,6 +53,7 @@ export default function Documents() {
     targetId: "",
     docTypeId: "",
     docType: "",
+    customDocType: "", // 기타 선택 시 직접 입력
     fileName: "",
     fileUrl: "",
     fileSize: 0,
@@ -59,6 +61,56 @@ export default function Documents() {
     issueDate: "",
     expiryDate: "",
   });
+
+  // 선택된 장비/인력의 유형ID 추적
+  const [selectedEquipTypeId, setSelectedEquipTypeId] = useState<string>("");
+  const [selectedWorkerTypeId, setSelectedWorkerTypeId] = useState<string>("");
+
+  // 장비 유형별 필수 서류 조회
+  const { data: typeDocsData } = trpc.typeDocs.listByEquipType.useQuery(
+    { equipTypeId: selectedEquipTypeId },
+    { enabled: !!selectedEquipTypeId }
+  );
+
+  // 인력 유형별 필수 서류 조회
+  const { data: workerDocsData } = trpc.workerDocs.listByWorkerType.useQuery(
+    { workerTypeId: selectedWorkerTypeId },
+    { enabled: !!selectedWorkerTypeId }
+  );
+
+  // 기본 서류 유형 목록 (필수 서류가 없을 때 fallback)
+  const defaultEquipmentDocTypes = [
+    "건설기계등록증",
+    "자동차등록증",
+    "보험증서",
+    "정기검사증",
+    "안전검사확인서",
+    "제작증",
+  ];
+
+  const defaultWorkerDocTypes = [
+    "운전면허증",
+    "건설기계조종사면허증",
+    "자격증",
+    "신분증",
+    "건강검진확인서",
+    "안전교육수료증",
+    "특수건강진단결과서",
+  ];
+
+  // 현재 선택된 유형에 따른 서류 목록 (DB 데이터 + 기본값 + 기타)
+  const currentDocTypes = useMemo(() => {
+    if (formData.targetType === "equipment") {
+      const dbDocs = typeDocsData?.map((d: any) => d.docName) || [];
+      const combined = [...new Set([...dbDocs, ...defaultEquipmentDocTypes])];
+      return [...combined, "기타"];
+    } else {
+      const dbDocs = workerDocsData?.map((d: any) => d.docName) || [];
+      const combined = [...new Set([...dbDocs, ...defaultWorkerDocTypes])];
+      return [...combined, "기타"];
+    }
+  }, [formData.targetType, typeDocsData, workerDocsData]);
+
   const [editFormData, setEditFormData] = useState({
     issueDate: "",
     expiryDate: "",
@@ -178,6 +230,7 @@ export default function Documents() {
       targetId: "",
       docTypeId: "",
       docType: "",
+      customDocType: "",
       fileName: "",
       fileUrl: "",
       fileSize: 0,
@@ -185,6 +238,8 @@ export default function Documents() {
       issueDate: "",
       expiryDate: "",
     });
+    setSelectedEquipTypeId("");
+    setSelectedWorkerTypeId("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -193,7 +248,17 @@ export default function Documents() {
       toast.error("파일을 업로드하세요.");
       return;
     }
-    createMutation.mutate(formData);
+    // 기타 선택 시 customDocType 사용
+    const finalDocType = formData.docType === "기타" ? formData.customDocType : formData.docType;
+    if (!finalDocType) {
+      toast.error("서류 유형을 선택하거나 입력하세요.");
+      return;
+    }
+    createMutation.mutate({
+      ...formData,
+      docType: finalDocType,
+      docTypeId: finalDocType,
+    });
   };
 
   const handleFileUpload = (fileUrl: string, fileName: string, fileSize: number, mimeType: string) => {
@@ -283,12 +348,20 @@ export default function Documents() {
           <h1 className="text-3xl font-bold">서류 관리</h1>
           <p className="text-muted-foreground">장비 및 인력 관련 서류를 관리합니다.</p>
         </div>
-        {canUpload && (
-          <Button onClick={() => { resetForm(); setIsDialogOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" />
-            서류 등록
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Link href="/expiring-documents">
+            <Button variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50">
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              만료 서류 관리
+            </Button>
+          </Link>
+          {canUpload && (
+            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" />
+              서류 등록
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 검색 */}
@@ -354,7 +427,9 @@ export default function Documents() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setFormData({ ...formData, targetType: "equipment", targetId: eq.id });
+                          setFormData({ ...formData, targetType: "equipment", targetId: eq.id, docType: "", customDocType: "" });
+                          setSelectedEquipTypeId(eq.equipTypeId || "");
+                          setSelectedWorkerTypeId("");
                           setIsDialogOpen(true);
                         }}
                       >
@@ -504,7 +579,9 @@ export default function Documents() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setFormData({ ...formData, targetType: "worker", targetId: w.id });
+                          setFormData({ ...formData, targetType: "worker", targetId: w.id, docType: "", customDocType: "" });
+                          setSelectedWorkerTypeId(w.workerTypeId || "");
+                          setSelectedEquipTypeId("");
                           setIsDialogOpen(true);
                         }}
                       >
@@ -633,9 +710,11 @@ export default function Documents() {
                   <Label>대상 유형 *</Label>
                   <Select
                     value={formData.targetType}
-                    onValueChange={(value: "equipment" | "worker") =>
-                      setFormData({ ...formData, targetType: value, targetId: "" })
-                    }
+                    onValueChange={(value: "equipment" | "worker") => {
+                      setFormData({ ...formData, targetType: value, targetId: "", docType: "", customDocType: "" });
+                      setSelectedEquipTypeId("");
+                      setSelectedWorkerTypeId("");
+                    }}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -648,7 +727,19 @@ export default function Documents() {
                   <Label>대상 선택 *</Label>
                   <Select
                     value={formData.targetId}
-                    onValueChange={(value) => setFormData({ ...formData, targetId: value })}
+                    onValueChange={(value) => {
+                      setFormData({ ...formData, targetId: value, docType: "", customDocType: "" });
+                      // 선택한 장비/인력의 유형ID 설정
+                      if (formData.targetType === "equipment") {
+                        const selectedEquip = equipment?.find((e) => e.id === value);
+                        setSelectedEquipTypeId(selectedEquip?.equipTypeId || "");
+                        setSelectedWorkerTypeId("");
+                      } else {
+                        const selectedWorker = workers?.find((w) => w.id === value);
+                        setSelectedWorkerTypeId(selectedWorker?.workerTypeId || "");
+                        setSelectedEquipTypeId("");
+                      }
+                    }}
                   >
                     <SelectTrigger><SelectValue placeholder="선택하세요" /></SelectTrigger>
                     <SelectContent>
@@ -670,13 +761,39 @@ export default function Documents() {
 
               <div className="space-y-2">
                 <Label>서류 유형 *</Label>
-                <Input
+                <Select
                   value={formData.docType}
-                  onChange={(e) => setFormData({ ...formData, docType: e.target.value, docTypeId: e.target.value })}
-                  placeholder="예: 건설기계등록증, 면허증, 보험증"
-                  required
-                />
+                  onValueChange={(value) => setFormData({ ...formData, docType: value, customDocType: "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="서류 유형 선택" /></SelectTrigger>
+                  <SelectContent>
+                    {currentDocTypes.map((docType) => (
+                      <SelectItem key={docType} value={docType}>
+                        {docType}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(typeDocsData?.length > 0 || workerDocsData?.length > 0) && (
+                  <p className="text-xs text-muted-foreground">
+                    {formData.targetType === "equipment"
+                      ? `장비 유형에 설정된 필수 서류: ${typeDocsData?.map((d: any) => d.docName).join(", ") || "없음"}`
+                      : `인력 유형에 설정된 필수 서류: ${workerDocsData?.map((d: any) => d.docName).join(", ") || "없음"}`}
+                  </p>
+                )}
               </div>
+
+              {formData.docType === "기타" && (
+                <div className="space-y-2">
+                  <Label>서류 유형 직접 입력 *</Label>
+                  <Input
+                    value={formData.customDocType}
+                    onChange={(e) => setFormData({ ...formData, customDocType: e.target.value })}
+                    placeholder="서류 유형을 입력하세요"
+                    required
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

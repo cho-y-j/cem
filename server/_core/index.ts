@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { startScheduler } from "./scheduler";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -72,6 +73,9 @@ async function startServer() {
     console.log(`Server running on http://${host}:${port}/`);
     console.log(`[Server] Environment: ${process.env.NODE_ENV}`);
     console.log(`[Server] PORT: ${port}`);
+
+    // 서류 만료 알림 스케줄러 시작
+    startScheduler();
   });
 }
 

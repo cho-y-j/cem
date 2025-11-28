@@ -527,7 +527,7 @@ export default function EpEnhancedDashboard() {
                 {data.compliance.docsExpiring7Days}
               </div>
               {data.compliance.docsExpiring7Days > 0 && (
-                <Link href="/documents">
+                <Link href="/expiring-documents">
                   <Button size="sm" variant="ghost" className="mt-2 text-xs">
                     확인 →
                   </Button>
