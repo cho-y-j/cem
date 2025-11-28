@@ -21,10 +21,10 @@ export interface LicenseInfo {
   confidence: number;        // 신뢰도 (0-100)
   rawText: string;           // 원본 OCR 텍스트 (디버깅용)
   residentNumberBounds?: {   // 주민번호 위치 정보 (마스킹용)
-    x: number;               // X 좌표 (이미지 너비 기준 0-1)
-    y: number;               // Y 좌표 (이미지 높이 기준 0-1)
-    width: number;           // 너비 (이미지 너비 기준 0-1)
-    height: number;          // 높이 (이미지 높이 기준 0-1)
+    x: number;               // X 좌표 (픽셀, -1이면 폴백 사용)
+    y: number;               // Y 좌표 (픽셀)
+    width: number;           // 너비 (픽셀)
+    height: number;          // 높이 (픽셀)
   };
 }
 

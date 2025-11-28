@@ -164,19 +164,34 @@ export function ImageCropModal({
       const scaleX = image.naturalWidth / image.width;
       const scaleY = image.naturalHeight / image.height;
 
-      // 크롭 영역 계산
-      const cropX = completedCrop.x * scaleX;
-      const cropY = completedCrop.y * scaleY;
-      const cropWidth = completedCrop.width * scaleX;
-      const cropHeight = completedCrop.height * scaleY;
+      // 크롭 영역 계산 - 소수점 이하로 인한 잘림 방지를 위해 여유 마진 추가
+      const margin = 2; // 픽셀 여유
+      const cropX = Math.max(0, (completedCrop.x - margin) * scaleX);
+      const cropY = Math.max(0, (completedCrop.y - margin) * scaleY);
+      const cropWidth = (completedCrop.width + margin * 2) * scaleX;
+      const cropHeight = (completedCrop.height + margin * 2) * scaleY;
+
+      // 이미지 경계를 넘지 않도록 제한
+      const finalCropX = Math.max(0, cropX);
+      const finalCropY = Math.max(0, cropY);
+      const finalCropWidth = Math.min(cropWidth, image.naturalWidth - finalCropX);
+      const finalCropHeight = Math.min(cropHeight, image.naturalHeight - finalCropY);
+
+      console.log('[ImageCrop] 크롭 좌표:', {
+        display: { x: completedCrop.x, y: completedCrop.y, w: completedCrop.width, h: completedCrop.height },
+        scaled: { x: finalCropX.toFixed(0), y: finalCropY.toFixed(0), w: finalCropWidth.toFixed(0), h: finalCropHeight.toFixed(0) },
+        scale: { x: scaleX.toFixed(2), y: scaleY.toFixed(2) },
+        natural: { w: image.naturalWidth, h: image.naturalHeight },
+        displayed: { w: image.width, h: image.height }
+      });
 
       // 최종 이미지 그리기
       ctx.drawImage(
         image,
-        cropX,
-        cropY,
-        cropWidth,
-        cropHeight,
+        finalCropX,
+        finalCropY,
+        finalCropWidth,
+        finalCropHeight,
         0,
         0,
         outputWidth,

@@ -29,7 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter, ShieldCheck, CheckSquare } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -83,7 +85,10 @@ export default function Workers() {
   const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("");
   const [epCompanyFilter, setEpCompanyFilter] = useState<string>("");
   const [workerTypeFilter, setWorkerTypeFilter] = useState<string>(""); // 인력유형 필터
+  const [licenseStatusFilter, setLicenseStatusFilter] = useState<string>(""); // 면허상태 필터 (부적격자만 보기 등)
   const [filtersInitialized, setFiltersInitialized] = useState(false);
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<Set<string>>(new Set()); // 선택된 인력
+  const [isVerifying, setIsVerifying] = useState(false); // 검증 중 상태
 
   const utils = trpc.useUtils();
   const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
@@ -227,6 +232,26 @@ export default function Workers() {
     },
     onError: (error) => {
       toast.error("삭제 실패: " + error.message);
+    },
+  });
+
+  const verifyBatchMutation = trpc.workers.verifyLicenseBatch.useMutation({
+    onSuccess: (result) => {
+      utils.workers.list.invalidate();
+      setSelectedWorkerIds(new Set());
+
+      // 결과 메시지 표시
+      if (result.invalidCount > 0) {
+        toast.warning(
+          `${result.message}\n부적격 인력: ${result.results.filter(r => !r.isValid).map(r => r.workerName).join(", ")}`,
+          { duration: 10000 }
+        );
+      } else {
+        toast.success(result.message);
+      }
+    },
+    onError: (error) => {
+      toast.error("검증 실패: " + error.message);
     },
   });
 
@@ -380,23 +405,106 @@ export default function Workers() {
     return workerTypes?.find((t) => t.id === workerTypeId)?.name || "-";
   };
 
-  const getLicenseStatusLabel = (status: string) => {
+  const getLicenseStatusLabel = (status: string | null | undefined) => {
     const labels: Record<string, string> = {
       valid: "유효",
       expired: "만료",
       suspended: "정지",
+      revoked: "취소",
+      unverified: "미검증",
     };
-    return labels[status] || status;
+    return labels[status || "unverified"] || status || "미검증";
   };
 
-  const getLicenseStatusColor = (status: string) => {
+  const getLicenseStatusColor = (status: string | null | undefined) => {
     const colors: Record<string, string> = {
       valid: "bg-green-100 text-green-700",
       expired: "bg-red-100 text-red-700",
-      suspended: "bg-yellow-100 text-yellow-700",
+      suspended: "bg-orange-100 text-orange-700",
+      revoked: "bg-red-100 text-red-700",
+      unverified: "bg-gray-100 text-gray-500",
     };
-    return colors[status] || "bg-gray-100 text-gray-700";
+    return colors[status || "unverified"] || "bg-gray-100 text-gray-500";
   };
+
+  // 부적격 상태인지 확인
+  const isInvalidLicense = (status: string | null | undefined) => {
+    return status === "suspended" || status === "revoked" || status === "expired";
+  };
+
+  // 필터링된 인력 목록
+  const filteredWorkersList = useMemo(() => {
+    if (!workersList) return [];
+
+    let filtered = [...workersList];
+
+    // 면허 상태 필터
+    if (licenseStatusFilter) {
+      if (licenseStatusFilter === "invalid") {
+        // 부적격자만 (suspended, revoked, expired)
+        filtered = filtered.filter(w => isInvalidLicense(w.licenseStatus));
+      } else if (licenseStatusFilter === "unverified") {
+        // 미검증만
+        filtered = filtered.filter(w => !w.licenseStatus || w.licenseStatus === "unverified");
+      } else if (licenseStatusFilter === "valid") {
+        // 유효만
+        filtered = filtered.filter(w => w.licenseStatus === "valid");
+      }
+    }
+
+    return filtered;
+  }, [workersList, licenseStatusFilter]);
+
+  // 체크박스 핸들러
+  const handleSelectWorker = (workerId: string, checked: boolean) => {
+    setSelectedWorkerIds((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(workerId);
+      } else {
+        newSet.delete(workerId);
+      }
+      return newSet;
+    });
+  };
+
+  // 전체 선택/해제
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && filteredWorkersList) {
+      setSelectedWorkerIds(new Set(filteredWorkersList.map((w) => w.id)));
+    } else {
+      setSelectedWorkerIds(new Set());
+    }
+  };
+
+  // 면허 있는 인력만 선택
+  const handleSelectWithLicense = () => {
+    if (workersList) {
+      const withLicense = workersList.filter(
+        (w) => w.licenseNum && w.licenseNum.length === 12
+      );
+      setSelectedWorkerIds(new Set(withLicense.map((w) => w.id)));
+      toast.info(`면허번호가 있는 ${withLicense.length}명이 선택되었습니다.`);
+    }
+  };
+
+  // 배치 검증 실행
+  const handleVerifyBatch = () => {
+    if (selectedWorkerIds.size === 0) {
+      toast.warning("검증할 인력을 선택해주세요.");
+      return;
+    }
+
+    const confirmMsg = `선택된 ${selectedWorkerIds.size}명의 면허를 검증하시겠습니까?\n(면허번호가 없는 인력은 제외됩니다)`;
+    if (confirm(confirmMsg)) {
+      verifyBatchMutation.mutate({
+        workerIds: Array.from(selectedWorkerIds),
+      });
+    }
+  };
+
+  // 전체 선택 여부
+  const isAllSelected = filteredWorkersList && filteredWorkersList.length > 0 && selectedWorkerIds.size === filteredWorkersList.length;
 
   return (
     <div className="space-y-6">
@@ -525,16 +633,77 @@ export default function Workers() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">면허 상태</Label>
+              <Select
+                value={licenseStatusFilter || "all"}
+                onValueChange={(value) => setLicenseStatusFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="valid">✅ 유효</SelectItem>
+                  <SelectItem value="invalid">❌ 부적격</SelectItem>
+                  <SelectItem value="unverified">⚪ 미검증</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>인력 목록</CardTitle>
-          <CardDescription>
-            총 {workersList?.length || 0}명의 인력이 등록되어 있습니다.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>인력 목록</CardTitle>
+              <CardDescription>
+                총 {workersList?.length || 0}명 중 {filteredWorkersList?.length || 0}명 표시
+                {licenseStatusFilter && (
+                  <span className="ml-1 text-xs">
+                    ({licenseStatusFilter === "invalid" ? "부적격자" : licenseStatusFilter === "valid" ? "유효" : "미검증"} 필터)
+                  </span>
+                )}
+                {selectedWorkerIds.size > 0 && (
+                  <span className="ml-2 text-blue-600 font-medium">
+                    ({selectedWorkerIds.size}명 선택됨)
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectWithLicense}
+                disabled={!workersList || workersList.length === 0}
+              >
+                <CheckSquare className="mr-1 h-4 w-4" />
+                면허보유자 선택
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleVerifyBatch}
+                disabled={selectedWorkerIds.size === 0 || verifyBatchMutation.isPending}
+              >
+                {verifyBatchMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    검증 중...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="mr-1 h-4 w-4" />
+                    서류 검증
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -542,37 +711,84 @@ export default function Workers() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               로딩 중...
             </div>
-          ) : workersList && workersList.length > 0 ? (
+          ) : filteredWorkersList && filteredWorkersList.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    />
+                  </TableHead>
                   <TableHead>이름</TableHead>
                   <TableHead>이메일</TableHead>
                   <TableHead>인력 유형</TableHead>
                   <TableHead>면허번호</TableHead>
                   <TableHead>면허 상태</TableHead>
-                  <TableHead>등록일</TableHead>
+                  <TableHead>검증일</TableHead>
                   <TableHead className="text-right">작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {workersList.map((worker) => (
-                  <TableRow key={worker.id}>
-                    <TableCell className="font-medium">{worker.name}</TableCell>
+                {filteredWorkersList.map((worker) => (
+                  <TableRow
+                    key={worker.id}
+                    className={`
+                      ${selectedWorkerIds.has(worker.id) ? "bg-blue-50" : ""}
+                      ${isInvalidLicense(worker.licenseStatus) ? "bg-red-50 hover:bg-red-100" : ""}
+                    `}
+                  >
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedWorkerIds.has(worker.id)}
+                        onCheckedChange={(checked) =>
+                          handleSelectWorker(worker.id, !!checked)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className={`font-medium ${isInvalidLicense(worker.licenseStatus) ? "text-red-700" : ""}`}>
+                      {worker.name}
+                      {isInvalidLicense(worker.licenseStatus) && (
+                        <span className="ml-1 text-red-500">⚠️</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">{worker.email || "-"}</span>
                     </TableCell>
                     <TableCell>{getWorkerTypeName(worker.workerTypeId)}</TableCell>
-                    <TableCell>{worker.licenseNum || "-"}</TableCell>
                     <TableCell>
-                      <span className={`rounded-full px-2 py-1 text-xs ${getLicenseStatusColor(worker.licenseStatus || "valid")}`}>
-                        {getLicenseStatusLabel(worker.licenseStatus || "valid")}
-                      </span>
+                      {worker.licenseNum ? (
+                        <span className="font-mono text-sm">{worker.licenseNum}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      {worker.createdAt
-                        ? new Date(worker.createdAt).toLocaleDateString("ko-KR")
-                        : "-"}
+                      <Badge
+                        variant={
+                          worker.licenseStatus === "valid" ? "default" :
+                          worker.licenseStatus === "suspended" || worker.licenseStatus === "revoked" || worker.licenseStatus === "expired" ? "destructive" :
+                          "secondary"
+                        }
+                        className={
+                          worker.licenseStatus === "valid" ? "bg-green-500 hover:bg-green-600" :
+                          worker.licenseStatus === "suspended" ? "bg-orange-500 hover:bg-orange-600" :
+                          worker.licenseStatus === "revoked" || worker.licenseStatus === "expired" ? "bg-red-500 hover:bg-red-600" :
+                          "bg-gray-400 hover:bg-gray-500"
+                        }
+                      >
+                        {getLicenseStatusLabel(worker.licenseStatus)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {worker.licenseVerifiedAt ? (
+                        <span className="text-sm">
+                          {new Date(worker.licenseVerifiedAt).toLocaleDateString("ko-KR")}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

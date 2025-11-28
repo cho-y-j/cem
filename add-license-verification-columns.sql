@@ -1,26 +1,19 @@
--- docs_compliance 테이블에 운전면허 검증 관련 컬럼 추가
--- RIMS (운전자격확인시스템) 검증 결과 저장
+-- workers 테이블에 면허 검증 관련 컬럼 추가
+-- Supabase SQL Editor에서 실행하세요
 
-ALTER TABLE docs_compliance
-ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false,
-ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE,
-ADD COLUMN IF NOT EXISTS verification_result JSONB,
-ADD COLUMN IF NOT EXISTS verification_result_code VARCHAR(10),
-ADD COLUMN IF NOT EXISTS verification_error TEXT;
+-- 1. license_verified_at 컬럼 추가 (마지막 검증일)
+ALTER TABLE workers ADD COLUMN IF NOT EXISTS license_verified_at TIMESTAMP;
 
--- 인덱스 추가 (검증 상태로 빠르게 조회)
-CREATE INDEX IF NOT EXISTS idx_docs_compliance_verified 
-ON docs_compliance(verified);
+-- 2. license_status 기본값을 'unverified'로 설정
+ALTER TABLE workers ALTER COLUMN license_status SET DEFAULT 'unverified';
 
-CREATE INDEX IF NOT EXISTS idx_docs_compliance_verification_result_code 
-ON docs_compliance(verification_result_code);
+-- 3. 기존 데이터 중 license_status가 null인 경우 'unverified'로 업데이트
+UPDATE workers SET license_status = 'unverified' WHERE license_status IS NULL;
 
--- 주석 추가
-COMMENT ON COLUMN docs_compliance.verified IS '운전면허 검증 완료 여부';
-COMMENT ON COLUMN docs_compliance.verified_at IS '운전면허 검증 일시';
-COMMENT ON COLUMN docs_compliance.verification_result IS 'RIMS API 전체 응답 (JSON)';
-COMMENT ON COLUMN docs_compliance.verification_result_code IS 'RIMS 검증결과코드 (00: 적격, 01~: 부적격)';
-COMMENT ON COLUMN docs_compliance.verification_error IS '검증 실패 시 에러 메시지';
+-- 확인
+SELECT id, name, license_num, license_status, license_verified_at FROM workers LIMIT 10;
+
+
 
 
 

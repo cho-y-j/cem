@@ -993,7 +993,7 @@ export async function getWorkerById(id: string): Promise<Worker | undefined> {
     return undefined;
   }
 
-  return data as Worker;
+  return toCamelCase(data) as Worker;
 }
 
 export async function getWorkerByPin(pinCode: string): Promise<User | undefined> {

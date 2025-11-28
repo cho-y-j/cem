@@ -767,6 +767,115 @@ export const appRouter = router({
         }
       }),
 
+    // 면허 배치 검증 API (여러 인력 동시 검증)
+    verifyLicenseBatch: protectedProcedure
+      .input(
+        z.object({
+          workerIds: z.array(z.string()).min(1, "최소 1명 이상 선택해야 합니다"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const { rimsClient } = await import('./_core/rims-api');
+
+          // 선택된 인력 정보 조회
+          const workers = await Promise.all(
+            input.workerIds.map(id => db.getWorkerById(id))
+          );
+
+          // 디버그 로그: 조회된 인력 데이터
+          console.log(`[License Batch Verify] Requested workerIds:`, input.workerIds);
+          console.log(`[License Batch Verify] Workers fetched:`, workers.map(w => ({
+            id: w?.id,
+            name: w?.name,
+            licenseNum: w?.licenseNum,
+            license_num: (w as any)?.license_num,  // snake_case 체크
+            licenseNumLength: w?.licenseNum?.length
+          })));
+
+          // 면허번호가 있는 인력만 필터링
+          const workersWithLicense = workers.filter(
+            (w): w is NonNullable<typeof w> =>
+              w !== null && w !== undefined && !!w.licenseNum && w.licenseNum.length === 12
+          );
+
+          console.log(`[License Batch Verify] Workers with license (12 digits):`, workersWithLicense.length);
+
+          if (workersWithLicense.length === 0) {
+            console.log(`[License Batch Verify] No workers with valid 12-digit license found`);
+            return {
+              totalCount: input.workerIds.length,
+              verifiedCount: 0,
+              results: [],
+              message: '면허번호가 등록된 인력이 없습니다',
+            };
+          }
+
+          console.log(`[License Batch Verify] Verifying ${workersWithLicense.length} licenses...`);
+
+          // 오늘 날짜
+          const today = new Date();
+          const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+
+          // RIMS 배치 검증 호출
+          const licenses = workersWithLicense.map(w => ({
+            licenseNo: w.licenseNum!,
+            name: w.name,
+            licenseType: w.licenseType || '12',
+            fromDate: dateStr,
+            toDate: dateStr,
+          }));
+
+          const rimsResults = await rimsClient.verifyLicenseBatch(licenses);
+
+          // 결과 매핑 및 DB 업데이트
+          const now = new Date();
+          const results = await Promise.all(
+            workersWithLicense.map(async (worker, index) => {
+              const rimsResult = rimsResults[index];
+              const newStatus = rimsResult.isValid ? 'valid' : 'suspended';
+
+              // DB 업데이트 (상태 + 검증일)
+              await db.updateWorker(worker.id, {
+                licenseStatus: newStatus,
+                licenseVerifiedAt: now,
+              });
+
+              return {
+                workerId: worker.id,
+                workerName: worker.name,
+                licenseNum: worker.licenseNum,
+                isValid: rimsResult.isValid,
+                resultCode: rimsResult.resultCode,
+                previousStatus: worker.licenseStatus || 'unverified',
+                newStatus,
+              };
+            })
+          );
+
+          // 통계
+          const validCount = results.filter(r => r.isValid).length;
+          const invalidCount = results.filter(r => !r.isValid).length;
+
+          console.log(`[License Batch Verify] Results: ${validCount} valid, ${invalidCount} invalid`);
+
+          return {
+            totalCount: input.workerIds.length,
+            verifiedCount: workersWithLicense.length,
+            validCount,
+            invalidCount,
+            results,
+            message: `${workersWithLicense.length}명 검증 완료 (유효: ${validCount}, 부적격: ${invalidCount})`,
+          };
+        } catch (error: any) {
+          console.error('[License Batch Verify] Error:', error.message);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error.message || '면허 배치 검증에 실패했습니다',
+          });
+        }
+      }),
+
     // OCR API (Google Vision API 사용)
     extractLicenseInfo: protectedProcedure
       .input(
