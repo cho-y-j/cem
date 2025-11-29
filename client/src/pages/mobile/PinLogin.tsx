@@ -53,36 +53,49 @@ export default function PinLogin() {
   }, [setLocation, userQuery.data]);
 
   const utils = trpc.useUtils();
-  
+
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (data) => {
       console.log('[PinLogin] Login success:', data);
       toast.success(`환영합니다, ${data.user.name}님!`);
 
+      // 모바일 앱에서는 항상 토큰 저장 (세션 동안 사용)
+      // rememberMe는 다음 로그인 시 자동 입력 여부만 결정
+      const token = data.token || '';
+      if (!token) {
+        console.error('[PinLogin] No token received from server!');
+        toast.error('로그인 토큰을 받지 못했습니다. 다시 시도해주세요.');
+        return;
+      }
+      
+      // 토큰 저장 (모바일 앱에서 인증에 필수)
+      localStorage.setItem('authToken', token);
+      console.log('[PinLogin] Token saved:', token.length, 'chars');
+      console.log('[PinLogin] Token preview:', token.substring(0, 20) + '...');
+      
+      // 저장 확인
+      const savedToken = localStorage.getItem('authToken');
+      if (!savedToken) {
+        console.error('[PinLogin] Token save failed!');
+        toast.error('토큰 저장에 실패했습니다.');
+        return;
+      }
+      console.log('[PinLogin] Token saved verification: OK');
+      
       if (rememberMe) {
-        // 토큰 저장 (자동 로그인)
-        const token = data.token || '';
-        localStorage.setItem('authToken', token);
         // 이메일 저장 (다음 로그인 시 자동 입력)
         localStorage.setItem('savedEmail', email);
-        console.log('[PinLogin] Token and email saved for auto-login');
-        console.log('[PinLogin] Token length:', token.length);
-        console.log('[PinLogin] Token preview:', token.substring(0, 20) + '...');
-        // 저장 확인
-        const savedToken = localStorage.getItem('authToken');
-        console.log('[PinLogin] Token saved verification:', savedToken ? 'OK' : 'FAILED');
+        console.log('[PinLogin] Email saved for auto-login');
       } else {
-        // 로그인 유지 안 함: 저장된 정보 삭제
-        localStorage.removeItem('authToken');
+        // 이메일만 삭제 (토큰은 유지 - 세션 동안 필요)
         localStorage.removeItem('savedEmail');
       }
 
       // 사용자 정보를 캐시에 직접 설정 (auth.me 쿼리가 완료되기 전에도 사용 가능하도록)
       utils.auth.me.setData(undefined, data.user);
       
-      // 사용자 정보 쿼리 즉시 갱신 (다른 컴포넌트에서 사용자 정보를 바로 사용할 수 있도록)
+      // 토큰이 저장된 후에만 auth.me 쿼리 실행
       await utils.auth.me.invalidate();
-      await utils.auth.me.refetch();
 
       // 역할에 따라 적절한 페이지로 리다이렉션
       const userRole = data.user.role?.toLowerCase();
@@ -95,8 +108,8 @@ export default function PinLogin() {
       }
       // admin, owner, bp, ep는 대시보드(/)로 이동
 
-      console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
-      setLocation(redirectTo);
+        console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
+        setLocation(redirectTo);
     },
     onError: (error) => {
       console.error('[PinLogin] Login error:', error);
