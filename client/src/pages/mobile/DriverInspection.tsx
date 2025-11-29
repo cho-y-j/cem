@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import MobileLayout from "@/components/mobile/MobileLayout";
-import MobileBottomNav, { workerNavItems } from "@/components/mobile/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +77,7 @@ export default function DriverInspection() {
             </CardContent>
           </Card>
         </div>
-        <MobileBottomNav items={workerNavItems} />
+
       </MobileLayout>
     );
   }
@@ -190,10 +189,11 @@ export default function DriverInspection() {
         </div>
       </div>
 
-      <MobileBottomNav items={workerNavItems} />
+
     </MobileLayout>
   );
 }
+
 
 
 

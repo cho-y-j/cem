@@ -838,132 +838,113 @@ export default function WorkerMain() {
   return (
     <MobileLayout title="작업 관리" showMenu={false}>
       <div>
-        {/* 출근 체크 섹션 */}
+        {/* 출근 체크 섹션 - Clean Design */}
         {!todayCheckInStatus?.hasCheckedIn ? (
-          <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white p-6 mb-4">
-            <div className="text-center space-y-4">
-              <div className="text-lg font-semibold">오늘 아직 출근하지 않았습니다</div>
-
-              {/* PIN 출근 버튼 */}
-              <Button
-                size="lg"
-                className="w-full h-16 text-xl font-bold bg-white text-indigo-700 hover:bg-gray-100 shadow-lg active:scale-95 transition-transform"
-                onClick={handleCheckIn}
-                disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
-              >
-                {checkInMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-3 h-6 w-6 animate-spin" />
-                    GPS 확인 중...
-                  </>
-                ) : todayCheckInStatus?.checkIn ? (
-                  <>
-                    <CheckCircle className="mr-3 h-6 w-6" />
-                    출근 완료
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="mr-3 h-6 w-6" />
-                    출근하기
-                  </>
-                )}
-              </Button>
-
-              {/* 생체 인증 출근 버튼 - 항상 표시 (프로토타입용) */}
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full h-14 text-lg font-semibold bg-white/10 text-white border-white/30 hover:bg-white/20 shadow-lg active:scale-95 transition-transform"
-                onClick={() => {
-                  if (!isBiometricAvailable) {
-                    toast.info(
-                      "생체 인증은 HTTPS 환경에서만 사용 가능합니다.\n" +
-                      "현재 환경: " + window.location.protocol + "\n" +
-                      "WebAuthn 지원: " + ('PublicKeyCredential' in window ? '지원' : '미지원'),
-                      { duration: 5000 }
-                    );
-                    return;
-                  }
-                  handleBiometricCheckIn();
-                }}
-                disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
-              >
-                <Fingerprint className="mr-2 h-5 w-5" />
-                {todayCheckInStatus?.checkIn ? "출근 완료" : "생체 인증으로 출근"}
-                {!isBiometricAvailable && !todayCheckInStatus?.checkIn && (
-                  <span className="ml-2 text-xs opacity-60">(HTTPS 필요)</span>
-                )}
-              </Button>
-
-              <div className="text-xs opacity-80">
-                📍 현재 위치가 자동으로 기록됩니다
-              </div>
-
-              {/* 생체 인증 설정 링크 */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white/80 hover:text-white hover:bg-white/10"
-                onClick={() => setLocation("/mobile/biometric-setup")}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                생체 인증 설정
-              </Button>
+          <div className="px-4 mb-6 mt-2">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">안녕하세요, {user?.name}님!</h2>
+              <p className="text-gray-500 mt-1">오늘도 안전한 하루 되세요</p>
             </div>
-          </div>
-        ) : (
-          <div className="px-4 mb-4">
-            <Card className="bg-green-50 border-green-200">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-8 w-8 text-green-600 shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-bold text-green-900 mb-1">출근 완료</div>
-                    {checkInTimeDisplay && (
-                      <div className="text-sm text-green-700">
-                        {checkInTimeDisplay}
-                      </div>
-                    )}
-                    {todayCheckInStatus?.checkIn?.isWithinZone !== undefined && (
-                      <div className="text-xs text-green-600 mt-1">
-                        {todayCheckInStatus.checkIn.isWithinZone
-                          ? `✓ 작업 구역 내 (${todayCheckInStatus.checkIn.distanceFromZone}m)`
-                          : `⚠ 작업 구역 밖 (${todayCheckInStatus.checkIn.distanceFromZone}m)`}
-                      </div>
-                    )}
-                    {todayCheckInStatus?.checkIn?.authMethod === "webauthn" && (
-                      <div className="text-xs text-green-600 mt-1">
-                        생체 인증
-                      </div>
-                    )}
-                  </div>
+
+            <Card className="border-0 shadow-lg bg-white overflow-hidden">
+              <div className="h-2 bg-blue-600 w-full" />
+              <CardContent className="p-6 space-y-4">
+                <div className="text-center space-y-1 mb-2">
+                  <div className="text-lg font-semibold text-gray-900">출근 전입니다</div>
+                  <div className="text-sm text-gray-500">작업 시작 전 출근 체크를 해주세요</div>
                 </div>
-              </CardContent>
-            </Card>
-            {/* 삭제 버튼 - 카드 오른쪽에 별도로 배치 */}
-            {todayCheckInStatus?.checkIn?.id && (
-              <div className="px-4 mt-2 flex justify-end">
+
+                {/* PIN 출근 버튼 */}
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-600 border-red-300 hover:text-red-700 hover:bg-red-50"
-                  onClick={handleDeleteCheckIn}
-                  disabled={deleteCheckInMutation.isPending}
+                  size="lg"
+                  className="w-full h-14 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-md active:scale-95 transition-all rounded-xl"
+                  onClick={handleCheckIn}
+                  disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
                 >
-                  {deleteCheckInMutation.isPending ? (
+                  {checkInMutation.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      삭제 중...
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      확인 중...
                     </>
                   ) : (
                     <>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      삭제
+                      <CheckCircle className="mr-2 h-5 w-5" />
+                      출근하기
                     </>
                   )}
                 </Button>
-              </div>
-            )}
+
+                {/* 생체 인증 출근 버튼 */}
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full h-14 text-base font-semibold border-gray-200 hover:bg-gray-50 active:scale-95 transition-all rounded-xl"
+                  onClick={() => {
+                    if (!isBiometricAvailable) {
+                      toast.info(
+                        "생체 인증은 HTTPS 환경에서만 사용 가능합니다.",
+                        { duration: 3000 }
+                      );
+                      return;
+                    }
+                    handleBiometricCheckIn();
+                  }}
+                  disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
+                >
+                  <Fingerprint className="mr-2 h-5 w-5 text-purple-600" />
+                  생체 인증으로 출근
+                </Button>
+
+                <div className="flex items-center justify-center gap-1 text-xs text-gray-400 mt-2">
+                  <MapPin className="h-3 w-3" />
+                  <span>현재 위치가 자동으로 기록됩니다</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="px-4 mb-6 mt-2">
+            <Card className="border-0 shadow-md bg-white overflow-hidden">
+              <div className="h-2 bg-green-500 w-full" />
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-gray-900 text-lg">출근 완료</div>
+                      <div className="text-sm text-gray-500 font-medium">
+                        {checkInTimeDisplay}
+                      </div>
+                    </div>
+                  </div>
+
+                  {todayCheckInStatus?.checkIn?.id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                      onClick={handleDeleteCheckIn}
+                      disabled={deleteCheckInMutation.isPending}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
+                  )}
+                </div>
+
+                {todayCheckInStatus?.checkIn?.isWithinZone !== undefined && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">
+                      {todayCheckInStatus.checkIn.isWithinZone
+                        ? `작업 구역 내 (${todayCheckInStatus.checkIn.distanceFromZone}m)`
+                        : `작업 구역 밖 (${todayCheckInStatus.checkIn.distanceFromZone}m)`}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -1168,313 +1149,154 @@ export default function WorkerMain() {
           )}
         </div>
 
-        {/* 빠른 메뉴 */}
+        {/* 빠른 메뉴 - Grid Layout */}
         <div className="px-4 mt-6 space-y-3">
-          <div className="text-sm font-medium text-gray-700 mb-2">빠른 메뉴</div>
+          <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Settings className="h-4 w-4 text-gray-500" />
+            빠른 메뉴
+          </div>
 
-          {/* 현위치 전송 */}
-          <Button
-            size="lg"
-            className="w-full h-16 text-base font-bold bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg active:scale-95 transition-transform"
-            onClick={() => {
-              if (!assignedEquipment) {
-                toast.error("배정된 장비가 없습니다.");
-                return;
-              }
-
-              setIsSendingLocation(true);
-
-              if (!("geolocation" in navigator)) {
-                toast.error("이 기기는 위치 정보를 지원하지 않습니다.");
-                setIsSendingLocation(false);
-                return;
-              }
-
-              navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                  try {
-                    await sendLocationMutation.mutateAsync({
-                      equipmentId: assignedEquipment.id,
-                      latitude: position.coords.latitude,
-                      longitude: position.coords.longitude,
-                      accuracy: position.coords.accuracy,
-                    });
-                    toast.success("위치가 전송되었습니다.");
-                  } catch (error: any) {
-                    toast.error("위치 전송에 실패했습니다: " + error.message);
-                  } finally {
-                    setIsSendingLocation(false);
-                  }
-                },
-                (error) => {
-                  toast.error("위치 정보를 가져올 수 없습니다.");
-                  setIsSendingLocation(false);
-                },
-                {
-                  enableHighAccuracy: true,
-                  timeout: 10000,
-                  maximumAge: 0,
+          <div className="grid grid-cols-2 gap-3">
+            {/* 현위치 전송 */}
+            <Button
+              variant="outline"
+              className="h-24 flex flex-col items-center justify-center gap-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all rounded-xl shadow-sm"
+              onClick={() => {
+                if (!assignedEquipment) {
+                  toast.error("배정된 장비가 없습니다.");
+                  return;
                 }
-              );
-            }}
-            disabled={!assignedEquipment || isSendingLocation}
-          >
-            {isSendingLocation ? (
-              <>
-                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                전송 중...
-              </>
-            ) : (
-              <>
-                <MapPin className="mr-2 h-6 w-6" />
-                <div className="text-left flex-1">
-                  <div>현위치 전송</div>
-                  <div className="text-xs text-white/80 font-normal">
-                    관리자에게 현재 위치를 전송합니다
-                  </div>
-                </div>
-              </>
-            )}
-          </Button>
-
-          {/* 운전자 점검표 (유도원은 숨김) */}
-          {(() => {
-            // 유도원인지 확인 (workerType.name이 "유도원"인 경우)
-            const isGuideWorker = currentDeployment?.worker?.workerType?.name === "유도원";
-            if (isGuideWorker) {
-              return null; // 유도원인 경우 버튼 숨김
-            }
-            return (
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full h-16 text-base font-bold border-2 border-blue-400 hover:bg-blue-50 active:scale-95 transition-transform"
-                onClick={() => setLocation("/mobile/driver-inspection")}
-                disabled={!assignedEquipment}
-              >
-                <ClipboardCheck className="mr-2 h-6 w-6 text-blue-600" />
-                <div className="text-left flex-1">
-                  <div>운전자 점검표</div>
-                  <div className="text-xs text-gray-500 font-normal">일일/주간/월간 점검</div>
-                </div>
-              </Button>
-            );
-          })()}
-
-          {/* 생체 인증 설정 */}
-          <Button
-            size="lg"
-            variant="outline"
-            className="w-full h-16 text-base font-bold border-2 border-purple-400 hover:bg-purple-50 active:scale-95 transition-transform"
-            onClick={() => setLocation("/mobile/biometric-setup")}
-          >
-            <Fingerprint className="mr-2 h-6 w-6 text-purple-600" />
-            <div className="text-left flex-1">
-              <div>생체 인증 설정</div>
-              <div className="text-xs text-gray-500 font-normal">
-                지문/얼굴 인식 등록
-                {!isBiometricAvailable && ' (브라우저 미지원)'}
+                setIsSendingLocation(true);
+                // ... (기존 로직 유지)
+                if (!("geolocation" in navigator)) {
+                  toast.error("이 기기는 위치 정보를 지원하지 않습니다.");
+                  setIsSendingLocation(false);
+                  return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                  async (position) => {
+                    try {
+                      await sendLocationMutation.mutateAsync({
+                        equipmentId: assignedEquipment.id,
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                      });
+                      toast.success("위치가 전송되었습니다.");
+                    } catch (error: any) {
+                      toast.error("위치 전송에 실패했습니다: " + error.message);
+                    } finally {
+                      setIsSendingLocation(false);
+                    }
+                  },
+                  (error) => {
+                    toast.error("위치 정보를 가져올 수 없습니다.");
+                    setIsSendingLocation(false);
+                  },
+                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+              }}
+              disabled={!assignedEquipment || isSendingLocation}
+            >
+              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                {isSendingLocation ? (
+                  <Loader2 className="h-5 w-5 text-green-600 animate-spin" />
+                ) : (
+                  <MapPin className="h-5 w-5 text-green-600" />
+                )}
               </div>
-            </div>
-          </Button>
+              <span className="text-sm font-medium text-gray-700">현위치 전송</span>
+            </Button>
+
+            {/* 운전자 점검표 */}
+            {(() => {
+              const isGuideWorker = currentDeployment?.worker?.workerType?.name === "유도원";
+              if (isGuideWorker) return null;
+              return (
+                <Button
+                  variant="outline"
+                  className="h-24 flex flex-col items-center justify-center gap-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all rounded-xl shadow-sm"
+                  onClick={() => setLocation("/mobile/driver-inspection")}
+                  disabled={!assignedEquipment}
+                >
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">운전자 점검표</span>
+                </Button>
+              );
+            })()}
+
+            {/* 생체 인증 설정 */}
+            <Button
+              variant="outline"
+              className="h-24 flex flex-col items-center justify-center gap-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all rounded-xl shadow-sm"
+              onClick={() => setLocation("/mobile/biometric-setup")}
+            >
+              <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                <Fingerprint className="h-5 w-5 text-purple-600" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">생체 인증 설정</span>
+            </Button>
+          </div>
         </div>
 
         {/* 긴급 상황 버튼 (4개 큰 버튼 - 한 번 탭으로 즉시 신고) */}
-        <div className="px-4 mt-6">
-          <div className="text-base font-bold text-red-600 mb-3 text-center">
-            🚨 긴급 상황 신고 (즉시 전송)
+        {/* 긴급 상황 버튼 - Grid Layout */}
+        <div className="px-4 mt-8 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-red-600 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              긴급 신고 센터
+            </div>
+            <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1 rounded-full">즉시 전송됨</span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {/* 사고 발생 */}
-            <Button
-              size="lg"
-              className="h-24 text-base font-bold bg-gradient-to-br from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white shadow-xl border-2 border-red-900 active:scale-95 transition-transform"
-              onClick={() => {
-                if (!assignedEquipment) {
-                  toast.error("배정된 장비가 없습니다.");
-                  return;
-                }
-                if (confirm("🚨 사고 발생을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
-                  if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "사고",
-                          description: "사고 발생 - 작업자가 긴급 신고",
-                          latitude: position.coords.latitude,
-                          longitude: position.coords.longitude,
-                        });
-                      },
-                      () => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "사고",
-                          description: "사고 발생 - 작업자가 긴급 신고",
-                        });
-                      }
-                    );
-                  } else {
-                    sendEmergencyMutation.mutate({
-                      equipmentId: assignedEquipment.id,
-                      alertType: "사고",
-                      description: "사고 발생 - 작업자가 긴급 신고",
-                    });
-                  }
-                }
-              }}
-              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <AlertTriangle className="h-8 w-8" />
-                <div className="text-lg">사고 발생</div>
-                <div className="text-xs opacity-90">즉시 신고</div>
-              </div>
-            </Button>
 
-            {/* 장비 고장 */}
-            <Button
-              size="lg"
-              className="h-24 text-base font-bold bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-xl border-2 border-orange-800 active:scale-95 transition-transform"
-              onClick={() => {
-                if (!assignedEquipment) {
-                  toast.error("배정된 장비가 없습니다.");
-                  return;
-                }
-                if (confirm("⚠️ 장비 고장을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
-                  if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "고장",
-                          description: "장비 고장 - 작업자가 긴급 신고",
-                          latitude: position.coords.latitude,
-                          longitude: position.coords.longitude,
-                        });
-                      },
-                      () => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "고장",
-                          description: "장비 고장 - 작업자가 긴급 신고",
-                        });
-                      }
-                    );
-                  } else {
-                    sendEmergencyMutation.mutate({
-                      equipmentId: assignedEquipment.id,
-                      alertType: "고장",
-                      description: "장비 고장 - 작업자가 긴급 신고",
-                    });
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: "사고", icon: AlertTriangle, color: "red", type: "사고", desc: "사고 발생" },
+              { label: "고장", icon: Truck, color: "orange", type: "고장", desc: "장비 고장" },
+              { label: "위험", icon: AlertCircle, color: "yellow", type: "안전위험", desc: "안전 위험" },
+              { label: "기타", icon: Bell, color: "purple", type: "기타", desc: "기타 긴급" },
+            ].map((item) => (
+              <button
+                key={item.label}
+                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-${item.color}-100 bg-${item.color}-50 active:scale-95 transition-transform`}
+                onClick={() => {
+                  if (!assignedEquipment) {
+                    toast.error("배정된 장비가 없습니다.");
+                    return;
                   }
-                }
-              }}
-              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <Truck className="h-8 w-8" />
-                <div className="text-lg">장비 고장</div>
-                <div className="text-xs opacity-90">즉시 신고</div>
-              </div>
-            </Button>
+                  if (confirm(`🚨 ${item.desc} 신고를 전송하시겠습니까?`)) {
+                    // ... (기존 신고 로직)
+                    const sendAlert = (lat?: number, lng?: number) => {
+                      sendEmergencyMutation.mutate({
+                        equipmentId: assignedEquipment.id,
+                        alertType: item.type,
+                        description: `${item.desc} - 작업자가 긴급 신고`,
+                        latitude: lat,
+                        longitude: lng,
+                      });
+                    };
 
-            {/* 안전 위험 */}
-            <Button
-              size="lg"
-              className="h-24 text-base font-bold bg-gradient-to-br from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white shadow-xl border-2 border-yellow-800 active:scale-95 transition-transform"
-              onClick={() => {
-                if (!assignedEquipment) {
-                  toast.error("배정된 장비가 없습니다.");
-                  return;
-                }
-                if (confirm("⚠️ 안전 위험을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
-                  if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "안전위험",
-                          description: "안전 위험 발견 - 작업자가 긴급 신고",
-                          latitude: position.coords.latitude,
-                          longitude: position.coords.longitude,
-                        });
-                      },
-                      () => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "안전위험",
-                          description: "안전 위험 발견 - 작업자가 긴급 신고",
-                        });
-                      }
-                    );
-                  } else {
-                    sendEmergencyMutation.mutate({
-                      equipmentId: assignedEquipment.id,
-                      alertType: "안전위험",
-                      description: "안전 위험 발견 - 작업자가 긴급 신고",
-                    });
+                    if ("geolocation" in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => sendAlert(pos.coords.latitude, pos.coords.longitude),
+                        () => sendAlert()
+                      );
+                    } else {
+                      sendAlert();
+                    }
                   }
-                }
-              }}
-              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <AlertCircle className="h-8 w-8" />
-                <div className="text-lg">안전 위험</div>
-                <div className="text-xs opacity-90">즉시 신고</div>
-              </div>
-            </Button>
-
-            {/* 기타 긴급 */}
-            <Button
-              size="lg"
-              className="h-24 text-base font-bold bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-xl border-2 border-purple-800 active:scale-95 transition-transform"
-              onClick={() => {
-                if (!assignedEquipment) {
-                  toast.error("배정된 장비가 없습니다.");
-                  return;
-                }
-                if (confirm("❗ 기타 긴급 상황을 신고하시겠습니까?\n관리자에게 즉시 알림이 전송됩니다.")) {
-                  if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "기타",
-                          description: "기타 긴급 상황 - 작업자가 긴급 신고",
-                          latitude: position.coords.latitude,
-                          longitude: position.coords.longitude,
-                        });
-                      },
-                      () => {
-                        sendEmergencyMutation.mutate({
-                          equipmentId: assignedEquipment.id,
-                          alertType: "기타",
-                          description: "기타 긴급 상황 - 작업자가 긴급 신고",
-                        });
-                      }
-                    );
-                  } else {
-                    sendEmergencyMutation.mutate({
-                      equipmentId: assignedEquipment.id,
-                      alertType: "기타",
-                      description: "기타 긴급 상황 - 작업자가 긴급 신고",
-                    });
-                  }
-                }
-              }}
-              disabled={!assignedEquipment || sendEmergencyMutation.isPending}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <AlertTriangle className="h-8 w-8" />
-                <div className="text-lg">기타 긴급</div>
-                <div className="text-xs opacity-90">즉시 신고</div>
-              </div>
-            </Button>
-          </div>
-          <div className="text-xs text-gray-500 mt-2 text-center">
-            버튼 클릭 시 관리자에게 즉시 알림이 전송됩니다
+                }}
+                disabled={!assignedEquipment || sendEmergencyMutation.isPending}
+              >
+                <div className={`h-10 w-10 rounded-full bg-white flex items-center justify-center shadow-sm text-${item.color}-600`}>
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <span className={`text-xs font-medium text-${item.color}-700`}>{item.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
