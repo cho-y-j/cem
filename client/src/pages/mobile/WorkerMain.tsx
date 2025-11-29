@@ -1208,24 +1208,7 @@ export default function WorkerMain() {
               <span className="text-sm font-medium text-gray-700">현위치 전송</span>
             </Button>
 
-            {/* 운전자 점검표 */}
-            {(() => {
-              const isGuideWorker = currentDeployment?.worker?.workerType?.name === "유도원";
-              if (isGuideWorker) return null;
-              return (
-                <Button
-                  variant="outline"
-                  className="h-24 flex flex-col items-center justify-center gap-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all rounded-xl shadow-sm"
-                  onClick={() => setLocation("/mobile/driver-inspection")}
-                  disabled={!assignedEquipment}
-                >
-                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                    <ClipboardCheck className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">운전자 점검표</span>
-                </Button>
-              );
-            })()}
+
 
             {/* 생체 인증 설정 */}
             <Button
