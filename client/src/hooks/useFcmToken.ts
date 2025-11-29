@@ -65,9 +65,6 @@ export function useFcmToken() {
       // FCM 토큰 등록
       await PushNotifications.register();
 
-      // 리스너 제거 (중복 등록 방지)
-      await PushNotifications.removeAllListeners();
-
       // 토큰 수신 리스너
       PushNotifications.addListener('registration', async (token) => {
         console.log('[FCM] Token received:', token.value);
@@ -78,20 +75,6 @@ export function useFcmToken() {
       // 토큰 에러 리스너
       PushNotifications.addListener('registrationError', (error) => {
         console.error('[FCM] Registration error:', error);
-      });
-
-      // 토큰 갱신 리스너
-      PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-        console.log('[FCM] Push notification received:', notification);
-
-        // 앱이 포그라운드에 있을 때 토스트 알림 표시
-        toast.message(notification.title || '알림', {
-          description: notification.body,
-          action: {
-            label: '확인',
-            onClick: () => console.log('Notification clicked'),
-          },
-        });
       });
 
     } catch (error) {

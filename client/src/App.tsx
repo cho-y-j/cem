@@ -140,10 +140,20 @@ function Router() {
 }
 
 import { useFcmToken } from "@/hooks/useFcmToken";
+import { setupPushNotificationListeners } from "@/utils/pushNotifications";
+import { useLocation } from "wouter";
+import { useEffect } from "react";
 
 function App() {
+  const [, setLocation] = useLocation();
+
   // 앱 실행 시 FCM 토큰 등록 시도 (로그인 상태인 경우)
   useFcmToken();
+
+  // 푸시 알림 리스너 설정 (전역)
+  useEffect(() => {
+    setupPushNotificationListeners(setLocation);
+  }, [setLocation]);
 
   return (
     <ErrorBoundary>

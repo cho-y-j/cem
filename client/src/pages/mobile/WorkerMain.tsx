@@ -30,38 +30,32 @@ import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useFcmToken } from "@/hooks/useFcmToken";
-import { setupPushNotificationListeners } from "@/utils/pushNotifications";
 
 export default function WorkerMain() {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
-  
+
   // FCM 토큰 등록 (모바일 앱에서만 작동)
   useFcmToken();
-  
-  // 푸시 알림 리스너 설정 (모바일 앱에서만 작동)
-  useEffect(() => {
-    setupPushNotificationListeners(setLocation);
-  }, [setLocation]);
 
   // 로그인 체크 (로딩 중일 때는 리다이렉션하지 않음)
   useEffect(() => {
     const token = localStorage.getItem('authToken');
-    
+
     // 토큰이 없으면 즉시 로그인 페이지로 리다이렉션
     if (!token) {
       console.log('[WorkerMain] No token found, redirecting to login');
       setLocation("/mobile/login");
       return;
     }
-    
+
     // 로딩 중이면 대기
     if (loading) {
       console.log('[WorkerMain] Loading user info...');
       return;
     }
-    
+
     // 사용자 정보가 있으면 역할 확인
     if (user) {
       if (user.role !== "worker") {
@@ -72,7 +66,7 @@ export default function WorkerMain() {
       }
       return;
     }
-    
+
     // 토큰이 있는데 사용자 정보가 없으면 auth.me 쿼리를 강제로 실행
     if (token && !user && !loading) {
       console.log('[WorkerMain] Token exists but user info not loaded, refetching...');
@@ -129,23 +123,23 @@ export default function WorkerMain() {
   // PWA 안내 표시 여부 체크
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
     // 이미 설치되어 있으면 안내 표시 안 함
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     if (isStandalone) return;
-    
+
     // 한 번 본 적이 있으면 안내 표시 안 함
     const hasSeenHint = localStorage.getItem('pwa-hint-seen');
     if (hasSeenHint) return;
-    
+
     setShowPWAHint(true);
   }, []);
 
   // 배정된 장비 조회
-  const { 
-    data: assignedEquipment, 
+  const {
+    data: assignedEquipment,
     isLoading: isLoadingEquipment,
-    error: equipmentError 
+    error: equipmentError
   } = trpc.mobile.worker.getMyAssignedEquipment.useQuery(undefined, {
     enabled: !!user && user.role === "worker",
     retry: false,
@@ -156,9 +150,9 @@ export default function WorkerMain() {
   });
 
   // 현재 투입 정보 조회 (BP사 정보 포함)
-  const { 
+  const {
     data: currentDeployment,
-    error: deploymentError 
+    error: deploymentError
   } = trpc.mobile.worker.getCurrentDeployment.useQuery(undefined, {
     enabled: !!user && user.role === "worker",
     retry: false,
@@ -183,11 +177,11 @@ export default function WorkerMain() {
   }, [currentDeployment?.worker?.workerType?.name]);
 
   // 현재 작업 세션 조회
-  const { 
-    data: currentSession, 
-    refetch: refetchSession, 
+  const {
+    data: currentSession,
+    refetch: refetchSession,
     isLoading: isLoadingSession,
-    error: sessionError 
+    error: sessionError
   } = trpc.mobile.worker.getCurrentSession.useQuery(undefined, {
     enabled: !!user && user.role === "worker",
     retry: false,
@@ -198,10 +192,10 @@ export default function WorkerMain() {
   });
 
   // 오늘 출근 상태 조회
-  const { 
-    data: todayCheckInStatus, 
+  const {
+    data: todayCheckInStatus,
     refetch: refetchCheckIn,
-    error: checkInError 
+    error: checkInError
   } = trpc.checkIn.getTodayStatus.useQuery(undefined, {
     enabled: !!user && user.role === "worker",
     retry: false,
@@ -218,13 +212,13 @@ export default function WorkerMain() {
       // 브라우저의 toLocaleTimeString을 사용하여 자동으로 타임존 변환
       try {
         const date = new Date(todayCheckInStatus.checkIn.checkInTime);
-        
+
         if (isNaN(date.getTime())) {
           console.error('[WorkerMain] Invalid date:', todayCheckInStatus.checkIn.checkInTime);
           setCheckInTimeDisplay('');
           return;
         }
-        
+
         // toLocaleTimeString을 사용하여 한국 시간대(Asia/Seoul)로 자동 변환
         // 브라우저가 UTC 시간을 자동으로 KST로 변환해줌
         const timeStr = date.toLocaleTimeString('ko-KR', {
@@ -233,7 +227,7 @@ export default function WorkerMain() {
           timeZone: 'Asia/Seoul',
           hour12: false, // 24시간 형식 (14:11)
         });
-        
+
         setCheckInTimeDisplay(timeStr);
       } catch (error) {
         console.error('[WorkerMain] formatTime error:', error);
@@ -249,7 +243,7 @@ export default function WorkerMain() {
         ? `작업 구역 내에서 출근하셨습니다 (${data.distanceFromZone}m)`
         : `작업 구역 밖에서 출근하셨습니다 (${data.distanceFromZone}m 떨어짐)`;
       toast.success(`출근이 완료되었습니다!\n${distanceMsg}`);
-      
+
       // 출근 상태 즉시 새로고침 (여러 방법으로 강제 새로고침)
       try {
         // 1. 캐시 무효화
@@ -369,7 +363,7 @@ export default function WorkerMain() {
           console.error('[GPS] 퇴근 시 위치 전송 중 예외:', error);
         }
       }
-      
+
       toast.success("작업이 종료되었습니다.");
       refetchSession();
     },
@@ -411,7 +405,7 @@ export default function WorkerMain() {
           console.error('[GPS] 휴식 시작 시 위치 전송 중 예외:', error);
         }
       }
-      
+
       toast.success("휴식이 시작되었습니다.");
       refetchSession();
     },
@@ -511,7 +505,7 @@ export default function WorkerMain() {
             });
           } catch (error: any) {
             console.error('[GPS] 위치 전송 실패:', error);
-            
+
             // 네트워크 오류인 경우 재시도
             if (retryCount < maxRetries && (
               error.message?.includes('network') ||
@@ -547,7 +541,7 @@ export default function WorkerMain() {
       );
     } catch (error: any) {
       console.error('[GPS] 위치 전송 중 예외 발생:', error);
-      
+
       // 예외 발생 시 재시도
       if (retryCount < maxRetries) {
         setTimeout(() => {
@@ -679,7 +673,7 @@ export default function WorkerMain() {
                 errorStack: error.stack,
                 errorShape: error.shape,
               });
-              
+
               // 에러 메시지에 따라 다른 메시지 표시
               if (error.data?.code === 'NOT_FOUND') {
                 toast.error("등록된 생체 인증이 없습니다. 먼저 생체 인증을 등록해주세요.");
@@ -693,14 +687,14 @@ export default function WorkerMain() {
 
             // 3. 생체 인증 (지문/얼굴 스캔)
             toast.info("생체 인증을 진행해주세요...");
-            
+
             console.log('[BiometricCheckIn] Starting authentication with options:', {
               challenge: authOptions.challenge?.substring(0, 20) + '...',
               rpId: authOptions.rpId,
               allowCredentials: authOptions.allowCredentials?.length || 0,
               userVerification: authOptions.userVerification,
             });
-            
+
             let authResponse;
             try {
               authResponse = await startAuthentication(authOptions);
@@ -710,7 +704,7 @@ export default function WorkerMain() {
                 errorMessage: error.message,
                 errorStack: error.stack,
               });
-              
+
               if (error.name === 'NotAllowedError') {
                 toast.error("생체 인증이 취소되었습니다.");
               } else if (error.name === 'InvalidStateError') {
@@ -724,7 +718,7 @@ export default function WorkerMain() {
               }
               return;
             }
-            
+
             console.log('[BiometricCheckIn] Authentication response received:', {
               hasRawId: !!authResponse.rawId,
               rawIdType: typeof authResponse.rawId,
@@ -736,9 +730,9 @@ export default function WorkerMain() {
             // TODO: 서버 검증은 나중에 구현
             // 현재는 클라이언트에서 지문 인식 성공 시 바로 출근 처리
             // startAuthentication이 성공했다는 것은 브라우저/OS 레벨에서 지문 인증이 완료되었다는 의미
-            
+
             console.log('[BiometricCheckIn] Skipping server verification (temporary), proceeding with check-in...');
-            
+
             // credential ID 추출 (출근 기록에 저장용)
             // @simplewebauthn/browser는 이미 base64url 문자열로 변환된 id를 제공
             let credentialId: string;
@@ -759,7 +753,7 @@ export default function WorkerMain() {
             } else {
               credentialId = String(authResponse.rawId);
             }
-            
+
             // 5. 출근 체크 (생체 인증 성공)
             try {
               await checkInMutation.mutateAsync({
@@ -1195,7 +1189,7 @@ export default function WorkerMain() {
               }
 
               setIsSendingLocation(true);
-              
+
               if (!("geolocation" in navigator)) {
                 toast.error("이 기기는 위치 정보를 지원하지 않습니다.");
                 setIsSendingLocation(false);
@@ -1493,6 +1487,232 @@ export default function WorkerMain() {
       </div>
 
       <MobileBottomNav items={workerNavItems} />
+    </MobileLayout>
+  );
+}
+// ... (imports remain the same)
+
+export default function WorkerMain() {
+  // ... (hooks and logic remain the same)
+
+  return (
+    <MobileLayout>
+      <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
+        {/* Header - Sticky & Safe Area */}
+        <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b px-4 py-3 flex items-center justify-between safe-area-top">
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">
+              {user?.name ? `${user.name}님` : "작업자님"}
+            </h1>
+            <p className="text-xs text-gray-500">
+              {todayCheckInStatus?.checkIn
+                ? "오늘도 안전하게 작업하세요!"
+                : "출근 체크를 해주세요"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative rounded-full hover:bg-gray-100"
+              onClick={() => setLocation("/mobile/notifications")}
+            >
+              <Bell className="h-5 w-5 text-gray-600" />
+              {/* 알림 뱃지 (임시) */}
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+            </Button>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 px-4 py-6 space-y-6">
+          {/* Status Card */}
+          <Card className="border-none shadow-sm bg-white overflow-hidden">
+            <CardContent className="p-0">
+              <div className="bg-primary/5 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">
+                    {currentSession ? "현재 작업 중" : "작업 대기 중"}
+                  </span>
+                </div>
+                {getStatusBadge()}
+              </div>
+              <div className="p-5 text-center">
+                <div className="text-4xl font-bold tracking-tight text-gray-900 mb-1 font-mono">
+                  {formatElapsedTime(elapsedTime)}
+                </div>
+                <p className="text-xs text-gray-500">
+                  {currentSession?.startTime
+                    ? `시작 시간: ${new Date(currentSession.startTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`
+                    : "작업을 시작하면 시간이 측정됩니다"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {!currentSession ? (
+              <Button
+                size="lg"
+                className="h-24 flex flex-col gap-2 bg-blue-600 hover:bg-blue-700 shadow-md border-0"
+                onClick={() => startWorkMutation.mutate({
+                  equipmentId: assignedEquipment?.id || currentDeployment?.equipmentId || ""
+                })}
+                disabled={!todayCheckInStatus?.checkIn || startWorkMutation.isPending}
+              >
+                {startWorkMutation.isPending ? (
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                ) : (
+                  <Play className="h-8 w-8" />
+                )}
+                <span className="font-semibold">작업 시작</span>
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                variant="destructive"
+                className="h-24 flex flex-col gap-2 shadow-md border-0"
+                onClick={() => {
+                  if (confirm("작업을 종료하시겠습니까?")) {
+                    endWorkMutation.mutate({ workSessionId: currentSession.id });
+                  }
+                }}
+                disabled={endWorkMutation.isPending}
+              >
+                {endWorkMutation.isPending ? (
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                ) : (
+                  <Square className="h-8 w-8 fill-current" />
+                )}
+                <span className="font-semibold">작업 종료</span>
+              </Button>
+            )}
+
+            {currentSession?.status === "working" && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-24 flex flex-col gap-2 border-2 hover:bg-gray-50"
+                onClick={() => startBreakMutation.mutate({ workSessionId: currentSession.id })}
+                disabled={startBreakMutation.isPending}
+              >
+                <Coffee className="h-8 w-8 text-orange-500" />
+                <span className="font-semibold text-gray-700">휴식 시작</span>
+              </Button>
+            )}
+
+            {currentSession?.status === "break" && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-24 flex flex-col gap-2 border-2 hover:bg-gray-50"
+                onClick={() => endBreakMutation.mutate({ workSessionId: currentSession.id })}
+                disabled={endBreakMutation.isPending}
+              >
+                <Play className="h-8 w-8 text-green-600" />
+                <span className="font-semibold text-gray-700">휴식 종료</span>
+              </Button>
+            )}
+
+            {/* Emergency Button */}
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-24 flex flex-col gap-2 border-red-100 bg-red-50 hover:bg-red-100 hover:border-red-200"
+              onClick={() => {
+                if (confirm("긴급 알림을 전송하시겠습니까?")) {
+                  sendEmergencyMutation.mutate({
+                    type: "accident",
+                    message: "작업자 긴급 호출"
+                  });
+                }
+              }}
+            >
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+              <span className="font-semibold text-red-700">긴급 호출</span>
+            </Button>
+          </div>
+
+          {/* Info Cards */}
+          <div className="space-y-4">
+            {/* Equipment Info */}
+            <Card className="border shadow-sm">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                  <Truck className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">배정 장비</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {assignedEquipment
+                      ? `${assignedEquipment.equipType?.name || '장비'} (${assignedEquipment.regNum})`
+                      : "배정된 장비 없음"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Location Info */}
+            <Card className="border shadow-sm">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <MapPin className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">현재 현장</p>
+                  <p className="text-sm font-bold text-gray-900">
+                    {currentDeployment?.bpCompany || "현장 정보 없음"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Check-in Section */}
+          {!todayCheckInStatus?.checkIn && (
+            <Card className="bg-gradient-to-br from-gray-900 to-gray-800 text-white border-none shadow-lg">
+              <CardContent className="p-6 text-center space-y-4">
+                <div>
+                  <h3 className="text-lg font-bold mb-1">출근 체크</h3>
+                  <p className="text-gray-300 text-sm">작업 시작 전 출근 체크가 필요합니다</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    className="w-full bg-white text-gray-900 hover:bg-gray-100"
+                    onClick={handleCheckIn}
+                    disabled={checkInMutation.isPending}
+                  >
+                    {checkInMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <MapPin className="mr-2 h-4 w-4" />
+                    )}
+                    GPS 출근
+                  </Button>
+
+                  <Button
+                    className="w-full bg-blue-600 text-white hover:bg-blue-700 border-0"
+                    onClick={handleBiometricCheckIn}
+                    disabled={checkInMutation.isPending || !isBiometricAvailable}
+                  >
+                    {checkInMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Fingerprint className="mr-2 h-4 w-4" />
+                    )}
+                    생체 인증
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </main>
+
+        <MobileBottomNav items={workerNavItems} />
+      </div>
     </MobileLayout>
   );
 }

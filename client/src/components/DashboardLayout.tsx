@@ -30,22 +30,59 @@ import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "대시보드", path: "/", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: Truck, label: "장비 관리", path: "/equipment", roles: ["owner", "admin", "bp", "ep"] },
+  { icon: LayoutDashboard, label: "대시보드", path: "/", roles: ["owner", "ep", "bp", "admin", "worker"] },
+  { icon: Truck, label: "장비 관리", path: "/equipment", roles: ["owner", "admin", "bp", "ep", "worker"] },
   { icon: HardHat, label: "인력 관리", path: "/workers", roles: ["owner", "admin", "bp", "ep"] },
-  { icon: FileText, label: "서류 관리", path: "/documents", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: FileText, label: "서류 관리", path: "/documents", roles: ["owner", "ep", "bp", "admin", "worker"] },
   { icon: ArrowRightLeft, label: "반입,출입 요청", path: "/entry-requests", roles: ["owner", "ep", "bp", "admin"] },
   { icon: PackageCheck, label: "투입 관리", path: "/deployments", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Shield, label: "안전점검 확인", path: "/safety-inspection-review", roles: ["ep", "admin"] },
-  { icon: FileText, label: "작업 확인서", path: "/work-journal", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: FileText, label: "작업 확인서", path: "/work-journal", roles: ["owner", "ep", "bp", "admin", "worker"] },
   { icon: Map, label: "작업 구역 관리", path: "/work-zones", roles: ["ep", "admin"] },
-  { icon: UserCheck, label: "출근 현황", path: "/check-in-monitoring", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: Bell, label: "알림 관리", path: "/notifications", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: AlertTriangle, label: "긴급 알림", path: "/emergency-alerts", roles: ["owner", "ep", "bp", "admin"] },
-  { icon: Clock, label: "작업 현황 & 위치", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: UserCheck, label: "출근 현황", path: "/check-in-monitoring", roles: ["owner", "ep", "bp", "admin", "worker"] },
+  { icon: Bell, label: "알림 관리", path: "/notifications", roles: ["owner", "ep", "bp", "admin", "worker"] },
+  { icon: AlertTriangle, label: "긴급 알림", path: "/emergency-alerts", roles: ["owner", "ep", "bp", "admin", "worker"] },
+  { icon: Clock, label: "작업 현황 & 위치", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin", "worker"] },
   { icon: BarChart3, label: "통계 및 리포트", path: "/statistics", roles: ["owner", "ep", "bp", "admin"] },
   { icon: UserCircle, label: "내정보", path: "/my-profile", roles: ["worker"] },
 ];
+
+// ... (keep adminMenuItems as is)
+
+// ... (inside DashboardLayoutContent)
+
+<SidebarFooter className="p-3 border-t">
+  <div className="flex items-center gap-3 px-1 py-2 mb-2">
+    <Avatar className="h-9 w-9 border shrink-0">
+      <AvatarFallback className="text-xs font-medium">
+        {user?.name?.charAt(0).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
+    <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+      <p className="text-sm font-medium truncate leading-none">
+        {user?.name || "-"}
+      </p>
+      <p className="text-xs text-muted-foreground truncate mt-0.5">
+        {user?.role?.toUpperCase() || "-"}
+        {user?.companyName && ` • ${user.companyName}`}
+      </p>
+    </div>
+  </div>
+
+  <Button
+    variant="destructive"
+    className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+    onClick={async () => {
+      if (confirm("로그아웃 하시겠습니까?")) {
+        await logout();
+        window.location.href = "/login";
+      }
+    }}
+  >
+    <LogOut className="h-4 w-4" />
+    <span className="group-data-[collapsible=icon]:hidden">로그아웃</span>
+  </Button>
+</SidebarFooter>
 
 const adminMenuItems = [
   { icon: Building2, label: "회사 관리", path: "/admin/companies", roles: ["admin", "ep"] },

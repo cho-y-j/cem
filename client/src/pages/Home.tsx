@@ -1,3 +1,6 @@
+import { Capacitor } from "@capacitor/core";
+import { useLocation } from "wouter";
+import { useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import OwnerDashboard from "@/components/dashboard/OwnerDashboard";
@@ -148,8 +151,28 @@ function DefaultDashboard() {
   );
 }
 
+
+
 export default function Home() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
+
+  // 모바일 앱(Capacitor)인 경우 모바일 전용 페이지로 리다이렉트
+  useEffect(() => {
+    if (Capacitor.isNativePlatform() && user) {
+      if (user.role === "worker") {
+        setLocation("/mobile/worker");
+      } else if (user.role === "inspector") {
+        setLocation("/mobile/inspector");
+      }
+      // 다른 역할(admin, owner 등)은 모바일에서도 데스크탑 뷰 유지 (또는 필요시 추가)
+    }
+  }, [user, setLocation]);
+
+  // 모바일 앱이면 리다이렉트 중이므로 아무것도 렌더링하지 않음 (깜빡임 방지)
+  if (Capacitor.isNativePlatform() && (user?.role === "worker" || user?.role === "inspector")) {
+    return null;
+  }
 
   // 역할별 대시보드 렌더링
   switch (user?.role) {
