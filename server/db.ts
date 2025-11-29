@@ -2811,7 +2811,7 @@ export async function createEmergencyAlert(alert: any): Promise<void> {
       longitude: alert.longitude,
       description: alert.description,
       status: alert.status || 'active',
-      created_at: new Date()
+      created_at: new Date().toISOString()  // UTC ISO 문자열로 저장
     });
 
   if (error) throw error;

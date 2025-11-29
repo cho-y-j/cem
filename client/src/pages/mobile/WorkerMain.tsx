@@ -1335,22 +1335,28 @@ export default function WorkerMain() {
                       let finalLng = lng;
 
                       if (!finalLat || !finalLng) {
-                        if (currentDeployment?.workZone) {
-                          const zoneLat = parseFloat(currentDeployment.workZone.centerLat);
-                          const zoneLng = parseFloat(currentDeployment.workZone.centerLng);
+                        // workZone 객체 확인 (camelCase와 snake_case 모두 지원)
+                        const workZone = currentDeployment?.workZone || (currentDeployment as any)?.work_zone;
+                        if (workZone) {
+                          // camelCase (centerLat) 또는 snake_case (center_lat) 모두 지원
+                          const rawLat = workZone.centerLat || workZone.center_lat;
+                          const rawLng = workZone.centerLng || workZone.center_lng;
+                          const zoneLat = typeof rawLat === 'number' ? rawLat : parseFloat(rawLat);
+                          const zoneLng = typeof rawLng === 'number' ? rawLng : parseFloat(rawLng);
 
-                          if (!isNaN(zoneLat) && !isNaN(zoneLng)) {
+                          if (!isNaN(zoneLat) && !isNaN(zoneLng) && zoneLat !== 0 && zoneLng !== 0) {
                             finalLat = zoneLat;
                             finalLng = zoneLng;
                             console.log('[Emergency] Using Work Zone location as fallback:', finalLat, finalLng);
                             toast.info("현장 위치(Work Zone)로 대체하여 전송합니다.");
                           } else {
-                            console.warn('[Emergency] Work Zone location is invalid:', currentDeployment.workZone);
+                            console.warn('[Emergency] Work Zone location is invalid:', workZone);
                             finalLat = undefined;
                             finalLng = undefined;
                           }
                         } else {
                           console.warn('[Emergency] No location and no Work Zone fallback available.');
+                          console.log('[Emergency] currentDeployment:', currentDeployment);
                           finalLat = undefined;
                           finalLng = undefined;
                         }
