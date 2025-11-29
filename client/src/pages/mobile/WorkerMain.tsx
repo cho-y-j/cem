@@ -26,6 +26,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useFcmToken } from "@/hooks/useFcmToken";
@@ -87,6 +98,17 @@ export default function WorkerMain() {
   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState<string>("");
   const [isMounted, setIsMounted] = useState(false);
   const [showPWAHint, setShowPWAHint] = useState(false);
+
+  // 긴급 신고 Drawer 상태
+  const [isEmergencyDrawerOpen, setIsEmergencyDrawerOpen] = useState(false);
+  const [selectedEmergencyType, setSelectedEmergencyType] = useState<{
+    label: string;
+    icon: any;
+    color: string;
+    type: string;
+    desc: string;
+  } | null>(null);
+  const [emergencyDetails, setEmergencyDetails] = useState("");
 
   // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
   useEffect(() => {
@@ -1250,27 +1272,10 @@ export default function WorkerMain() {
                     toast.error("배정된 장비가 없습니다.");
                     return;
                   }
-                  if (confirm(`🚨 ${item.desc} 신고를 전송하시겠습니까?`)) {
-                    // ... (기존 신고 로직)
-                    const sendAlert = (lat?: number, lng?: number) => {
-                      sendEmergencyMutation.mutate({
-                        equipmentId: assignedEquipment.id,
-                        alertType: item.type,
-                        description: `${item.desc} - 작업자가 긴급 신고`,
-                        latitude: lat,
-                        longitude: lng,
-                      });
-                    };
-
-                    if ("geolocation" in navigator) {
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => sendAlert(pos.coords.latitude, pos.coords.longitude),
-                        () => sendAlert()
-                      );
-                    } else {
-                      sendAlert();
-                    }
-                  }
+                  // Drawer 열기
+                  setSelectedEmergencyType(item);
+                  setEmergencyDetails(""); // 내용 초기화
+                  setIsEmergencyDrawerOpen(true);
                 }}
                 disabled={!assignedEquipment || sendEmergencyMutation.isPending}
               >
@@ -1283,7 +1288,90 @@ export default function WorkerMain() {
           </div>
         </div>
 
+        {/* 긴급 신고 Drawer */}
+        <Drawer open={isEmergencyDrawerOpen} onOpenChange={setIsEmergencyDrawerOpen}>
+          <DrawerContent>
+            <div className="mx-auto w-full max-w-sm">
+              <DrawerHeader>
+                <DrawerTitle className="text-center text-xl font-bold flex items-center justify-center gap-2">
+                  {selectedEmergencyType && (
+                    <>
+                      <selectedEmergencyType.icon className={`h-6 w-6 text-${selectedEmergencyType.color}-600`} />
+                      <span className={`text-${selectedEmergencyType.color}-700`}>{selectedEmergencyType.desc} 신고</span>
+                    </>
+                  )}
+                </DrawerTitle>
+                <DrawerDescription className="text-center">
+                  상황을 자세히 적어주시면 빠른 조치에 도움이 됩니다.<br />
+                  (내용 없이도 즉시 신고 가능합니다)
+                </DrawerDescription>
+              </DrawerHeader>
+
+              <div className="p-4 pb-0">
+                <Textarea
+                  placeholder="예: 3번 게이트 앞 타이어 펑크, 작업자 부상 등 (선택사항)"
+                  className="min-h-[120px] text-base resize-none bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  value={emergencyDetails}
+                  onChange={(e) => setEmergencyDetails(e.target.value)}
+                />
+              </div>
+
+              <DrawerFooter>
+                <Button
+                  size="lg"
+                  className={`w-full h-14 text-lg font-bold shadow-lg ${selectedEmergencyType
+                    ? `bg-${selectedEmergencyType.color}-600 hover:bg-${selectedEmergencyType.color}-700`
+                    : 'bg-red-600'
+                    }`}
+                  onClick={() => {
+                    if (!assignedEquipment || !selectedEmergencyType) return;
+
+                    const sendAlert = (lat?: number, lng?: number) => {
+                      sendEmergencyMutation.mutate({
+                        equipmentId: assignedEquipment.id,
+                        alertType: selectedEmergencyType.type,
+                        description: emergencyDetails.trim()
+                          ? `${selectedEmergencyType.desc} - ${emergencyDetails.trim()}`
+                          : `${selectedEmergencyType.desc} - 작업자가 긴급 신고 (내용 없음)`,
+                        latitude: lat,
+                        longitude: lng,
+                      });
+                      setIsEmergencyDrawerOpen(false);
+                    };
+
+                    if ("geolocation" in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => sendAlert(pos.coords.latitude, pos.coords.longitude),
+                        () => sendAlert()
+                      );
+                    } else {
+                      sendAlert();
+                    }
+                  }}
+                  disabled={sendEmergencyMutation.isPending}
+                >
+                  {sendEmergencyMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      전송 중...
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="mr-2 h-5 w-5" />
+                      신고하기
+                    </>
+                  )}
+                </Button>
+                <DrawerClose asChild>
+                  <Button variant="outline" className="h-12">취소</Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </div>
+          </DrawerContent>
+        </Drawer>
+
       </div>
     </MobileLayout>
   );
 }
+
