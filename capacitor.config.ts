@@ -5,6 +5,10 @@ const config: CapacitorConfig = {
   appName: 'CEM',
   webDir: 'dist',
   bundledWebRuntime: false,
+  server: {
+    url: "https://cem-21tp.onrender.com",
+    cleartext: true
+  },
   plugins: {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],

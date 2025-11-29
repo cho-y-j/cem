@@ -24,9 +24,9 @@ export default function PinLogin() {
   });
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
-  
-  // FCM 토큰 등록 (모바일 앱에서만 작동)
-  useFcmToken();
+
+  // FCM 토큰 등록 훅
+  const { registerFcmToken } = useFcmToken();
 
   // 자동 로그인 체크
   const userQuery = trpc.auth.me.useQuery(undefined, {
@@ -67,12 +67,12 @@ export default function PinLogin() {
         toast.error('로그인 토큰을 받지 못했습니다. 다시 시도해주세요.');
         return;
       }
-      
+
       // 토큰 저장 (모바일 앱에서 인증에 필수)
       localStorage.setItem('authToken', token);
       console.log('[PinLogin] Token saved:', token.length, 'chars');
       console.log('[PinLogin] Token preview:', token.substring(0, 20) + '...');
-      
+
       // 저장 확인
       const savedToken = localStorage.getItem('authToken');
       if (!savedToken) {
@@ -81,7 +81,10 @@ export default function PinLogin() {
         return;
       }
       console.log('[PinLogin] Token saved verification: OK');
-      
+
+      // 로그인 성공 후 FCM 토큰 등록 시도
+      registerFcmToken();
+
       if (rememberMe) {
         // 이메일 저장 (다음 로그인 시 자동 입력)
         localStorage.setItem('savedEmail', email);
@@ -93,7 +96,7 @@ export default function PinLogin() {
 
       // 사용자 정보를 캐시에 직접 설정 (auth.me 쿼리가 완료되기 전에도 사용 가능하도록)
       utils.auth.me.setData(undefined, data.user);
-      
+
       // 토큰이 저장된 후에만 auth.me 쿼리 실행
       await utils.auth.me.invalidate();
 
@@ -108,8 +111,8 @@ export default function PinLogin() {
       }
       // admin, owner, bp, ep는 대시보드(/)로 이동
 
-        console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
-        setLocation(redirectTo);
+      console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
+      setLocation(redirectTo);
     },
     onError: (error) => {
       console.error('[PinLogin] Login error:', error);

@@ -72,64 +72,64 @@ function Router() {
       <Route path="/mobile/login-new" component={MobileLoginNew} />
       <Route path="/mobile/login-compare" component={MobileLoginCompare} />
       <Route path="/mobile/inspector/login" component={InspectorLogin} />
-      
+
       {/* 나머지 페이지 (DashboardLayout으로 감싸기) */}
       <Route>
         <DashboardLayout>
           <Switch>
             <Route path="/" component={Home} />
-        <Route path="/equipment" component={Equipment} />
-        <Route path="/workers" component={Workers} />
-        <Route path="/documents" component={Documents} />
-        <Route path="/work-journal" component={WorkJournal} />
-        <Route path="/approvals" component={Approvals} />
-        <Route path="/entry-requests" component={EntryRequestsNew} />
-        <Route path="/entry-requests/new" component={EntryRequestCreate} />
-        <Route path="/entry-requests/:id/bp-approve" component={EntryRequestBpApprove} />
-        <Route path="/entry-requests/:id/ep-approve" component={EntryRequestEpApprove} />
-        <Route path="/entry-requests-old" component={EntryRequests} />
-        <Route path="/deployments" component={Deployments} />
-        <Route path="/statistics" component={Statistics} />
-        <Route path="/location-tracking" component={LocationTracking} />
-        <Route path="/emergency-alerts" component={EmergencyAlerts} />
-        <Route path="/work-monitoring" component={WorkMonitoring} />
-        <Route path="/work-zones" component={WorkZones} />
-        <Route path="/check-in-monitoring" component={CheckInMonitoring} />
-        <Route path="/notifications" component={Notifications} />
-        <Route path="/notifications/send" component={NotificationSend} />
-        <Route path="/expiring-documents" component={ExpiringDocuments} />
-        <Route path="/my-profile" component={MyProfile} />
+            <Route path="/equipment" component={Equipment} />
+            <Route path="/workers" component={Workers} />
+            <Route path="/documents" component={Documents} />
+            <Route path="/work-journal" component={WorkJournal} />
+            <Route path="/approvals" component={Approvals} />
+            <Route path="/entry-requests" component={EntryRequestsNew} />
+            <Route path="/entry-requests/new" component={EntryRequestCreate} />
+            <Route path="/entry-requests/:id/bp-approve" component={EntryRequestBpApprove} />
+            <Route path="/entry-requests/:id/ep-approve" component={EntryRequestEpApprove} />
+            <Route path="/entry-requests-old" component={EntryRequests} />
+            <Route path="/deployments" component={Deployments} />
+            <Route path="/statistics" component={Statistics} />
+            <Route path="/location-tracking" component={LocationTracking} />
+            <Route path="/emergency-alerts" component={EmergencyAlerts} />
+            <Route path="/work-monitoring" component={WorkMonitoring} />
+            <Route path="/work-zones" component={WorkZones} />
+            <Route path="/check-in-monitoring" component={CheckInMonitoring} />
+            <Route path="/notifications" component={Notifications} />
+            <Route path="/notifications/send" component={NotificationSend} />
+            <Route path="/expiring-documents" component={ExpiringDocuments} />
+            <Route path="/my-profile" component={MyProfile} />
 
-        <Route path="/mobile/worker" component={WorkerMain} />
-        <Route path="/mobile/profile" component={MobileMyProfile} />
-        <Route path="/mobile/biometric-setup" component={BiometricSetup} />
-        <Route path="/mobile/inspector" component={InspectorMain} />
-        <Route path="/mobile/inspector/inspection/:equipmentId" component={SafetyInspectionNew} />
-        <Route path="/mobile/inspector/history" component={SafetyInspectionHistory} />
-        <Route path="/mobile/worker-old" component={WorkerMobile} />
-        <Route path="/mobile/document-upload" component={DocumentUpload} />
-        <Route path="/mobile/inspection-log" component={InspectionLog} />
-        <Route path="/mobile/work-log" component={WorkLog} />
-        <Route path="/mobile/work-journal-list" component={WorkJournalList} />
-        <Route path="/mobile/driver-inspection" component={DriverInspection} />
-        <Route path="/mobile/driver-inspection/:id/perform" component={DriverInspectionPerform} />
-        <Route path="/mobile/driver-inspection/history" component={DriverInspectionHistory} />
-        <Route path="/mobile/notifications" component={NotificationsMobile} />
-        <Route path="/admin/users" component={AdminUsersNew} />
-        <Route path="/admin/users-old" component={AdminUsers} />
-        <Route path="/admin/companies" component={AdminCompanies} />
-        <Route path="/admin/equip-types" component={AdminEquipTypes} />
-        <Route path="/admin/worker-types" component={AdminWorkerTypes} />
-        <Route path="/admin/safety-templates" component={SafetyTemplates} />
-        <Route path="/admin/safety-templates/new" component={SafetyTemplateNew} />
-        <Route path="/admin/driver-templates" component={DriverInspectionTemplates} />
-        <Route path="/admin/driver-templates/new" component={DriverInspectionTemplateNew} />
-        <Route path="/admin/driver-templates/:id/edit" component={DriverInspectionTemplateEdit} />
-        <Route path="/admin/driver-templates/:id" component={DriverInspectionTemplateDetail} />
-        <Route path="/admin/safety-templates/:id/edit" component={SafetyTemplateEdit} />
-        <Route path="/admin/safety-templates/:id" component={SafetyTemplateDetail} />
-        <Route path="/admin/safety-inspections" component={SafetyInspections} />
-        <Route path="/safety-inspection-review" component={SafetyInspectionReview} />
+            <Route path="/mobile/worker" component={WorkerMain} />
+            <Route path="/mobile/profile" component={MobileMyProfile} />
+            <Route path="/mobile/biometric-setup" component={BiometricSetup} />
+            <Route path="/mobile/inspector" component={InspectorMain} />
+            <Route path="/mobile/inspector/inspection/:equipmentId" component={SafetyInspectionNew} />
+            <Route path="/mobile/inspector/history" component={SafetyInspectionHistory} />
+            <Route path="/mobile/worker-old" component={WorkerMobile} />
+            <Route path="/mobile/document-upload" component={DocumentUpload} />
+            <Route path="/mobile/inspection-log" component={InspectionLog} />
+            <Route path="/mobile/work-log" component={WorkLog} />
+            <Route path="/mobile/work-journal-list" component={WorkJournalList} />
+            <Route path="/mobile/driver-inspection" component={DriverInspection} />
+            <Route path="/mobile/driver-inspection/:id/perform" component={DriverInspectionPerform} />
+            <Route path="/mobile/driver-inspection/history" component={DriverInspectionHistory} />
+            <Route path="/mobile/notifications" component={NotificationsMobile} />
+            <Route path="/admin/users" component={AdminUsersNew} />
+            <Route path="/admin/users-old" component={AdminUsers} />
+            <Route path="/admin/companies" component={AdminCompanies} />
+            <Route path="/admin/equip-types" component={AdminEquipTypes} />
+            <Route path="/admin/worker-types" component={AdminWorkerTypes} />
+            <Route path="/admin/safety-templates" component={SafetyTemplates} />
+            <Route path="/admin/safety-templates/new" component={SafetyTemplateNew} />
+            <Route path="/admin/driver-templates" component={DriverInspectionTemplates} />
+            <Route path="/admin/driver-templates/new" component={DriverInspectionTemplateNew} />
+            <Route path="/admin/driver-templates/:id/edit" component={DriverInspectionTemplateEdit} />
+            <Route path="/admin/driver-templates/:id" component={DriverInspectionTemplateDetail} />
+            <Route path="/admin/safety-templates/:id/edit" component={SafetyTemplateEdit} />
+            <Route path="/admin/safety-templates/:id" component={SafetyTemplateDetail} />
+            <Route path="/admin/safety-inspections" component={SafetyInspections} />
+            <Route path="/safety-inspection-review" component={SafetyInspectionReview} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>
@@ -139,7 +139,12 @@ function Router() {
   );
 }
 
+import { useFcmToken } from "@/hooks/useFcmToken";
+
 function App() {
+  // 앱 실행 시 FCM 토큰 등록 시도 (로그인 상태인 경우)
+  useFcmToken();
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
