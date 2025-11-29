@@ -18,16 +18,21 @@ function initializeFirebaseAdmin() {
   }
 
   try {
-    // Private Key는 환경 변수에서 \n을 실제 줄바꿈으로 변환
-    const privateKey = ENV.firebasePrivateKey.replace(/\\n/g, '\n');
+    // 환경 변수 값에서 앞뒤 따옴표 제거 및 줄바꿈 처리
+    const cleanValue = (val: string) => val ? val.replace(/^["']|["']$/g, '') : '';
+
+    const projectId = cleanValue(ENV.firebaseProjectId);
+    const clientEmail = cleanValue(ENV.firebaseClientEmail);
+    // Private Key는 \n을 실제 줄바꿈으로 변환
+    const privateKey = cleanValue(ENV.firebasePrivateKey).replace(/\\n/g, '\n');
 
     // 이미 초기화된 앱이 있는지 확인
     if (admin.apps.length === 0) {
       app = admin.initializeApp({
         credential: admin.credential.cert({
-          projectId: ENV.firebaseProjectId,
-          clientEmail: ENV.firebaseClientEmail,
-          privateKey: privateKey,
+          projectId,
+          clientEmail,
+          privateKey,
         }),
       });
       console.log('[FCM] Firebase Admin SDK 초기화 완료');
@@ -35,7 +40,7 @@ function initializeFirebaseAdmin() {
       app = admin.app();
       console.log('[FCM] Firebase Admin SDK 이미 초기화됨');
     }
-    
+
     return app;
   } catch (error) {
     console.error('[FCM] Firebase Admin SDK 초기화 실패:', error);
@@ -86,14 +91,14 @@ export async function sendFcmNotification(
     return true;
   } catch (error: any) {
     console.error('[FCM] 푸시 알림 전송 실패:', error);
-    
+
     // 토큰이 유효하지 않은 경우 (앱 삭제 등)
-    if (error.code === 'messaging/invalid-registration-token' || 
-        error.code === 'messaging/registration-token-not-registered') {
+    if (error.code === 'messaging/invalid-registration-token' ||
+      error.code === 'messaging/registration-token-not-registered') {
       console.warn('[FCM] 유효하지 않은 토큰:', fcmToken);
       // TODO: DB에서 토큰 삭제 처리
     }
-    
+
     return false;
   }
 }
@@ -123,7 +128,7 @@ export async function sendFcmNotifications(
   const batchSize = 500;
   for (let i = 0; i < recipients.length; i += batchSize) {
     const batch = recipients.slice(i, i + batchSize);
-    
+
     try {
       const messages: admin.messaging.Message[] = batch.map((recipient) => ({
         token: recipient.fcmToken,
@@ -146,17 +151,17 @@ export async function sendFcmNotifications(
       }));
 
       const response = await admin.messaging().sendEach(messages);
-      
+
       response.responses.forEach((result, index) => {
         if (result.success) {
           success++;
         } else {
           failed++;
           console.error(`[FCM] 푸시 알림 전송 실패 (${batch[index].userId}):`, result.error);
-          
+
           // 유효하지 않은 토큰인 경우
-          if (result.error?.code === 'messaging/invalid-registration-token' || 
-              result.error?.code === 'messaging/registration-token-not-registered') {
+          if (result.error?.code === 'messaging/invalid-registration-token' ||
+            result.error?.code === 'messaging/registration-token-not-registered') {
             console.warn(`[FCM] 유효하지 않은 토큰 삭제 필요: ${batch[index].userId}`);
             // TODO: DB에서 토큰 삭제 처리
           }
