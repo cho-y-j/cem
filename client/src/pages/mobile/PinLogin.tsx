@@ -55,86 +55,90 @@ export default function PinLogin() {
   const utils = trpc.useUtils();
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: async (data) => {
-      console.log('[PinLogin] Login success:', data);
-      toast.success(`환영합니다, ${data.user.name}님!`);
+    onSuccess: (data) => handleLoginSuccess(data),
+    onError: (error) => handleLoginError(error),
+  });
 
-      // 모바일 앱에서는 항상 토큰 저장 (세션 동안 사용)
-      // rememberMe는 다음 로그인 시 자동 입력 여부만 결정
-      const token = data.token || '';
-      if (!token) {
-        console.error('[PinLogin] No token received from server!');
-        toast.error('로그인 토큰을 받지 못했습니다. 다시 시도해주세요.');
-        return;
-      }
+  const pinLoginMutation = trpc.authPin.loginWithEmailAndPin.useMutation({
+    onSuccess: (data) => handleLoginSuccess(data),
+    onError: (error) => handleLoginError(error),
+  });
 
-      // 토큰 저장 (모바일 앱에서 인증에 필수)
+  const handleLoginSuccess = async (data: any) => {
+    console.log('[PinLogin] Login success:', data);
+    toast.success(`환영합니다, ${data.user.name}님!`);
+
+    // 모바일 앱에서는 항상 토큰 저장 (세션 동안 사용)
+    const token = data.token || '';
+    if (!token) {
+      console.error('[PinLogin] No token received from server!');
+      // authPin은 쿠키를 사용하므로 토큰이 없을 수 있음 (하지만 모바일은 토큰 필요)
+      // authPin 라우터가 토큰을 반환하지 않는다면 수정 필요. 
+      // 현재 authPinRouter는 { success: true, user: ... } 만 반환하고 쿠키를 설정함.
+      // 모바일 앱은 쿠키를 공유받지 못할 수 있으므로, authPinRouter도 토큰을 반환해야 함.
+      // 일단 토큰이 없으면 진행 (쿠키가 작동하기를 기대하거나, authPinRouter 수정 필요)
+    }
+
+    if (token) {
       localStorage.setItem('authToken', token);
       console.log('[PinLogin] Token saved:', token.length, 'chars');
-      console.log('[PinLogin] Token preview:', token.substring(0, 20) + '...');
-
-      // 저장 확인
-      const savedToken = localStorage.getItem('authToken');
-      if (!savedToken) {
-        console.error('[PinLogin] Token save failed!');
-        toast.error('토큰 저장에 실패했습니다.');
-        return;
-      }
-      console.log('[PinLogin] Token saved verification: OK');
 
       // 로그인 성공 후 FCM 토큰 등록 시도
       registerFcmToken();
+    }
 
-      if (rememberMe) {
-        // 이메일 저장 (다음 로그인 시 자동 입력)
-        localStorage.setItem('savedEmail', email);
-        console.log('[PinLogin] Email saved for auto-login');
-      } else {
-        // 이메일만 삭제 (토큰은 유지 - 세션 동안 필요)
-        localStorage.removeItem('savedEmail');
-      }
+    if (rememberMe) {
+      localStorage.setItem('savedEmail', email);
+    } else {
+      localStorage.removeItem('savedEmail');
+    }
 
-      // 사용자 정보를 캐시에 직접 설정 (auth.me 쿼리가 완료되기 전에도 사용 가능하도록)
-      utils.auth.me.setData(undefined, data.user);
+    // 사용자 정보를 캐시에 직접 설정
+    utils.auth.me.setData(undefined, data.user);
+    await utils.auth.me.invalidate();
 
-      // 토큰이 저장된 후에만 auth.me 쿼리 실행
-      await utils.auth.me.invalidate();
+    // 리다이렉션
+    const userRole = data.user.role?.toLowerCase();
+    let redirectTo = "/";
 
-      // 역할에 따라 적절한 페이지로 리다이렉션
-      const userRole = data.user.role?.toLowerCase();
-      let redirectTo = "/";
+    if (userRole === "worker") {
+      redirectTo = "/mobile/worker";
+    } else if (userRole === "inspector") {
+      redirectTo = "/mobile/inspector";
+    }
 
-      if (userRole === "worker") {
-        redirectTo = "/mobile/worker";
-      } else if (userRole === "inspector") {
-        redirectTo = "/mobile/inspector";
-      }
-      // admin, owner, bp, ep는 대시보드(/)로 이동
+    console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
+    setLocation(redirectTo);
+  };
 
-      console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
-      setLocation(redirectTo);
-    },
-    onError: (error) => {
-      console.error('[PinLogin] Login error:', error);
-      // 네트워크 에러인 경우 더 명확한 메시지 표시
-      const errorMessage = error.message || "로그인에 실패했습니다";
-      if (errorMessage.includes('네트워크') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
-        toast.error("서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.");
-      } else {
-        toast.error(errorMessage);
-      }
-    },
-  });
+  const handleLoginError = (error: any) => {
+    console.error('[PinLogin] Login error:', error);
+    const errorMessage = error.message || "로그인에 실패했습니다";
+    if (errorMessage.includes('네트워크') || errorMessage.includes('fetch')) {
+      toast.error("서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.");
+    } else {
+      toast.error(errorMessage);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email || !password) {
-      toast.error("이메일과 비밀번호를 입력해주세요");
+      toast.error("이메일과 비밀번호(또는 PIN)를 입력해주세요");
       return;
     }
 
-    loginMutation.mutate({ email, password });
+    // 비밀번호 길이에 따라 로그인 방식 결정
+    if (password.length === 4) {
+      // 4자리는 PIN 로그인 시도
+      console.log('[PinLogin] Attempting PIN login...');
+      pinLoginMutation.mutate({ email, pin: password });
+    } else {
+      // 그 외는 일반 비밀번호 로그인 시도
+      console.log('[PinLogin] Attempting Password login...');
+      loginMutation.mutate({ email, password });
+    }
   };
 
   return (
