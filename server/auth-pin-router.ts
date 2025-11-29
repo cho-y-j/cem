@@ -45,6 +45,7 @@ export const authPinRouter = router({
 
       return {
         success: true,
+        token, // 모바일 앱을 위해 토큰 반환
         user: {
           id: worker.id,
           name: worker.name,
@@ -96,6 +97,7 @@ export const authPinRouter = router({
 
       return {
         success: true,
+        token, // 모바일 앱을 위해 토큰 반환
         user: {
           id: user.id,
           name: user.name,
