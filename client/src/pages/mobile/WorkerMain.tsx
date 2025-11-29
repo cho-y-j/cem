@@ -1330,14 +1330,29 @@ export default function WorkerMain() {
                     setIsLocating(true);
 
                     const sendAlert = (lat?: number, lng?: number) => {
+                      // 위치 정보가 없으면 Work Zone 위치 사용 (Fallback)
+                      let finalLat = lat;
+                      let finalLng = lng;
+
+                      if (!finalLat || !finalLng) {
+                        if (currentDeployment?.workZone) {
+                          finalLat = parseFloat(currentDeployment.workZone.centerLat);
+                          finalLng = parseFloat(currentDeployment.workZone.centerLng);
+                          console.log('[Emergency] Using Work Zone location as fallback:', finalLat, finalLng);
+                          toast.info("현장 위치(Work Zone)로 대체하여 전송합니다.");
+                        } else {
+                          console.warn('[Emergency] No location and no Work Zone fallback available.');
+                        }
+                      }
+
                       sendEmergencyMutation.mutate({
                         equipmentId: assignedEquipment.id,
                         alertType: selectedEmergencyType.type,
                         description: emergencyDetails.trim()
                           ? `${selectedEmergencyType.desc} - ${emergencyDetails.trim()}`
                           : `${selectedEmergencyType.desc} - 작업자가 긴급 신고 (내용 없음)`,
-                        latitude: lat,
-                        longitude: lng,
+                        latitude: finalLat,
+                        longitude: finalLng,
                       });
                       setIsEmergencyDrawerOpen(false);
                       setIsLocating(false);
@@ -1348,16 +1363,18 @@ export default function WorkerMain() {
                         (pos) => sendAlert(pos.coords.latitude, pos.coords.longitude),
                         (err) => {
                           console.error("Geolocation error:", err);
-                          toast.error("위치 정보를 가져올 수 없습니다. (위치 없이 전송됨)");
+                          toast.error("GPS 위치를 가져올 수 없습니다.");
+                          // 에러 발생 시 Fallback 실행 (인자 없이 호출하면 내부에서 처리)
                           sendAlert();
                         },
                         {
                           enableHighAccuracy: true,
-                          timeout: 10000,
+                          timeout: 5000, // 5초로 단축 (빠른 Fallback 전환)
                           maximumAge: 0,
                         }
                       );
                     } else {
+                      toast.error("GPS를 지원하지 않는 기기입니다.");
                       sendAlert();
                     }
                   }}
