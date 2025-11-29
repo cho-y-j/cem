@@ -61,10 +61,16 @@ export default function PinLogin() {
 
       if (rememberMe) {
         // 토큰 저장 (자동 로그인)
-        localStorage.setItem('authToken', data.token || '');
+        const token = data.token || '';
+        localStorage.setItem('authToken', token);
         // 이메일 저장 (다음 로그인 시 자동 입력)
         localStorage.setItem('savedEmail', email);
         console.log('[PinLogin] Token and email saved for auto-login');
+        console.log('[PinLogin] Token length:', token.length);
+        console.log('[PinLogin] Token preview:', token.substring(0, 20) + '...');
+        // 저장 확인
+        const savedToken = localStorage.getItem('authToken');
+        console.log('[PinLogin] Token saved verification:', savedToken ? 'OK' : 'FAILED');
       } else {
         // 로그인 유지 안 함: 저장된 정보 삭제
         localStorage.removeItem('authToken');
