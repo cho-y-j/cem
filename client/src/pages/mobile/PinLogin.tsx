@@ -72,11 +72,9 @@ export default function PinLogin() {
     const token = data.token || '';
     if (!token) {
       console.error('[PinLogin] No token received from server!');
-      // authPin은 쿠키를 사용하므로 토큰이 없을 수 있음 (하지만 모바일은 토큰 필요)
-      // authPin 라우터가 토큰을 반환하지 않는다면 수정 필요. 
-      // 현재 authPinRouter는 { success: true, user: ... } 만 반환하고 쿠키를 설정함.
-      // 모바일 앱은 쿠키를 공유받지 못할 수 있으므로, authPinRouter도 토큰을 반환해야 함.
-      // 일단 토큰이 없으면 진행 (쿠키가 작동하기를 기대하거나, authPinRouter 수정 필요)
+      // 토큰이 없으면 리다이렉션 하지 않음 (무한 루프 방지)
+      toast.error('로그인 처리에 실패했습니다. (토큰 누락)');
+      return;
     }
 
     if (token) {
