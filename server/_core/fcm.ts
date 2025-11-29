@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import { ENV } from './env';
 
 /**
@@ -26,8 +26,8 @@ function initializeFirebaseAdmin() {
     // Private Key는 \n을 실제 줄바꿈으로 변환
     const privateKey = cleanValue(ENV.firebasePrivateKey).replace(/\\n/g, '\n');
 
-    // 이미 초기화된 앱이 있는지 확인
-    if (admin.apps.length === 0) {
+    // 이미 초기화된 앱이 있는지 확인 (admin.apps가 undefined일 수 있음)
+    if (!admin.apps || admin.apps.length === 0) {
       app = admin.initializeApp({
         credential: admin.credential.cert({
           projectId,
@@ -157,12 +157,12 @@ export async function sendFcmNotifications(
           success++;
         } else {
           failed++;
-          console.error(`[FCM] 푸시 알림 전송 실패 (${batch[index].userId}):`, result.error);
+          console.error(`[FCM] 푸시 알림 전송 실패(${batch[index].userId}): `, result.error);
 
           // 유효하지 않은 토큰인 경우
           if (result.error?.code === 'messaging/invalid-registration-token' ||
             result.error?.code === 'messaging/registration-token-not-registered') {
-            console.warn(`[FCM] 유효하지 않은 토큰 삭제 필요: ${batch[index].userId}`);
+            console.warn(`[FCM] 유효하지 않은 토큰 삭제 필요: ${batch[index].userId} `);
             // TODO: DB에서 토큰 삭제 처리
           }
         }
@@ -173,7 +173,7 @@ export async function sendFcmNotifications(
     }
   }
 
-  console.log(`[FCM] 푸시 알림 전송 완료: 성공 ${success}건, 실패 ${failed}건`);
+  console.log(`[FCM] 푸시 알림 전송 완료: 성공 ${success} 건, 실패 ${failed} 건`);
   return { success, failed };
 }
 
