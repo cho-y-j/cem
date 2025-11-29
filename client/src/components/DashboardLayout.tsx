@@ -47,42 +47,7 @@ const menuItems = [
   { icon: UserCircle, label: "내정보", path: "/my-profile", roles: ["worker"] },
 ];
 
-// ... (keep adminMenuItems as is)
 
-// ... (inside DashboardLayoutContent)
-
-<SidebarFooter className="p-3 border-t">
-  <div className="flex items-center gap-3 px-1 py-2 mb-2">
-    <Avatar className="h-9 w-9 border shrink-0">
-      <AvatarFallback className="text-xs font-medium">
-        {user?.name?.charAt(0).toUpperCase()}
-      </AvatarFallback>
-    </Avatar>
-    <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-      <p className="text-sm font-medium truncate leading-none">
-        {user?.name || "-"}
-      </p>
-      <p className="text-xs text-muted-foreground truncate mt-0.5">
-        {user?.role?.toUpperCase() || "-"}
-        {user?.companyName && ` • ${user.companyName}`}
-      </p>
-    </div>
-  </div>
-
-  <Button
-    variant="destructive"
-    className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-    onClick={async () => {
-      if (confirm("로그아웃 하시겠습니까?")) {
-        await logout();
-        window.location.href = "/login";
-      }
-    }}
-  >
-    <LogOut className="h-4 w-4" />
-    <span className="group-data-[collapsible=icon]:hidden">로그아웃</span>
-  </Button>
-</SidebarFooter>
 
 const adminMenuItems = [
   { icon: Building2, label: "회사 관리", path: "/admin/companies", roles: ["admin", "ep"] },
@@ -346,42 +311,37 @@ function DashboardLayoutContent({
             })()}
           </SidebarContent>
 
-          <SidebarFooter className="p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
-                    <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none">
-                      {user?.name || "-"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {user?.role?.toUpperCase() || "-"}
-                      {user?.companyName && ` • ${user.companyName}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {user?.email || "-"}
-                    </p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={async () => {
-                    await logout();
-                    window.location.href = "/login";
-                  }}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>로그아웃</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <SidebarFooter className="p-3 border-t">
+            <div className="flex items-center gap-3 px-1 py-2 mb-2">
+              <Avatar className="h-9 w-9 border shrink-0">
+                <AvatarFallback className="text-xs font-medium">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                <p className="text-sm font-medium truncate leading-none">
+                  {user?.name || "-"}
+                </p>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {user?.role?.toUpperCase() || "-"}
+                  {user?.companyName && ` • ${user.companyName}`}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="destructive"
+              className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              onClick={async () => {
+                if (confirm("로그아웃 하시겠습니까?")) {
+                  await logout();
+                  window.location.href = "/login";
+                }
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="group-data-[collapsible=icon]:hidden">로그아웃</span>
+            </Button>
           </SidebarFooter>
         </Sidebar>
         <div
