@@ -49,13 +49,23 @@ export default function WorkerMain() {
   useEffect(() => {
     // 로딩 중이면 대기
     if (loading) {
+      console.log('[WorkerMain] Loading user info...');
+      return;
+    }
+    
+    // 토큰이 있는데 사용자 정보가 없으면 잠시 대기 (auth.me 쿼리가 진행 중일 수 있음)
+    const token = localStorage.getItem('authToken');
+    if (token && !user) {
+      console.log('[WorkerMain] Token exists but user info not loaded yet, waiting...');
       return;
     }
     
     // 사용자 정보가 없거나 worker 역할이 아니면 로그인 페이지로 리다이렉션
     if (!user || user.role !== "worker") {
-      console.log('[WorkerMain] User not authenticated or not a worker, redirecting to login');
+      console.log('[WorkerMain] User not authenticated or not a worker, redirecting to login', { user, role: user?.role });
       setLocation("/mobile/login");
+    } else {
+      console.log('[WorkerMain] User authenticated:', user.name, user.role);
     }
   }, [user, loading, setLocation]);
 

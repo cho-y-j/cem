@@ -71,6 +71,9 @@ export default function PinLogin() {
         localStorage.removeItem('savedEmail');
       }
 
+      // 사용자 정보를 캐시에 직접 설정 (auth.me 쿼리가 완료되기 전에도 사용 가능하도록)
+      utils.auth.me.setData(undefined, data.user);
+      
       // 사용자 정보 쿼리 즉시 갱신 (다른 컴포넌트에서 사용자 정보를 바로 사용할 수 있도록)
       await utils.auth.me.invalidate();
       await utils.auth.me.refetch();
@@ -86,11 +89,8 @@ export default function PinLogin() {
       }
       // admin, owner, bp, ep는 대시보드(/)로 이동
 
-      // 사용자 정보가 갱신될 시간을 주기 위해 약간의 지연
-      setTimeout(() => {
-        console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
-        setLocation(redirectTo);
-      }, 300);
+      console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
+      setLocation(redirectTo);
     },
     onError: (error) => {
       console.error('[PinLogin] Login error:', error);
