@@ -1,6 +1,7 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
+import { Capacitor } from "@capacitor/core";
 import { useCallback, useEffect, useMemo } from "react";
 
 type UseAuthOptions = {
@@ -13,9 +14,15 @@ export function useAuth(options?: UseAuthOptions) {
     options ?? {};
   const utils = trpc.useUtils();
 
+  // 모바일 앱에서는 토큰이 있을 때만 auth.me 쿼리 실행 (웹은 쿠키 사용)
+  const isMobile = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('authToken');
+  const shouldEnableQuery = !isMobile || hasToken; // 웹이거나 모바일에서 토큰이 있으면 실행
+
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
+    enabled: shouldEnableQuery,
   });
 
   const logoutMutation = trpc.auth.logout.useMutation({
