@@ -290,6 +290,8 @@ export default function EmergencyAlerts() {
                             setOpenInfoWindowId(marker.id);
                             setHighlightedAlertId(marker.id);
                           }}
+                          onMouseEnter={() => setOpenInfoWindowId(marker.id)}
+                          onMouseLeave={() => setOpenInfoWindowId(null)}
                         >
                           <div
                             className={`relative flex items-center justify-center rounded-full shadow-lg transition-all ${isHighlighted ? 'scale-125' : 'scale-100'
@@ -420,10 +422,18 @@ export default function EmergencyAlerts() {
                             </p>
                           )}
                           {alert.latitude && alert.longitude && (
-                            <p className="text-sm text-blue-600 font-medium">
-                              <MapPin className="h-3 w-3 inline mr-1" />
-                              지도에서 보기 (클릭)
-                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mt-2 w-full justify-start text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAlertClick(alert);
+                              }}
+                            >
+                              <MapPin className="h-3 w-3 mr-2" />
+                              지도에서 보기
+                            </Button>
                           )}
                           {alert.resolved_at && (
                             <p className="text-sm text-green-600">
