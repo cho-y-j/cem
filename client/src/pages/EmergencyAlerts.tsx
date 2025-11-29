@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, MapPin, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { APIProvider, Map, AdvancedMarker, InfoWindow } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
@@ -18,9 +18,24 @@ export default function EmergencyAlerts() {
   const [highlightedAlertId, setHighlightedAlertId] = useState<string | null>(null);
   const [openInfoWindowId, setOpenInfoWindowId] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+
   const [mapZoom, setMapZoom] = useState<number>(12);
   const previousAlertCountRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 지도 제어 컴포넌트
+  const MapController = ({ center, zoom }: { center: { lat: number; lng: number } | null, zoom: number }) => {
+    const map = useMap();
+
+    useEffect(() => {
+      if (map && center) {
+        map.panTo(center);
+        map.setZoom(zoom);
+      }
+    }, [map, center, zoom]);
+
+    return null;
+  };
 
   const utils = trpc.useUtils();
 
@@ -149,12 +164,16 @@ export default function EmergencyAlerts() {
     }
   };
 
-  // 지도 마커 데이터
-  const mapMarkers = alerts
-    ?.filter((alert: any) => alert.latitude && alert.longitude && alert.status === "active")
+  // 지도 마커 데이터 (최신순 정렬)
+  const sortedAlerts = alerts?.slice().sort((a: any, b: any) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  ) || [];
+
+  const mapMarkers = sortedAlerts
+    .filter((alert: any) => alert.latitude && alert.longitude && alert.status === "active")
     .map((alert: any, index: number) => ({
       id: alert.id,
-      index: index + 1, // 1부터 시작하는 번호
+      index: index + 1, // 1부터 시작하는 번호 (최신순)
       position: {
         lat: parseFloat(alert.latitude),
         lng: parseFloat(alert.longitude),
@@ -165,7 +184,7 @@ export default function EmergencyAlerts() {
       createdAt: alert.created_at,
       workerName: alert.workers?.name || "Unknown",
       equipmentRegNum: alert.equipment?.reg_num || "미배정",
-    })) || [];
+    }));
 
   // 지도 초기 중심 좌표
   const initialMapCenter = mapMarkers.length > 0
@@ -257,6 +276,7 @@ export default function EmergencyAlerts() {
                   mapTypeControl={true}
                   fullscreenControl={true}
                 >
+                  <MapController center={mapCenter} zoom={mapZoom} />
                   {mapMarkers.map((marker) => {
                     const isHighlighted = highlightedAlertId === marker.id;
                     const markerColor = getAlertTypeColor(marker.alertType);
@@ -272,9 +292,8 @@ export default function EmergencyAlerts() {
                           }}
                         >
                           <div
-                            className={`relative flex items-center justify-center rounded-full shadow-lg transition-all ${
-                              isHighlighted ? 'scale-125' : 'scale-100'
-                            }`}
+                            className={`relative flex items-center justify-center rounded-full shadow-lg transition-all ${isHighlighted ? 'scale-125' : 'scale-100'
+                              }`}
                             style={{
                               backgroundColor: markerColor,
                               width: isHighlighted ? '48px' : '40px',
@@ -351,87 +370,86 @@ export default function EmergencyAlerts() {
             </div>
           ) : (
             <div className="space-y-4">
-              {alerts.map((alert: any, index: number) => {
+              {sortedAlerts.map((alert: any, index: number) => {
                 const isHighlighted = highlightedAlertId === alert.id;
                 const hasLocation = alert.latitude && alert.longitude && alert.status === "active";
 
                 return (
                   <div
                     key={alert.id}
-                    className={`p-4 border rounded-lg transition-all cursor-pointer ${
-                      alert.status === "active"
-                        ? isHighlighted
-                          ? "border-red-500 bg-red-100 shadow-lg"
-                          : "border-red-300 bg-red-50 hover:bg-red-100"
-                        : "hover:bg-accent"
-                    }`}
+                    className={`p-4 border rounded-lg transition-all cursor-pointer ${alert.status === "active"
+                      ? isHighlighted
+                        ? "border-red-500 bg-red-100 shadow-lg"
+                        : "border-red-300 bg-red-50 hover:bg-red-100"
+                      : "hover:bg-accent"
+                      }`}
                     onClick={() => hasLocation && handleAlertClick(alert)}
                   >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        {hasLocation && (
-                          <Badge
-                            className="font-bold"
-                            style={{
-                              backgroundColor: getAlertTypeColor(alert.alert_type),
-                              color: 'white'
-                            }}
-                          >
-                            #{index + 1}
-                          </Badge>
-                        )}
-                        {getStatusBadge(alert.status)}
-                        {getAlertTypeBadge(alert.alert_type)}
-                        <span className="text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3 inline mr-1" />
-                          {new Date(alert.created_at).toLocaleString("ko-KR")}
-                        </span>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {hasLocation && (
+                            <Badge
+                              className="font-bold"
+                              style={{
+                                backgroundColor: getAlertTypeColor(alert.alert_type),
+                                color: 'white'
+                              }}
+                            >
+                              #{index + 1}
+                            </Badge>
+                          )}
+                          {getStatusBadge(alert.status)}
+                          {getAlertTypeBadge(alert.alert_type)}
+                          <span className="text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            {new Date(alert.created_at).toLocaleString("ko-KR")}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="font-medium">
+                            작업자: {alert.workers?.name || "Unknown"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            장비: {alert.equipment?.reg_num || "미배정"}
+                          </p>
+                          {alert.description && (
+                            <p className="text-sm">
+                              <strong>상세:</strong> {alert.description}
+                            </p>
+                          )}
+                          {alert.latitude && alert.longitude && (
+                            <p className="text-sm text-blue-600 font-medium">
+                              <MapPin className="h-3 w-3 inline mr-1" />
+                              지도에서 보기 (클릭)
+                            </p>
+                          )}
+                          {alert.resolved_at && (
+                            <p className="text-sm text-green-600">
+                              <CheckCircle className="h-3 w-3 inline mr-1" />
+                              해결: {new Date(alert.resolved_at).toLocaleString("ko-KR")}
+                              {alert.resolution_note && ` - ${alert.resolution_note}`}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <p className="font-medium">
-                          작업자: {alert.workers?.name || "Unknown"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          장비: {alert.equipment?.reg_num || "미배정"}
-                        </p>
-                        {alert.description && (
-                          <p className="text-sm">
-                            <strong>상세:</strong> {alert.description}
-                          </p>
-                        )}
-                        {alert.latitude && alert.longitude && (
-                          <p className="text-sm text-blue-600 font-medium">
-                            <MapPin className="h-3 w-3 inline mr-1" />
-                            지도에서 보기 (클릭)
-                          </p>
-                        )}
-                        {alert.resolved_at && (
-                          <p className="text-sm text-green-600">
-                            <CheckCircle className="h-3 w-3 inline mr-1" />
-                            해결: {new Date(alert.resolved_at).toLocaleString("ko-KR")}
-                            {alert.resolution_note && ` - ${alert.resolution_note}`}
-                          </p>
-                        )}
-                      </div>
+                      {alert.status === "active" && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAlert(alert);
+                          }}
+                        >
+                          해결 처리
+                        </Button>
+                      )}
                     </div>
-
-                    {alert.status === "active" && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAlert(alert);
-                        }}
-                      >
-                        해결 처리
-                      </Button>
-                    )}
                   </div>
-                </div>
-              );
+                );
               })}
             </div>
           )}
