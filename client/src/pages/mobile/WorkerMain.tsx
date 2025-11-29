@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import MobileLayout from "@/components/mobile/MobileLayout";
-import MobileBottomNav, { getWorkerNavItems } from "@/components/mobile/MobileBottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
@@ -169,12 +168,7 @@ export default function WorkerMain() {
     console.log('[WorkerMain] Current Deployment:', currentDeployment);
   }, [user, assignedEquipment, currentDeployment]);
 
-  // Worker Type에 따른 동적 네비게이션 아이템 생성
-  const workerNavItems = useMemo(() => {
-    const workerTypeName = currentDeployment?.worker?.workerType?.name;
-    console.log('[WorkerMain] Worker Type Name:', workerTypeName);
-    return getWorkerNavItems(workerTypeName);
-  }, [currentDeployment?.worker?.workerType?.name]);
+
 
   // 현재 작업 세션 조회
   const {
@@ -843,7 +837,7 @@ export default function WorkerMain() {
 
   return (
     <MobileLayout title="작업 관리" showMenu={false}>
-      <div className="pb-24">
+      <div>
         {/* 출근 체크 섹션 */}
         {!todayCheckInStatus?.hasCheckedIn ? (
           <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white p-6 mb-4">
@@ -1485,8 +1479,6 @@ export default function WorkerMain() {
         </div>
 
       </div>
-
-      <MobileBottomNav items={workerNavItems} />
     </MobileLayout>
   );
 }

@@ -31,18 +31,18 @@ import { Button } from "./ui/button";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "대시보드", path: "/", roles: ["owner", "ep", "bp", "admin", "worker"] },
-  { icon: Truck, label: "장비 관리", path: "/equipment", roles: ["owner", "admin", "bp", "ep", "worker"] },
+  { icon: Truck, label: "장비 관리", path: "/equipment", roles: ["owner", "admin", "bp", "ep"] },
   { icon: HardHat, label: "인력 관리", path: "/workers", roles: ["owner", "admin", "bp", "ep"] },
-  { icon: FileText, label: "서류 관리", path: "/documents", roles: ["owner", "ep", "bp", "admin", "worker"] },
+  { icon: FileText, label: "서류 관리", path: "/documents", roles: ["owner", "ep", "bp", "admin"] },
   { icon: ArrowRightLeft, label: "반입,출입 요청", path: "/entry-requests", roles: ["owner", "ep", "bp", "admin"] },
   { icon: PackageCheck, label: "투입 관리", path: "/deployments", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Shield, label: "안전점검 확인", path: "/safety-inspection-review", roles: ["ep", "admin"] },
   { icon: FileText, label: "작업 확인서", path: "/work-journal", roles: ["owner", "ep", "bp", "admin", "worker"] },
   { icon: Map, label: "작업 구역 관리", path: "/work-zones", roles: ["ep", "admin"] },
-  { icon: UserCheck, label: "출근 현황", path: "/check-in-monitoring", roles: ["owner", "ep", "bp", "admin", "worker"] },
+  { icon: UserCheck, label: "출근 현황", path: "/check-in-monitoring", roles: ["owner", "ep", "bp", "admin"] },
   { icon: Bell, label: "알림 관리", path: "/notifications", roles: ["owner", "ep", "bp", "admin", "worker"] },
-  { icon: AlertTriangle, label: "긴급 알림", path: "/emergency-alerts", roles: ["owner", "ep", "bp", "admin", "worker"] },
-  { icon: Clock, label: "작업 현황 & 위치", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin", "worker"] },
+  { icon: AlertTriangle, label: "긴급 알림", path: "/emergency-alerts", roles: ["owner", "ep", "bp", "admin"] },
+  { icon: Clock, label: "작업 현황 & 위치", path: "/work-monitoring", roles: ["owner", "ep", "bp", "admin"] },
   { icon: BarChart3, label: "통계 및 리포트", path: "/statistics", roles: ["owner", "ep", "bp", "admin"] },
   { icon: UserCircle, label: "내정보", path: "/my-profile", roles: ["worker"] },
 ];
@@ -311,7 +311,7 @@ function DashboardLayoutContent({
             })()}
           </SidebarContent>
 
-          <SidebarFooter className="p-3 border-t">
+          <SidebarFooter className="p-3 border-t pb-8">
             <div className="flex items-center gap-3 px-1 py-2 mb-2">
               <Avatar className="h-9 w-9 border shrink-0">
                 <AvatarFallback className="text-xs font-medium">

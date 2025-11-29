@@ -73,6 +73,23 @@ function Router() {
       <Route path="/mobile/login-compare" component={MobileLoginCompare} />
       <Route path="/mobile/inspector/login" component={InspectorLogin} />
 
+      {/* 모바일 전용 페이지 (레이아웃 없음 - MobileLayout 사용) */}
+      <Route path="/mobile/worker" component={WorkerMain} />
+      <Route path="/mobile/profile" component={MobileMyProfile} />
+      <Route path="/mobile/biometric-setup" component={BiometricSetup} />
+      <Route path="/mobile/inspector" component={InspectorMain} />
+      <Route path="/mobile/inspector/inspection/:equipmentId" component={SafetyInspectionNew} />
+      <Route path="/mobile/inspector/history" component={SafetyInspectionHistory} />
+      <Route path="/mobile/worker-old" component={WorkerMobile} />
+      <Route path="/mobile/document-upload" component={DocumentUpload} />
+      <Route path="/mobile/inspection-log" component={InspectionLog} />
+      <Route path="/mobile/work-log" component={WorkLog} />
+      <Route path="/mobile/work-journal-list" component={WorkJournalList} />
+      <Route path="/mobile/driver-inspection" component={DriverInspection} />
+      <Route path="/mobile/driver-inspection/:id/perform" component={DriverInspectionPerform} />
+      <Route path="/mobile/driver-inspection/history" component={DriverInspectionHistory} />
+      <Route path="/mobile/notifications" component={NotificationsMobile} />
+
       {/* 나머지 페이지 (DashboardLayout으로 감싸기) */}
       <Route>
         <DashboardLayout>
@@ -99,22 +116,6 @@ function Router() {
             <Route path="/notifications/send" component={NotificationSend} />
             <Route path="/expiring-documents" component={ExpiringDocuments} />
             <Route path="/my-profile" component={MyProfile} />
-
-            <Route path="/mobile/worker" component={WorkerMain} />
-            <Route path="/mobile/profile" component={MobileMyProfile} />
-            <Route path="/mobile/biometric-setup" component={BiometricSetup} />
-            <Route path="/mobile/inspector" component={InspectorMain} />
-            <Route path="/mobile/inspector/inspection/:equipmentId" component={SafetyInspectionNew} />
-            <Route path="/mobile/inspector/history" component={SafetyInspectionHistory} />
-            <Route path="/mobile/worker-old" component={WorkerMobile} />
-            <Route path="/mobile/document-upload" component={DocumentUpload} />
-            <Route path="/mobile/inspection-log" component={InspectionLog} />
-            <Route path="/mobile/work-log" component={WorkLog} />
-            <Route path="/mobile/work-journal-list" component={WorkJournalList} />
-            <Route path="/mobile/driver-inspection" component={DriverInspection} />
-            <Route path="/mobile/driver-inspection/:id/perform" component={DriverInspectionPerform} />
-            <Route path="/mobile/driver-inspection/history" component={DriverInspectionHistory} />
-            <Route path="/mobile/notifications" component={NotificationsMobile} />
             <Route path="/admin/users" component={AdminUsersNew} />
             <Route path="/admin/users-old" component={AdminUsers} />
             <Route path="/admin/companies" component={AdminCompanies} />

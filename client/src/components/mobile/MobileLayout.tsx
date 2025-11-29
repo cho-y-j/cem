@@ -88,13 +88,13 @@ export default function MobileLayout({
       )}
 
       {/* 메인 컨텐츠 - 모바일 최적화 */}
-      <main className={cn(showBottomNav && "pb-24 safe-area-inset-bottom")}>
+      <main className={cn(showBottomNav && "pb-28 safe-area-inset-bottom")}>
         {children}
       </main>
 
       {/* 하단 네비게이션 (Worker 전용) - 모바일 최적화 */}
       {showBottomNav && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50 safe-area-inset-bottom max-w-md mx-auto">
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50 safe-area-inset-bottom pb-2 max-w-md mx-auto">
           <div className="grid grid-cols-5 gap-1 px-2 py-2">
             <button
               onClick={() => setLocation('/mobile/worker')}
