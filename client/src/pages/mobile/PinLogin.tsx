@@ -17,7 +17,11 @@ import { useFcmToken } from "@/hooks/useFcmToken";
  */
 export default function PinLogin() {
   const [, setLocation] = useLocation();
-  const [email, setEmail] = useState("");
+  // 저장된 이메일 불러오기
+  const [email, setEmail] = useState(() => {
+    const savedEmail = localStorage.getItem('savedEmail');
+    return savedEmail || "";
+  });
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   
@@ -56,7 +60,13 @@ export default function PinLogin() {
       if (rememberMe) {
         // 토큰 저장 (자동 로그인)
         localStorage.setItem('authToken', data.token || '');
-        console.log('[PinLogin] Token saved for auto-login');
+        // 이메일 저장 (다음 로그인 시 자동 입력)
+        localStorage.setItem('savedEmail', email);
+        console.log('[PinLogin] Token and email saved for auto-login');
+      } else {
+        // 로그인 유지 안 함: 저장된 정보 삭제
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('savedEmail');
       }
 
       // 역할에 따라 적절한 페이지로 리다이렉션
@@ -77,7 +87,13 @@ export default function PinLogin() {
     },
     onError: (error) => {
       console.error('[PinLogin] Login error:', error);
-      toast.error(error.message || "로그인에 실패했습니다");
+      // 네트워크 에러인 경우 더 명확한 메시지 표시
+      const errorMessage = error.message || "로그인에 실패했습니다";
+      if (errorMessage.includes('네트워크') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
+        toast.error("서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.");
+      } else {
+        toast.error(errorMessage);
+      }
     },
   });
 
