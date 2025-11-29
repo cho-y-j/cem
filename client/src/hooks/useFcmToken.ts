@@ -83,6 +83,15 @@ export function useFcmToken() {
       // 토큰 갱신 리스너
       PushNotifications.addListener('pushNotificationReceived', async (notification) => {
         console.log('[FCM] Push notification received:', notification);
+
+        // 앱이 포그라운드에 있을 때 토스트 알림 표시
+        toast.message(notification.title || '알림', {
+          description: notification.body,
+          action: {
+            label: '확인',
+            onClick: () => console.log('Notification clicked'),
+          },
+        });
       });
 
     } catch (error) {
