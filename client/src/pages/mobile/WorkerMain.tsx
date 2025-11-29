@@ -47,27 +47,46 @@ export default function WorkerMain() {
 
   // 로그인 체크 (로딩 중일 때는 리다이렉션하지 않음)
   useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    
+    // 토큰이 없으면 즉시 로그인 페이지로 리다이렉션
+    if (!token) {
+      console.log('[WorkerMain] No token found, redirecting to login');
+      setLocation("/mobile/login");
+      return;
+    }
+    
     // 로딩 중이면 대기
     if (loading) {
       console.log('[WorkerMain] Loading user info...');
       return;
     }
     
-    // 토큰이 있는데 사용자 정보가 없으면 잠시 대기 (auth.me 쿼리가 진행 중일 수 있음)
-    const token = localStorage.getItem('authToken');
-    if (token && !user) {
-      console.log('[WorkerMain] Token exists but user info not loaded yet, waiting...');
+    // 사용자 정보가 있으면 역할 확인
+    if (user) {
+      if (user.role !== "worker") {
+        console.log('[WorkerMain] User is not a worker, redirecting to login', { role: user.role });
+        setLocation("/mobile/login");
+      } else {
+        console.log('[WorkerMain] User authenticated:', user.name, user.role);
+      }
       return;
     }
     
-    // 사용자 정보가 없거나 worker 역할이 아니면 로그인 페이지로 리다이렉션
-    if (!user || user.role !== "worker") {
-      console.log('[WorkerMain] User not authenticated or not a worker, redirecting to login', { user, role: user?.role });
-      setLocation("/mobile/login");
-    } else {
-      console.log('[WorkerMain] User authenticated:', user.name, user.role);
+    // 토큰이 있는데 사용자 정보가 없으면 auth.me 쿼리를 강제로 실행
+    if (token && !user && !loading) {
+      console.log('[WorkerMain] Token exists but user info not loaded, refetching...');
+      utils.auth.me.refetch().then((result) => {
+        if (!result.data || result.data.role !== "worker") {
+          console.log('[WorkerMain] Failed to get user info or not a worker, redirecting to login');
+          setLocation("/mobile/login");
+        }
+      }).catch((error) => {
+        console.error('[WorkerMain] Failed to fetch user info:', error);
+        setLocation("/mobile/login");
+      });
     }
-  }, [user, loading, setLocation]);
+  }, [user, loading, setLocation, utils]);
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isSendingLocation, setIsSendingLocation] = useState(false);
