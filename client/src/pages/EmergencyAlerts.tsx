@@ -335,7 +335,7 @@ export default function EmergencyAlerts() {
                                   <div><strong>상세:</strong> {marker.description}</div>
                                 )}
                                 <div className="text-gray-600 text-xs mt-2">
-                                  {new Date(marker.createdAt).toLocaleString("ko-KR")}
+                                  {new Date(marker.createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
                                 </div>
                               </div>
                             </div>
@@ -406,7 +406,7 @@ export default function EmergencyAlerts() {
                           {getAlertTypeBadge(alert.alert_type)}
                           <span className="text-sm text-muted-foreground">
                             <Clock className="h-3 w-3 inline mr-1" />
-                            {new Date(alert.created_at).toLocaleString("ko-KR")}
+                            {new Date(alert.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
                           </span>
                         </div>
 
@@ -439,7 +439,7 @@ export default function EmergencyAlerts() {
                           {alert.resolved_at && (
                             <p className="text-sm text-green-600">
                               <CheckCircle className="h-3 w-3 inline mr-1" />
-                              해결: {new Date(alert.resolved_at).toLocaleString("ko-KR")}
+                              해결: {new Date(alert.resolved_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
                               {alert.resolution_note && ` - ${alert.resolution_note}`}
                             </p>
                           )}
