@@ -29,11 +29,21 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 import { startAuthentication } from '@simplewebauthn/browser';
+import { useFcmToken } from "@/hooks/useFcmToken";
+import { setupPushNotificationListeners } from "@/utils/pushNotifications";
 
 export default function WorkerMain() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  
+  // FCM 토큰 등록 (모바일 앱에서만 작동)
+  useFcmToken();
+  
+  // 푸시 알림 리스너 설정 (모바일 앱에서만 작동)
+  useEffect(() => {
+    setupPushNotificationListeners(setLocation);
+  }, [setLocation]);
 
   // 로그인 체크
   useEffect(() => {

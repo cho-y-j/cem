@@ -258,8 +258,18 @@ class SDKServer {
 
   async authenticateRequest(req: Request): Promise<User> {
     // Regular authentication flow
+    // 1. 쿠키에서 토큰 확인 (웹 브라우저용)
     const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
+    let sessionCookie = cookies.get(COOKIE_NAME);
+    
+    // 2. Authorization 헤더에서 토큰 확인 (모바일 앱용)
+    if (!sessionCookie) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        sessionCookie = authHeader.substring(7);
+      }
+    }
+    
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {

@@ -18,10 +18,20 @@ import { Search, Truck, AlertCircle, FileText, Settings, Lock, User, Nfc } from 
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useFcmToken } from "@/hooks/useFcmToken";
+import { setupPushNotificationListeners } from "@/utils/pushNotifications";
 
 export default function InspectorMain() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  
+  // FCM 토큰 등록 (모바일 앱에서만 작동)
+  useFcmToken();
+  
+  // 푸시 알림 리스너 설정 (모바일 앱에서만 작동)
+  useEffect(() => {
+    setupPushNotificationListeners(setLocation);
+  }, [setLocation]);
   const [searchInput, setSearchInput] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isNfcSupported, setIsNfcSupported] = useState(false);

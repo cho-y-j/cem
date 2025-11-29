@@ -113,7 +113,8 @@ export const appRouter = router({
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
         
-        return { user };
+        // 모바일 앱을 위해 토큰도 반환 (웹은 쿠키 사용, 모바일은 헤더 사용)
+        return { user, token };
       }),
     
     logout: publicProcedure.mutation(({ ctx }) => {

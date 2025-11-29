@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { startScheduler } from "./scheduler";
 import { serveStatic, setupVite } from "./vite";
+// FCM은 지연 로딩으로 처리 (필요할 때만 초기화)
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {

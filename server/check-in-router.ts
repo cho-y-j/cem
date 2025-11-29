@@ -467,7 +467,7 @@ export const checkInRouter = router({
     else if (userRole === "bp" && ctx.user.companyId) {
       deploymentQuery = deploymentQuery.eq("bp_company_id", ctx.user.companyId);
     }
-    // Owner인 경우 자신의 회사 deployment만 (deployment의 owner_id로 필터링)
+    // Owner인 경우 자신이 생성한 deployment만 (owner_id는 사용자 ID)
     else if (userRole === "owner" && ctx.user.id) {
       deploymentQuery = deploymentQuery.eq("owner_id", ctx.user.id);
     }
@@ -572,13 +572,13 @@ export const checkInRouter = router({
     // 출근 대상 worker 목록 조회
     const expectedWorkersList = await (async () => {
       if (!activeDeployments || activeDeployments.length === 0) return [];
-      
+
       const epCompanyIds = [...new Set(
         activeDeployments.map((d: any) => d.epCompanyId || d.ep_company_id).filter(Boolean)
       )];
-      
+
       if (epCompanyIds.length === 0) return [];
-      
+
       const { data: workZonesRaw } = await supabase
         .from("work_zones")
         .select("company_id, id, name, is_active")
@@ -589,11 +589,14 @@ export const checkInRouter = router({
       const validEpCompanyIds = new Set(
         workZones.map((wz: any) => wz.companyId || wz.company_id).filter(Boolean)
       );
-      
+
+      // work_zone이 있는 deployment만 필터 (이미 권한별 필터링이 적용된 activeDeployments 사용)
       const validDeployments = activeDeployments.filter((d: any) => {
         const epCompanyId = d.epCompanyId || d.ep_company_id;
         return epCompanyId && validEpCompanyIds.has(epCompanyId);
       });
+
+      console.log('[expectedWorkersList] Valid deployments after filter:', validDeployments.length);
 
       // worker_id와 guide_worker_id 목록 수집
       const workerIds = [...new Set(

@@ -1,0 +1,65 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.1'
+        classpath 'com.google.gms:google-services:4.4.2'
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+plugins {
+    // This plugin is required to use the 'java' extension for toolchain configuration.
+    id 'java-base'
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    
+    // Apply Java toolchain to all projects
+    afterEvaluate { project ->
+        // For Android projects, ensure compileOptions use Java 21
+        if (project.plugins.hasPlugin('com.android.application') || project.plugins.hasPlugin('com.android.library')) {
+            project.android {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_21
+                    targetCompatibility = JavaVersion.VERSION_21
+                }
+            }
+        }
+        
+        // For Java projects, set toolchain
+        if (project.plugins.hasPlugin('java') || project.plugins.hasPlugin('java-library')) {
+            project.java {
+                toolchain {
+                    languageVersion.set(JavaLanguageVersion.of(21))
+                }
+            }
+        }
+    }
+}
+
+// Set the Java toolchain for the root project
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+// Clean task - java-base plugin already provides a clean task,
+// so we configure it instead of creating a new one
+tasks.named('clean', Delete).configure {
+    delete rootProject.buildDir
+}

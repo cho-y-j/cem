@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { useFcmToken } from "@/hooks/useFcmToken";
 
 /**
  * 모바일 로그인 페이지
@@ -19,6 +20,9 @@ export default function PinLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
+  
+  // FCM 토큰 등록 (모바일 앱에서만 작동)
+  useFcmToken();
 
   // 자동 로그인 체크
   const userQuery = trpc.auth.me.useQuery(undefined, {
