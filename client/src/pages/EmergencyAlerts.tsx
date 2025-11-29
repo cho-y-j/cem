@@ -275,6 +275,7 @@ export default function EmergencyAlerts() {
                   disableDefaultUI={false}
                   mapTypeControl={true}
                   fullscreenControl={true}
+                  zoomControl={true}
                 >
                   <MapController center={mapCenter} zoom={mapZoom} />
                   {mapMarkers.map((marker) => {

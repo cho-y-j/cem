@@ -109,6 +109,7 @@ export default function WorkerMain() {
     desc: string;
   } | null>(null);
   const [emergencyDetails, setEmergencyDetails] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
 
   // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
   useEffect(() => {
@@ -1326,6 +1327,8 @@ export default function WorkerMain() {
                   onClick={() => {
                     if (!assignedEquipment || !selectedEmergencyType) return;
 
+                    setIsLocating(true);
+
                     const sendAlert = (lat?: number, lng?: number) => {
                       sendEmergencyMutation.mutate({
                         equipmentId: assignedEquipment.id,
@@ -1337,23 +1340,33 @@ export default function WorkerMain() {
                         longitude: lng,
                       });
                       setIsEmergencyDrawerOpen(false);
+                      setIsLocating(false);
                     };
 
                     if ("geolocation" in navigator) {
                       navigator.geolocation.getCurrentPosition(
                         (pos) => sendAlert(pos.coords.latitude, pos.coords.longitude),
-                        () => sendAlert()
+                        (err) => {
+                          console.error("Geolocation error:", err);
+                          toast.error("위치 정보를 가져올 수 없습니다. (위치 없이 전송됨)");
+                          sendAlert();
+                        },
+                        {
+                          enableHighAccuracy: true,
+                          timeout: 10000,
+                          maximumAge: 0,
+                        }
                       );
                     } else {
                       sendAlert();
                     }
                   }}
-                  disabled={sendEmergencyMutation.isPending}
+                  disabled={sendEmergencyMutation.isPending || isLocating}
                 >
-                  {sendEmergencyMutation.isPending ? (
+                  {sendEmergencyMutation.isPending || isLocating ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      전송 중...
+                      {isLocating ? "위치 확인 중..." : "전송 중..."}
                     </>
                   ) : (
                     <>
