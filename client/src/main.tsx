@@ -79,6 +79,9 @@ const trpcClient = trpc.createClient({
           const token = localStorage.getItem('authToken');
           if (token) {
             headers.set('Authorization', `Bearer ${token}`);
+            console.log('[API] Authorization header added:', token.substring(0, 20) + '...');
+          } else {
+            console.warn('[API] No auth token found in localStorage');
           }
           // 모바일 앱에서 Content-Type 명시적으로 설정
           if (!headers.has('Content-Type')) {
@@ -88,16 +91,23 @@ const trpcClient = trpc.createClient({
         
         const url = typeof input === 'string' ? input : input.url;
         console.log(`[API] ${init?.method || 'GET'} ${url}`);
+        console.log('[API] Headers:', Object.fromEntries(headers.entries()));
+        
+        // Headers 객체를 일반 객체로 변환하여 전달 (일부 환경에서 Headers 객체가 제대로 전달되지 않을 수 있음)
+        const headersObj: Record<string, string> = {};
+        headers.forEach((value, key) => {
+          headersObj[key] = value;
+        });
         
         return globalThis.fetch(input, {
           ...(init ?? {}),
-          headers,
+          headers: headersObj,
           // 웹에서는 쿠키 사용, 모바일에서는 헤더 사용
           credentials: Capacitor.isNativePlatform() ? "omit" : "include",
         }).catch((error) => {
           console.error('[API] Fetch error:', error);
           console.error('[API] URL:', url);
-          console.error('[API] Headers:', Object.fromEntries(headers.entries()));
+          console.error('[API] Headers:', headersObj);
           // 네트워크 에러를 더 명확하게 전달
           throw new Error(`네트워크 연결 실패: ${error.message || '서버에 연결할 수 없습니다'}`);
         });
