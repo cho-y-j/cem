@@ -33,7 +33,7 @@ import { useFcmToken } from "@/hooks/useFcmToken";
 import { setupPushNotificationListeners } from "@/utils/pushNotifications";
 
 export default function WorkerMain() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
   
@@ -45,12 +45,19 @@ export default function WorkerMain() {
     setupPushNotificationListeners(setLocation);
   }, [setLocation]);
 
-  // 로그인 체크
+  // 로그인 체크 (로딩 중일 때는 리다이렉션하지 않음)
   useEffect(() => {
+    // 로딩 중이면 대기
+    if (loading) {
+      return;
+    }
+    
+    // 사용자 정보가 없거나 worker 역할이 아니면 로그인 페이지로 리다이렉션
     if (!user || user.role !== "worker") {
+      console.log('[WorkerMain] User not authenticated or not a worker, redirecting to login');
       setLocation("/mobile/login");
     }
-  }, [user, setLocation]);
+  }, [user, loading, setLocation]);
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isSendingLocation, setIsSendingLocation] = useState(false);

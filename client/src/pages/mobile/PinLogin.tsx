@@ -52,8 +52,10 @@ export default function PinLogin() {
     }
   }, [setLocation, userQuery.data]);
 
+  const utils = trpc.useUtils();
+  
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       console.log('[PinLogin] Login success:', data);
       toast.success(`환영합니다, ${data.user.name}님!`);
 
@@ -69,6 +71,10 @@ export default function PinLogin() {
         localStorage.removeItem('savedEmail');
       }
 
+      // 사용자 정보 쿼리 즉시 갱신 (다른 컴포넌트에서 사용자 정보를 바로 사용할 수 있도록)
+      await utils.auth.me.invalidate();
+      await utils.auth.me.refetch();
+
       // 역할에 따라 적절한 페이지로 리다이렉션
       const userRole = data.user.role?.toLowerCase();
       let redirectTo = "/";
@@ -80,10 +86,11 @@ export default function PinLogin() {
       }
       // admin, owner, bp, ep는 대시보드(/)로 이동
 
+      // 사용자 정보가 갱신될 시간을 주기 위해 약간의 지연
       setTimeout(() => {
         console.log(`[PinLogin] Redirecting to ${redirectTo} (role: ${userRole})`);
         setLocation(redirectTo);
-      }, 100);
+      }, 300);
     },
     onError: (error) => {
       console.error('[PinLogin] Login error:', error);
