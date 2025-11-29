@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -89,7 +90,15 @@ export default function DashboardLayout({
     return <DashboardLayoutSkeleton />
   }
 
+
+
   if (!user) {
+    // 모바일 앱(Capacitor)인 경우 모바일 로그인 페이지로 자동 리다이렉션
+    if (Capacitor.isNativePlatform()) {
+      window.location.href = "/mobile/login";
+      return null; // 리다이렉션 중에는 아무것도 렌더링하지 않음
+    }
+
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
