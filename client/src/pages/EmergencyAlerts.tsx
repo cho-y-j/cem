@@ -271,11 +271,12 @@ export default function EmergencyAlerts() {
                   center={mapCenter || undefined}
                   zoom={mapZoom}
                   mapId="emergency-alerts-map"
-                  gestureHandling="greedy"
+                  gestureHandling="cooperative"
                   disableDefaultUI={false}
                   mapTypeControl={true}
                   fullscreenControl={true}
                   zoomControl={true}
+                  scrollwheel={true}
                 >
                   <MapController center={mapCenter} zoom={mapZoom} />
                   {mapMarkers.map((marker) => {
@@ -288,11 +289,15 @@ export default function EmergencyAlerts() {
                           position={marker.position}
                           title={marker.title}
                           onClick={() => {
-                            setOpenInfoWindowId(marker.id);
-                            setHighlightedAlertId(marker.id);
+                            // 클릭 시 InfoWindow 토글 (열려있으면 닫고, 닫혀있으면 열기)
+                            if (openInfoWindowId === marker.id) {
+                              setOpenInfoWindowId(null);
+                              setHighlightedAlertId(null);
+                            } else {
+                              setOpenInfoWindowId(marker.id);
+                              setHighlightedAlertId(marker.id);
+                            }
                           }}
-                          onMouseEnter={() => setOpenInfoWindowId(marker.id)}
-                          onMouseLeave={() => setOpenInfoWindowId(null)}
                         >
                           <div
                             className={`relative flex items-center justify-center rounded-full shadow-lg transition-all ${isHighlighted ? 'scale-125' : 'scale-100'
@@ -322,7 +327,10 @@ export default function EmergencyAlerts() {
                         {openInfoWindowId === marker.id && (
                           <InfoWindow
                             position={marker.position}
-                            onCloseClick={() => setOpenInfoWindowId(null)}
+                            onCloseClick={() => {
+                              setOpenInfoWindowId(null);
+                              setHighlightedAlertId(null);
+                            }}
                           >
                             <div className="p-2 min-w-[200px]">
                               <div className="font-bold text-base mb-2">
