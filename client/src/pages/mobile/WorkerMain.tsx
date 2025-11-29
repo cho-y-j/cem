@@ -1336,12 +1336,23 @@ export default function WorkerMain() {
 
                       if (!finalLat || !finalLng) {
                         if (currentDeployment?.workZone) {
-                          finalLat = parseFloat(currentDeployment.workZone.centerLat);
-                          finalLng = parseFloat(currentDeployment.workZone.centerLng);
-                          console.log('[Emergency] Using Work Zone location as fallback:', finalLat, finalLng);
-                          toast.info("현장 위치(Work Zone)로 대체하여 전송합니다.");
+                          const zoneLat = parseFloat(currentDeployment.workZone.centerLat);
+                          const zoneLng = parseFloat(currentDeployment.workZone.centerLng);
+
+                          if (!isNaN(zoneLat) && !isNaN(zoneLng)) {
+                            finalLat = zoneLat;
+                            finalLng = zoneLng;
+                            console.log('[Emergency] Using Work Zone location as fallback:', finalLat, finalLng);
+                            toast.info("현장 위치(Work Zone)로 대체하여 전송합니다.");
+                          } else {
+                            console.warn('[Emergency] Work Zone location is invalid:', currentDeployment.workZone);
+                            finalLat = undefined;
+                            finalLng = undefined;
+                          }
                         } else {
                           console.warn('[Emergency] No location and no Work Zone fallback available.');
+                          finalLat = undefined;
+                          finalLng = undefined;
                         }
                       }
 
