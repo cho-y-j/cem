@@ -32,6 +32,48 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  
+  // CORS 설정 (모바일 앱 지원)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    
+    // 허용할 origin 목록
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://localhost',
+      'capacitor://localhost',
+      'ionic://localhost',
+      'http://localhost',
+      'https://cem-21tp.onrender.com',
+      // 개발 환경에서 모든 origin 허용 (프로덕션에서는 제한 필요)
+      ...(process.env.NODE_ENV === 'development' ? ['*'] : [])
+    ];
+    
+    // Origin이 있으면 CORS 헤더 설정
+    if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes('*'))) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (!origin) {
+      // Origin이 없으면 (같은 도메인 요청) 허용
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    } else {
+      // 개발 환경에서는 모든 origin 허용
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24시간
+    
+    // OPTIONS 요청 (preflight) 처리
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    
+    next();
+  });
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
