@@ -3,8 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
 import {
   Bell,
   Check,
@@ -245,7 +243,15 @@ export default function NotificationsPage() {
                                 <span className="h-2 w-2 rounded-full bg-primary" />
                               )}
                               <span className="text-xs text-muted-foreground ml-auto">
-                                {format(new Date(notification.createdAt), "yyyy.MM.dd HH:mm", { locale: ko })}
+                                {new Date(notification.createdAt).toLocaleString("ko-KR", {
+                                  timeZone: "Asia/Seoul",
+                                  year: "numeric",
+                                  month: "2-digit",
+                                  day: "2-digit",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: false,
+                                })}
                               </span>
                             </div>
                             <h3 className="font-medium mt-1">{notification.title}</h3>

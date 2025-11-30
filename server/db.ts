@@ -6600,8 +6600,12 @@ async function sendDocumentExpiryNotification(
     }
   }
 
-  // Owner에게도 알림 (있는 경우)
-  if (ownerId) {
+  // Owner에게도 알림 (있는 경우, Worker와 다른 경우에만)
+  // Worker의 user_id와 Owner가 같으면 중복 알림 방지
+  const workerUserId = doc.target_type === 'worker' ?
+    (await supabase.from('workers').select('user_id').eq('id', doc.target_id).single()).data?.user_id : null;
+
+  if (ownerId && ownerId !== workerUserId) {
     const notification: InsertNotification = {
       id: nanoid(),
       targetType: 'user',
