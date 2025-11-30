@@ -6426,6 +6426,55 @@ export async function getUsersByFcmToken(targetType: string, targetId?: string):
 }
 
 /**
+ * 역할 목록으로 FCM 토큰 조회
+ * @param roles 역할 목록 (예: ["admin", "owner", "bp", "ep"])
+ * @returns FCM 토큰이 있는 사용자 목록
+ */
+export async function getUsersFcmTokensByRoles(roles: string[]): Promise<{ userId: string; fcmToken: string; role: string }[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, fcm_token, role')
+    .in('role', roles)
+    .not('fcm_token', 'is', null);
+
+  if (error) {
+    console.error("[Database] Error getting users FCM tokens by roles:", error);
+    return [];
+  }
+
+  return (data || [])
+    .filter((u: any) => u.fcm_token)
+    .map((u: any) => ({
+      userId: u.id,
+      fcmToken: u.fcm_token,
+      role: u.role,
+    }));
+}
+
+/**
+ * 특정 사용자의 FCM 토큰 조회
+ */
+export async function getUserFcmToken(userId: string): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('fcm_token')
+    .eq('id', userId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.fcm_token;
+}
+
+/**
  * 만료 예정 서류 알림 생성 (Cron Job용)
  * D-30, D-14, D-7, D-3, D-day에 알림 생성
  * 이미 만료된 서류도 포함 (D+N)

@@ -13,6 +13,7 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import * as db from "./db";
 import { storagePut } from "./storage";
+import { sendFcmNotifications, sendFcmNotification } from "./_core/fcm";
 
 // 상태 정의
 // owner_requested: Owner가 BP에게 요청
@@ -620,6 +621,52 @@ export const entryRequestsRouterV2 = router({
 
       console.log(`[EntryRequests] Created: ${requestNumber} by ${ctx.user.name}`);
 
+      // FCM 푸시 알림 발송
+      try {
+        if (!isBpRequest && bpCompanyId) {
+          // Owner가 요청한 경우 → BP 담당자들에게 푸시
+          const bpUsers = await db.getUsersFcmTokensByRoles(["bp"]);
+          // 해당 BP 회사 소속만 필터링 (나중에 회사 ID 기반 필터링 추가 가능)
+
+          if (bpUsers.length > 0) {
+            await sendFcmNotifications(
+              bpUsers.map((u) => ({ userId: u.userId, fcmToken: u.fcmToken })),
+              {
+                title: "📋 새 반입 요청",
+                body: `${ctx.user.name}님이 새로운 반입 요청을 등록했습니다.\n${input.purpose}`,
+                data: {
+                  type: "entry_request",
+                  requestId: requestId,
+                  action: "new",
+                },
+              }
+            );
+            console.log(`[EntryRequests] FCM 푸시 발송: BP에게 새 요청 알림`);
+          }
+        } else if (isBpRequest && input.targetEpCompanyId) {
+          // BP가 요청한 경우 → EP 담당자들에게 푸시
+          const epUsers = await db.getUsersFcmTokensByRoles(["ep"]);
+
+          if (epUsers.length > 0) {
+            await sendFcmNotifications(
+              epUsers.map((u) => ({ userId: u.userId, fcmToken: u.fcmToken })),
+              {
+                title: "📋 BP 반입 요청 승인 필요",
+                body: `${ctx.user.name}님(BP)이 반입 요청을 등록했습니다.\n${input.purpose}`,
+                data: {
+                  type: "entry_request",
+                  requestId: requestId,
+                  action: "pending_ep",
+                },
+              }
+            );
+            console.log(`[EntryRequests] FCM 푸시 발송: EP에게 BP 요청 알림`);
+          }
+        }
+      } catch (fcmError) {
+        console.error("[EntryRequests] FCM 푸시 발송 실패:", fcmError);
+      }
+
       return { id: requestId, requestNumber, success: true };
     }),
 
@@ -734,6 +781,28 @@ export const entryRequestsRouterV2 = router({
       console.log(`[EntryRequests] ✅ BP approved: ${input.id} by ${ctx.user.name}`);
       console.log(`[EntryRequests] ✅ Status changed to: bp_approved`);
       console.log(`[EntryRequests] ✅ Target EP company: ${input.targetEpCompanyId}`);
+
+      // FCM 푸시: EP에게 승인 요청 알림
+      try {
+        const epUsers = await db.getUsersFcmTokensByRoles(["ep"]);
+        if (epUsers.length > 0) {
+          await sendFcmNotifications(
+            epUsers.map((u) => ({ userId: u.userId, fcmToken: u.fcmToken })),
+            {
+              title: "✅ 반입 요청 승인 필요",
+              body: `BP(${ctx.user.name})가 반입 요청을 승인했습니다. EP 승인이 필요합니다.`,
+              data: {
+                type: "entry_request",
+                requestId: input.id,
+                action: "pending_ep",
+              },
+            }
+          );
+          console.log(`[EntryRequests] FCM 푸시 발송: EP에게 승인 요청 알림`);
+        }
+      } catch (fcmError) {
+        console.error("[EntryRequests] FCM 푸시 발송 실패:", fcmError);
+      }
 
       return { success: true };
     }),
@@ -913,6 +982,38 @@ export const entryRequestsRouterV2 = router({
       }
 
       console.log(`[EntryRequests] EP approved: ${input.id} by ${ctx.user.name}`);
+
+      // FCM 푸시: Owner와 BP에게 최종 승인 알림
+      try {
+        const recipientUserIds: string[] = [];
+
+        // Owner에게 알림
+        if (request.owner_user_id) {
+          recipientUserIds.push(request.owner_user_id);
+        }
+        // BP 승인자에게 알림
+        if (request.bp_approved_user_id && request.bp_approved_user_id !== request.owner_user_id) {
+          recipientUserIds.push(request.bp_approved_user_id);
+        }
+
+        for (const userId of recipientUserIds) {
+          const fcmToken = await db.getUserFcmToken(userId);
+          if (fcmToken) {
+            await sendFcmNotification(fcmToken, {
+              title: "🎉 반입 요청 최종 승인",
+              body: `EP(${ctx.user.name})가 반입 요청을 최종 승인했습니다. 반입이 가능합니다.`,
+              data: {
+                type: "entry_request",
+                requestId: input.id,
+                action: "approved",
+              },
+            });
+          }
+        }
+        console.log(`[EntryRequests] FCM 푸시 발송: Owner/BP에게 최종 승인 알림`);
+      } catch (fcmError) {
+        console.error("[EntryRequests] FCM 푸시 발송 실패:", fcmError);
+      }
 
       return { success: true };
     }),
