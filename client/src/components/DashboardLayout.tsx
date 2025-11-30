@@ -169,6 +169,10 @@ function DashboardLayoutContent({
   const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
+  // FCM 토큰 등록 (앱에서 푸시 알림 수신을 위해)
+  // admin, owner, bp, ep 사용자가 앱에서 접속 시 FCM 토큰 자동 등록
+  useFcmToken();
+
   useEffect(() => {
     if (isCollapsed) {
       setIsResizing(false);
