@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import MobileLayout from "@/components/mobile/MobileLayout";
 import MobileBottomNav, { inspectorNavItems } from "@/components/mobile/MobileBottomNav";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useFcmToken } from "@/hooks/useFcmToken";
 import { setupPushNotificationListeners } from "@/utils/pushNotifications";
+import { Capacitor } from "@capacitor/core";
+import { isNfcAvailable, startNativeNfcScan, startWebNfcScan, isNativeApp } from "@/utils/nfcHelper";
 
 export default function InspectorMain() {
   const [, setLocation] = useLocation();
@@ -59,71 +61,93 @@ export default function InspectorMain() {
   const utils = trpc.useUtils();
   const assignNfcTagMutation = trpc.safetyInspection.assignNfcTag.useMutation();
 
+  // NFC 태그 처리 콜백
+  const handleNfcTagRead = useCallback(async (tagValue: string) => {
+    if (!tagValue) return;
+
+    toast.info(`NFC 태그 인식: ${tagValue}`);
+    try {
+      const context = await utils.safetyInspection.getEquipmentByNfcTag.fetch({ nfcTagId: tagValue });
+      if (!context?.equipment?.id) {
+        setPendingNfcTag(tagValue);
+        setLastNfcTag(null);
+        setSearchResults([]);
+        toast.error("등록되지 않은 태그입니다. 장비를 검색한 뒤 '태그 등록'을 눌러 연결해주세요.");
+        return;
+      }
+
+      const equipmentResult = {
+        ...context.equipment,
+        activeDeployment: context.activeDeployment || null,
+      };
+
+      setPendingNfcTag(null);
+      setLastNfcTag(tagValue);
+      setSearchInput(context.equipment.regNum || "");
+      setSearchResults([equipmentResult]);
+      toast.success("태그와 매칭된 장비를 불러왔습니다. 목록에서 선택해 주세요.");
+    } catch (error: any) {
+      console.error("[InspectorMain] NFC 자동 스캔 처리 중 오류:", error);
+    }
+  }, [utils]);
+
+  // NFC 스캔 중지 함수 ref
+  const stopNfcScanRef = useRef<(() => void) | null>(null);
+
+  // NFC 초기화 (네이티브 앱 + 웹 지원)
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).NDEFReader) {
-      setIsNfcSupported(true);
-      if (!(window as any).__cemNfcListening) {
-        (window as any).__cemNfcListening = true;
+    let mounted = true;
+
+    const initNfc = async () => {
+      // NFC 지원 여부 확인
+      const available = await isNfcAvailable();
+      if (!mounted) return;
+
+      setIsNfcSupported(available);
+      console.log('[InspectorMain] NFC available:', available, 'isNative:', isNativeApp());
+
+      if (!available) return;
+
+      // 이미 초기화되었으면 스킵
+      if ((window as any).__cemNfcListening) return;
+      (window as any).__cemNfcListening = true;
+
+      if (isNativeApp()) {
+        // 네이티브 앱: Capacitor NFC 플러그인 사용
         try {
-          const NDEFReader = (window as any).NDEFReader;
-          const reader = new NDEFReader();
-          reader.addEventListener("reading", async (event: any) => {
-            if (!event) return;
-            try {
-              let tagValue = typeof event.serialNumber === "string" ? event.serialNumber.trim() : "";
-              if (!tagValue && event.message?.records?.length) {
-                for (const record of event.message.records) {
-                  if (record.recordType === "text" || record.recordType === "url") {
-                    const decoder = new TextDecoder(record.encoding || "utf-8");
-                    const decoded = decoder.decode(record.data);
-                    if (decoded?.trim()) {
-                      tagValue = decoded.trim();
-                      break;
-                    }
-                  }
-                }
-              }
-
-              if (!tagValue) return;
-
-              toast.info(`NFC 태그 인식: ${tagValue}`);
-              const context = await utils.safetyInspection.getEquipmentByNfcTag.fetch({ nfcTagId: tagValue });
-              if (!context?.equipment?.id) {
-                setPendingNfcTag(tagValue);
-                setLastNfcTag(null);
-                setSearchResults([]);
-                toast.error("등록되지 않은 태그입니다. 장비를 검색한 뒤 '태그 등록'을 눌러 연결해주세요.");
-                return;
-              }
-
-              const equipmentResult = {
-                ...context.equipment,
-                activeDeployment: context.activeDeployment || null,
-              };
-
-              setPendingNfcTag(null);
-              setLastNfcTag(tagValue);
-              setSearchInput(context.equipment.regNum || "");
-              setSearchResults([equipmentResult]);
-              toast.success("태그와 매칭된 장비를 불러왔습니다. 목록에서 선택해 주세요.");
-            } catch (error: any) {
-              console.error("[InspectorMain] NFC 자동 스캔 처리 중 오류:", error);
-            }
-          });
-          reader
-            .scan()
-            .then(() => {
-              toast.info("NFC 태그를 기기에 가까이 가져다주시면 자동으로 인식합니다.");
-            })
-            .catch((error: any) => {
-              console.warn("[InspectorMain] 자동 스캔 시작 실패:", error?.message || error);
-            });
+          const stopFn = await startNativeNfcScan(
+            handleNfcTagRead,
+            (error) => toast.error(`NFC 오류: ${error}`)
+          );
+          stopNfcScanRef.current = stopFn;
+          toast.info("NFC 태그를 기기에 가까이 가져다주시면 자동으로 인식합니다.");
         } catch (error) {
-          console.warn("[InspectorMain] NFC Reader 초기화 실패:", error);
+          console.error('[InspectorMain] Native NFC init error:', error);
+        }
+      } else {
+        // 웹 브라우저: Web NFC API 사용
+        try {
+          await startWebNfcScan(
+            handleNfcTagRead,
+            (error) => console.warn('[InspectorMain] Web NFC error:', error)
+          );
+          toast.info("NFC 태그를 기기에 가까이 가져다주시면 자동으로 인식합니다.");
+        } catch (error) {
+          console.warn("[InspectorMain] Web NFC init error:", error);
         }
       }
-    }
-  }, []);
+    };
+
+    initNfc();
+
+    return () => {
+      mounted = false;
+      if (stopNfcScanRef.current) {
+        stopNfcScanRef.current();
+        stopNfcScanRef.current = null;
+      }
+    };
+  }, [handleNfcTagRead]);
 
   const handleNfcScan = async () => {
     if (!isNfcSupported) {
@@ -136,61 +160,92 @@ export default function InspectorMain() {
     setTimeout(() => setIsNfcScanning(false), 2500);
   };
 
+  // 다이얼로그용 NFC 스캔 중지 함수 ref
+  const stopDialogNfcScanRef = useRef<(() => void) | null>(null);
+
   const handleDialogNfcScan = async () => {
     if (!isNfcSupported) {
       toast.error("이 기기는 NFC 스캔을 지원하지 않습니다.");
       return;
     }
 
+    setIsDialogScanning(true);
+    toast.info("등록할 NFC 태그를 기기에 가까이 가져다주세요.");
+
+    const onTagRead = (tagValue: string) => {
+      setIsDialogScanning(false);
+      if (stopDialogNfcScanRef.current) {
+        stopDialogNfcScanRef.current();
+        stopDialogNfcScanRef.current = null;
+      }
+      if (!tagValue) {
+        toast.error("인식된 NFC 태그에서 식별 정보를 찾지 못했습니다.");
+        return;
+      }
+      setTagInputValue(tagValue);
+      toast.success(`NFC 태그 인식: ${tagValue}`);
+    };
+
+    const onError = (error: string) => {
+      console.error("[InspectorMain] NFC 스캔 오류:", error);
+      setIsDialogScanning(false);
+      toast.error("NFC 스캔 중 오류가 발생했습니다.");
+    };
+
     try {
-      const NDEFReader = (window as any).NDEFReader;
-      const reader = new NDEFReader();
-      await reader.scan();
-      setIsDialogScanning(true);
-      toast.info("등록할 NFC 태그를 기기에 가까이 가져다주세요.");
+      if (isNativeApp()) {
+        // 네이티브 앱: Capacitor NFC 플러그인 사용
+        const stopFn = await startNativeNfcScan(onTagRead, onError);
+        stopDialogNfcScanRef.current = stopFn;
+      } else {
+        // 웹 브라우저: Web NFC API 사용
+        const NDEFReader = (window as any).NDEFReader;
+        const reader = new NDEFReader();
+        await reader.scan();
 
-      const handleError = (event: any) => {
-        console.error("[InspectorMain] NFC 스캔 오류:", event?.message || event);
-        setIsDialogScanning(false);
-        toast.error("NFC 스캔 중 오류가 발생했습니다.");
-        reader.removeEventListener("error", handleError);
-      };
+        const handleError = (event: any) => {
+          console.error("[InspectorMain] NFC 스캔 오류:", event?.message || event);
+          setIsDialogScanning(false);
+          toast.error("NFC 스캔 중 오류가 발생했습니다.");
+          reader.removeEventListener("error", handleError);
+        };
 
-      const handleReading = (event: any) => {
-        reader.removeEventListener("reading", handleReading);
-        reader.removeEventListener("error", handleError);
-        setIsDialogScanning(false);
+        const handleReading = (event: any) => {
+          reader.removeEventListener("reading", handleReading);
+          reader.removeEventListener("error", handleError);
+          setIsDialogScanning(false);
 
-        try {
-          let tagValue = typeof event.serialNumber === "string" ? event.serialNumber.trim() : "";
-          if (event.message?.records?.length) {
-            for (const record of event.message.records) {
-              if (record.recordType === "text" || record.recordType === "url") {
-                const decoder = new TextDecoder(record.encoding || "utf-8");
-                const decoded = decoder.decode(record.data);
-                if (decoded?.trim()) {
-                  tagValue = decoded.trim();
-                  break;
+          try {
+            let tagValue = typeof event.serialNumber === "string" ? event.serialNumber.trim() : "";
+            if (event.message?.records?.length) {
+              for (const record of event.message.records) {
+                if (record.recordType === "text" || record.recordType === "url") {
+                  const decoder = new TextDecoder(record.encoding || "utf-8");
+                  const decoded = decoder.decode(record.data);
+                  if (decoded?.trim()) {
+                    tagValue = decoded.trim();
+                    break;
+                  }
                 }
               }
             }
+
+            if (!tagValue) {
+              toast.error("인식된 NFC 태그에서 식별 정보를 찾지 못했습니다.");
+              return;
+            }
+
+            setTagInputValue(tagValue);
+            toast.success(`NFC 태그 인식: ${tagValue}`);
+          } catch (error: any) {
+            console.error("[InspectorMain] NFC 태그 처리 중 오류:", error);
+            toast.error(error?.message || "NFC 태그를 처리하는 중 오류가 발생했습니다.");
           }
+        };
 
-          if (!tagValue) {
-            toast.error("인식된 NFC 태그에서 식별 정보를 찾지 못했습니다.");
-            return;
-          }
-
-          setTagInputValue(tagValue);
-          toast.success(`NFC 태그 인식: ${tagValue}`);
-        } catch (error: any) {
-          console.error("[InspectorMain] NFC 태그 처리 중 오류:", error);
-          toast.error(error?.message || "NFC 태그를 처리하는 중 오류가 발생했습니다.");
-        }
-      };
-
-      reader.addEventListener("error", handleError);
-      reader.addEventListener("reading", handleReading, { once: true });
+        reader.addEventListener("error", handleError);
+        reader.addEventListener("reading", handleReading, { once: true });
+      }
     } catch (error: any) {
       console.error("[InspectorMain] NFC 스캔 시작 실패:", error);
       setIsDialogScanning(false);
@@ -570,6 +625,11 @@ export default function InspectorMain() {
             setTagDialogEquipment(null);
             setTagInputValue("");
             setIsDialogScanning(false);
+            // 다이얼로그 NFC 스캔 중지
+            if (stopDialogNfcScanRef.current) {
+              stopDialogNfcScanRef.current();
+              stopDialogNfcScanRef.current = null;
+            }
           }
         }}
       >
