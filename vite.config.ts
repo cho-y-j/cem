@@ -11,15 +11,15 @@ function htmlEnvPlugin(): Plugin {
   return {
     name: "html-env-replace",
     transformIndexHtml(html) {
-      const appLogo = process.env.VITE_APP_LOGO || "/icon-192.png";
+      const appLogo = process.env.VITE_APP_LOGO || "/dain.png";
       const appTitle = process.env.VITE_APP_TITLE || "장비관리";
       const analyticsEndpoint = process.env.VITE_ANALYTICS_ENDPOINT || "";
       const analyticsWebsiteId = process.env.VITE_ANALYTICS_WEBSITE_ID || "";
-      
+
       let result = html
         .replace(/%VITE_APP_LOGO%/g, appLogo)
         .replace(/%VITE_APP_TITLE%/g, appTitle);
-      
+
       // Analytics 스크립트 조건부 추가
       if (analyticsEndpoint && analyticsWebsiteId) {
         result = result.replace(
@@ -32,7 +32,7 @@ function htmlEnvPlugin(): Plugin {
           ""
         );
       }
-      
+
       return result;
     },
   };
@@ -56,6 +56,9 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
     chunkSizeWarningLimit: 1000, // 1MB로 경고 임계값 설정
+    rollupOptions: {
+      external: ['@exxili/capacitor-nfc'], // 네이티브 전용 패키지, 웹 빌드에서 제외
+    },
   },
   server: {
     host: true,

@@ -14,7 +14,13 @@ export async function isNfcAvailable(): Promise<boolean> {
   if (isNativeApp()) {
     // 네이티브 앱: Capacitor NFC 플러그인 사용
     try {
-      const { Nfc } = await import('@exxili/capacitor-nfc');
+      // 동적 import를 사용하되, 웹 빌드에서는 패키지가 없을 수 있으므로 안전하게 처리
+      const nfcModule = await import('@exxili/capacitor-nfc').catch(() => null);
+      if (!nfcModule) {
+        console.warn('[NFC] Native NFC plugin not available');
+        return false;
+      }
+      const { Nfc } = nfcModule;
       const result = await Nfc.isEnabled();
       return result.isEnabled;
     } catch (error) {
@@ -43,7 +49,13 @@ export async function startNativeNfcScan(
   }
 
   try {
-    const { Nfc } = await import('@exxili/capacitor-nfc');
+    // 동적 import를 사용하되, 웹 빌드에서는 패키지가 없을 수 있으므로 안전하게 처리
+    const nfcModule = await import('@exxili/capacitor-nfc').catch(() => null);
+    if (!nfcModule) {
+      onError?.('NFC 플러그인을 사용할 수 없습니다.');
+      return () => {};
+    }
+    const { Nfc } = nfcModule;
 
     // 리스너 등록
     const listener = await Nfc.addListener('nfcTag', (event: any) => {
