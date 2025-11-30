@@ -6490,32 +6490,6 @@ export async function getUserFcmToken(userId: string): Promise<string | null> {
     return null;
   }
 
-  return data.fcm_token;
-}
-
-/**
- * 사용자의 FCM 토큰 업데이트
- */
-export async function updateUserFcmToken(userId: string, fcmToken: string): Promise<void> {
-  const supabase = getSupabase();
-  if (!supabase) return;
-
-  try {
-    const { error } = await supabase
-      .from('users')
-      .update({ fcm_token: fcmToken })
-      .eq('id', userId);
-
-    if (error) {
-      console.error(`[Database] Error updating FCM token for user ${userId}:`, error);
-      throw error;
-    }
-
-    console.log(`[Database] FCM token updated for user ${userId}`);
-  } catch (error) {
-    console.error(`[Database] Failed to update FCM token for user ${userId}:`, error);
-    throw error;
-  }
 }
 
 /**
