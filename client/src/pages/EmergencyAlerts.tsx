@@ -429,7 +429,11 @@ export default function EmergencyAlerts() {
                           {getAlertTypeBadge(alert.alert_type)}
                           <span className="text-sm text-muted-foreground">
                             <Clock className="h-3 w-3 inline mr-1" />
-                            {formatToKST(alert.created_at)}
+                            {(() => {
+                              const kstTime = formatToKST(alert.created_at);
+                              console.log(`[Alert Debug] ID: ${alert.id}, Raw: ${alert.created_at}, KST: ${kstTime}`);
+                              return kstTime;
+                            })()}
                           </span>
                         </div>
 

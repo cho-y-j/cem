@@ -86,5 +86,6 @@ export const inspectorNavItems: NavItem[] = [
     matchPaths: ["/mobile/inspector/inspection"],
   },
   { icon: History, label: "점검 내역", path: "/mobile/inspector/history" },
+  { icon: Settings, label: "설정", path: "/mobile/inspector/settings" },
 ];
 

@@ -31,8 +31,16 @@ export function useAuth(options?: UseAuthOptions) {
     },
   });
 
+  const removeFcmTokenMutation = trpc.notifications.removeFcmToken.useMutation();
+
   const logout = useCallback(async () => {
     try {
+      // 로그아웃 전 FCM 토큰 제거 시도 (실패해도 로그아웃은 진행)
+      try {
+        await removeFcmTokenMutation.mutateAsync();
+      } catch (e) {
+        console.warn('Failed to remove FCM token:', e);
+      }
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {
       if (
@@ -52,7 +60,7 @@ export function useAuth(options?: UseAuthOptions) {
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }
-  }, [logoutMutation, utils, isMobile]);
+  }, [logoutMutation, removeFcmTokenMutation, utils, isMobile]);
 
   const state = useMemo(() => {
     return {

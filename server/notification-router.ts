@@ -79,6 +79,15 @@ export const notificationRouter = router({
       return { success: true };
     }),
 
+  /**
+   * FCM 토큰 제거 (로그아웃 시)
+   */
+  removeFcmToken: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      await db.updateUserFcmToken(ctx.user.id, null);
+      return { success: true };
+    }),
+
   // ============================================================
   // 관리자용 API
   // ============================================================

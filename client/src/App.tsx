@@ -39,6 +39,7 @@ import WorkerMain from "./pages/mobile/WorkerMain";
 import InspectorMain from "./pages/mobile/InspectorMain";
 import SafetyInspectionNew from "./pages/mobile/SafetyInspectionNew";
 import SafetyInspectionHistory from "./pages/mobile/SafetyInspectionHistory";
+import InspectorSettings from "./pages/mobile/InspectorSettings";
 import PinLogin from "./pages/mobile/PinLogin";
 import InspectorLogin from "./pages/mobile/InspectorLogin";
 import DriverInspection from "./pages/mobile/DriverInspection";
@@ -80,6 +81,7 @@ function Router() {
       <Route path="/mobile/inspector" component={InspectorMain} />
       <Route path="/mobile/inspector/inspection/:equipmentId" component={SafetyInspectionNew} />
       <Route path="/mobile/inspector/history" component={SafetyInspectionHistory} />
+      <Route path="/mobile/inspector/settings" component={InspectorSettings} />
       <Route path="/mobile/worker-old" component={WorkerMobile} />
       <Route path="/mobile/document-upload" component={DocumentUpload} />
       <Route path="/mobile/inspection-log" component={InspectionLog} />

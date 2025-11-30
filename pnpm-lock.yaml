@@ -34,6 +34,9 @@ importers:
       '@capacitor/push-notifications':
         specifier: ^7.0.3
         version: 7.0.3(@capacitor/core@7.4.4)
+      '@exxili/capacitor-nfc':
+        specifier: ^0.0.12
+        version: 0.0.12(@capacitor/core@7.4.4)
       '@google-cloud/vision':
         specifier: ^5.3.4
         version: 5.3.4
@@ -1074,6 +1077,11 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@exxili/capacitor-nfc@0.0.12':
+    resolution: {integrity: sha512-2IsApjBMIEEQhtgwmusyTVVeWWGEymcIYK/CzOGmVYQW6JmhJPRfSnC9ob6H06mXGntLWJaGiPmmvwukc/b41g==}
+    peerDependencies:
+      '@capacitor/core': '>=6.0.0 <9.0.0'
 
   '@fastify/busboy@3.2.0':
     resolution: {integrity: sha512-m9FVDXU3GT2ITSe0UaMA5rU3QkfC/UXtCU8y0gSN/GugTqtVldOBWIB5V6V3sbmenVZUIpU6f+mPEO2+m5iTaA==}
@@ -6046,6 +6054,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.10':
     optional: true
+
+  '@exxili/capacitor-nfc@0.0.12(@capacitor/core@7.4.4)':
+    dependencies:
+      '@capacitor/core': 7.4.4
 
   '@fastify/busboy@3.2.0': {}
 

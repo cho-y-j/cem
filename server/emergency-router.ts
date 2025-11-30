@@ -58,9 +58,12 @@ export const emergencyRouter = router({
         const alertTitle = alertTypeKorean[input.alertType] || "🚨 긴급 알림";
 
         // 관리자 역할들에게 FCM 토큰 조회
+        console.log(`[Emergency] Fetching FCM tokens for roles: admin, owner, bp, ep`);
         const recipients = await db.getUsersFcmTokensByRoles(["admin", "owner", "bp", "ep"]);
+        console.log(`[Emergency] Found ${recipients.length} recipients for push notification`);
 
         if (recipients.length > 0) {
+          console.log(`[Emergency] Sending FCM to ${recipients.length} devices`);
           const result = await sendFcmNotifications(
             recipients.map((r) => ({ userId: r.userId, fcmToken: r.fcmToken })),
             {
@@ -76,7 +79,7 @@ export const emergencyRouter = router({
           );
           console.log(`[Emergency] FCM 푸시 발송 완료: 성공 ${result.success}건, 실패 ${result.failed}건`);
         } else {
-          console.log("[Emergency] FCM 토큰이 등록된 관리자가 없습니다.");
+          console.log("[Emergency] FCM 토큰이 등록된 관리자가 없습니다. (DB 조회 결과 0건)");
         }
       } catch (fcmError) {
         console.error("[Emergency] FCM 푸시 발송 실패:", fcmError);

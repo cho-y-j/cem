@@ -48,6 +48,32 @@ allprojects {
                 }
             }
         }
+        
+        // Force Kotlin JVM target to 21 for all projects with Kotlin
+        try {
+            project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                kotlinOptions {
+                    jvmTarget = "21"
+                }
+            }
+        } catch (Exception e) {
+            // Kotlin plugin not available, skip
+        }
+    }
+}
+
+// Force Kotlin JVM target to 21 for all subprojects
+subprojects {
+    afterEvaluate { project ->
+        try {
+            project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                kotlinOptions {
+                    jvmTarget = "21"
+                }
+            }
+        } catch (Exception e) {
+            // Kotlin plugin not available, skip
+        }
     }
 }
 

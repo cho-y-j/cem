@@ -395,9 +395,17 @@ export default function InspectorMain() {
                 )}
               </Button>
               {!isNfcSupported && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  NFC 스캔은 Android Chrome 최신 버전에서만 지원됩니다.
-                </p>
+                <div className="text-xs text-muted-foreground mt-2 p-2 bg-muted rounded">
+                  <p className="font-semibold text-red-500">NFC 비활성화 원인:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Capacitor Native: {Capacitor.isNativePlatform() ? "Yes" : "No"}</li>
+                    <li>Android: {Capacitor.getPlatform() === 'android' ? "Yes" : "No"}</li>
+                    <li>Plugin Available: {isNfcSupported ? "Yes" : "No"}</li>
+                  </ul>
+                  <p className="mt-2">
+                    * 앱이 로컬 빌드(file://)로 실행되어야 플러그인이 작동합니다.
+                  </p>
+                </div>
               )}
             </div>
             {isNfcSupported && (
