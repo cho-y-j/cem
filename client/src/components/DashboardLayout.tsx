@@ -28,6 +28,7 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { useFcmToken } from "@/hooks/useFcmToken";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "대시보드", path: "/", roles: ["owner", "ep", "bp", "admin", "worker"] },
@@ -110,7 +111,7 @@ export default function DashboardLayout({
                 <img
                   src={APP_LOGO}
                   alt={APP_TITLE}
-                  className="h-20 w-20 rounded-xl object-cover shadow"
+                  className="h-32 w-32 rounded-xl object-cover shadow"
                 />
               </div>
             </div>
@@ -233,7 +234,7 @@ function DashboardLayoutContent({
                   <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={APP_LOGO}
-                      className="h-8 w-8 rounded-md object-cover ring-1 ring-border shrink-0"
+                      className="h-12 w-12 rounded-md object-cover ring-1 ring-border shrink-0"
                       alt="Logo"
                     />
                     <span className="font-semibold tracking-tight truncate">

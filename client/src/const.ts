@@ -3,7 +3,7 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 export const APP_TITLE = import.meta.env.VITE_APP_TITLE || "App";
 
 export const APP_LOGO =
-  import.meta.env.VITE_APP_LOGO || "/dain.png";
+  import.meta.env.VITE_APP_LOGO || "/binpng.png";
 
 // 로그인 URL 반환 (자체 로그인 페이지)
 export const getLoginUrl = () => {
