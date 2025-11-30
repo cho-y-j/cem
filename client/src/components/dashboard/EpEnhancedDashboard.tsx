@@ -281,7 +281,7 @@ export default function EpEnhancedDashboard() {
                           </span>
                           <span className="text-xs text-muted-foreground">
                             <Clock className="h-3 w-3 inline mr-1" />
-                            {new Date(alert.created_at).toLocaleString("ko-KR")}
+                            {new Date(alert.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
                           </span>
                         </div>
                         <p className="font-semibold text-gray-900">

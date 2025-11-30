@@ -9,6 +9,8 @@ import { trpc } from "@/lib/trpc";
 import { Loader2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 
+import { useFcmToken } from "@/hooks/useFcmToken";
+
 /**
  * 개선된 모바일 로그인 페이지
  * - 이메일 + 비밀번호 로그인
@@ -20,6 +22,7 @@ export default function LoginNew() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
+  const { registerFcmToken } = useFcmToken();
 
   // 자동 로그인 체크
   const userQuery = trpc.auth.me.useQuery(undefined, {
@@ -41,9 +44,11 @@ export default function LoginNew() {
       }
 
       console.log(`[MobileLoginNew] Auto-login to ${redirectTo} (role: ${userRole})`);
+      // 자동 로그인 시에도 FCM 토큰 갱신 시도
+      registerFcmToken();
       setLocation(redirectTo);
     }
-  }, [setLocation, userQuery.data]);
+  }, [setLocation, userQuery.data, registerFcmToken]);
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
@@ -55,6 +60,9 @@ export default function LoginNew() {
         localStorage.setItem('authToken', data.token || '');
         console.log('[MobileLoginNew] Token saved for auto-login');
       }
+
+      // 로그인 성공 즉시 FCM 토큰 등록
+      registerFcmToken();
 
       // 역할에 따라 적절한 페이지로 리다이렉션
       const userRole = data.user.role?.toLowerCase();

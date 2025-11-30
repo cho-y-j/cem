@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
+import { useFcmToken } from "@/hooks/useFcmToken";
 import { Loader2, Shield, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,10 +13,15 @@ export default function InspectorLogin() {
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
+  const { registerFcmToken } = useFcmToken();
 
   const loginMutation = trpc.authPin.loginWithEmailAndPin.useMutation({
     onSuccess: (data) => {
       toast.success(`환영합니다, ${data.user.name}님!`);
+
+      // 로그인 성공 즉시 FCM 토큰 등록
+      registerFcmToken();
+
       // 로그인 성공 후 역할에 따라 리다이렉션
       const userRole = data.user.role?.toLowerCase();
       if (userRole === "inspector") {
@@ -111,11 +117,10 @@ export default function InspectorLogin() {
                 {[...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className={`w-3 h-3 rounded-full border-2 transition-all ${
-                      i < pin.length
+                    className={`w-3 h-3 rounded-full border-2 transition-all ${i < pin.length
                         ? "bg-green-600 border-green-600"
                         : "bg-white border-gray-300"
-                    }`}
+                      }`}
                   />
                 ))}
               </div>

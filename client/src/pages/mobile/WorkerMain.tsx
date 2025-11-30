@@ -1389,68 +1389,92 @@ export default function WorkerMain() {
                         } else {
                           console.warn('[Emergency] No location and no Work Zone fallback available.');
                           console.log('[Emergency] currentDeployment:', currentDeployment);
-                          finalLat = undefined;
-                          finalLng = undefined;
                         }
                       }
 
-                      sendEmergencyMutation.mutate({
+                      console.log('[Emergency] Sending alert:', {
+                        workerId: workerInfo.id,
                         equipmentId: assignedEquipment.id,
-                        alertType: selectedEmergencyType.type,
-                        description: emergencyDetails.trim()
-                          ? `${selectedEmergencyType.desc} - ${emergencyDetails.trim()}`
-                          : `${selectedEmergencyType.desc} - 작업자가 긴급 신고 (내용 없음)`,
+                        alertType: selectedEmergencyType.id,
                         latitude: finalLat,
                         longitude: finalLng,
+                        description: emergencyDetails
                       });
-                      setIsEmergencyDrawerOpen(false);
-                      setIsLocating(false);
+
+                      createEmergencyAlertMutation.mutate({
+                        workerId: workerInfo.id,
+                        equipmentId: assignedEquipment.id,
+                        alertType: selectedEmergencyType.id,
+                        latitude: finalLat,
+                        longitude: finalLng,
+                        description: emergencyDetails,
+                      }, {
+                        onSuccess: (data) => {
+                          console.log('[Emergency] Alert created successfully:', data);
+                          toast.success("긴급 알림이 전송되었습니다.", {
+                            description: "관리자에게 푸시 알림이 발송됩니다."
+                          });
+                          setIsEmergencyDrawerOpen(false);
+                          setEmergencyDetails("");
+                          setSelectedEmergencyType(null);
+                        },
+                        onError: (error) => {
+                          console.error('[Emergency] Failed to create alert:', error);
+                          toast.error("긴급 알림 전송 실패", {
+                            description: `오류: ${error.message || "알 수 없는 오류가 발생했습니다."}`
+                          });
+                          // 네트워크 에러인 경우 추가 안내
+                          if (error.message?.includes("fetch") || error.message?.includes("Network")) {
+                            toast.error("네트워크 연결을 확인해주세요.");
+                          }
+                        }
+                      });
                     };
 
-                    if ("geolocation" in navigator) {
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => sendAlert(pos.coords.latitude, pos.coords.longitude),
-                        (err) => {
-                          console.error("Geolocation error:", err);
-                          toast.error("GPS 위치를 가져올 수 없습니다.");
-                          // 에러 발생 시 Fallback 실행 (인자 없이 호출하면 내부에서 처리)
-                          sendAlert();
-                        },
-                        {
-                          enableHighAccuracy: true,
-                          timeout: 5000, // 5초로 단축 (빠른 Fallback 전환)
-                          maximumAge: 0,
-                        }
-                      );
-                    } else {
-                      toast.error("GPS를 지원하지 않는 기기입니다.");
+                // 위치 정보 가져오기 시도 (타임아웃 5초)
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      setIsLocating(false);
+                      sendAlert(position.coords.latitude, position.coords.longitude);
+                    },
+                    (error) => {
+                      console.warn('[Emergency] Geolocation error:', error);
+                      setIsLocating(false);
+                      // 위치 실패해도 전송 (Fallback 로직이 sendAlert 안에 있음)
                       sendAlert();
+                    },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                  );
+                    } else {
+                  setIsLocating(false);
+                sendAlert();
                     }
                   }}
-                  disabled={sendEmergencyMutation.isPending || isLocating}
+                disabled={sendEmergencyMutation.isPending || isLocating}
                 >
-                  {sendEmergencyMutation.isPending || isLocating ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      {isLocating ? "위치 확인 중..." : "전송 중..."}
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle className="mr-2 h-5 w-5" />
-                      신고하기
-                    </>
-                  )}
-                </Button>
-                <DrawerClose asChild>
-                  <Button variant="outline" className="h-12">취소</Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </div>
-          </DrawerContent>
-        </Drawer>
+                {sendEmergencyMutation.isPending || isLocating ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    {isLocating ? "위치 확인 중..." : "전송 중..."}
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="mr-2 h-5 w-5" />
+                    신고하기
+                  </>
+                )}
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline" className="h-12">취소</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
-      </div>
-    </MobileLayout>
+    </div>
+    </MobileLayout >
   );
 }
 

@@ -8,26 +8,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { APP_LOGO, APP_TITLE } from "@/const";
 
+import { useFcmToken } from "@/hooks/useFcmToken";
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
+  const { registerFcmToken } = useFcmToken();
+
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: () => {
       toast.success("로그인 성공");
+      // 로그인 성공 즉시 FCM 토큰 등록
+      registerFcmToken();
       window.location.href = "/"; // 전체 페이지 새로고침으로 사용자 정보 갱신
     },
     onError: (error) => {
       toast.error(error.message);
     },
   });
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     loginMutation.mutate({ email, password });
   };
-  
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
       <Card className="w-full max-w-md shadow-lg">
@@ -72,21 +77,21 @@ export default function Login() {
                 autoComplete="current-password"
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full"
               disabled={loginMutation.isPending}
             >
               {loginMutation.isPending ? "로그인 중..." : "로그인"}
             </Button>
           </form>
-          
+
           <div className="mt-6 pt-6 border-t text-center">
             <p className="text-sm text-muted-foreground mb-2">
               모바일 앱 사용자 (Worker/Inspector)
             </p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
               onClick={() => setLocation("/mobile/login")}
             >

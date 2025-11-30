@@ -153,10 +153,34 @@ export const notificationRouter = router({
 
       // FCM 푸시 알림 발송 (모바일 앱 사용자만)
       try {
-        const recipients = await db.getUsersByFcmToken(input.targetType, input.targetId);
+        let recipients: { userId: string; fcmToken: string }[] = [];
+        
+        // 기본 대상자 조회
+        console.log(`[Notification] Fetching FCM tokens for targetType: ${input.targetType}, targetId: ${input.targetId || 'all'}`);
+        const baseRecipients = await db.getUsersByFcmToken(input.targetType, input.targetId);
+        recipients.push(...baseRecipients);
+        console.log(`[Notification] Found ${baseRecipients.length} base recipients`);
+
+        // 긴급 알림인 경우 추가로 관리자 역할들에게도 발송
+        if (input.type === "emergency") {
+          console.log(`[Notification] Emergency notification - fetching additional FCM tokens for roles: admin, owner, bp, ep`);
+          const roleRecipients = await db.getUsersFcmTokensByRoles(["admin", "owner", "bp", "ep"]);
+          console.log(`[Notification] Found ${roleRecipients.length} role-based recipients`);
+          
+          // 중복 제거 (userId 기준)
+          const existingUserIds = new Set(recipients.map(r => r.userId));
+          const uniqueRoleRecipients = roleRecipients
+            .filter(r => !existingUserIds.has(r.userId))
+            .map(r => ({ userId: r.userId, fcmToken: r.fcmToken }));
+          
+          recipients.push(...uniqueRoleRecipients);
+          console.log(`[Notification] Added ${uniqueRoleRecipients.length} unique role-based recipients (total: ${recipients.length})`);
+        }
+
         if (recipients.length > 0) {
+          console.log(`[Notification] Sending FCM push to ${recipients.length} recipients`);
           const { sendFcmNotifications } = await import('./_core/fcm');
-          await sendFcmNotifications(recipients, {
+          const pushResult = await sendFcmNotifications(recipients, {
             title: input.title || result.title || '',
             body: input.content || result.content || '',
             data: {
@@ -168,6 +192,9 @@ export const notificationRouter = router({
               } : {}),
             },
           });
+          console.log(`[Notification] FCM 푸시 발송 완료: 성공 ${pushResult.success}건, 실패 ${pushResult.failed}건`);
+        } else {
+          console.log(`[Notification] FCM 토큰이 등록된 대상자가 없습니다. (총 ${recipients.length}건)`);
         }
       } catch (error) {
         console.error('[Notification] FCM push failed:', error);

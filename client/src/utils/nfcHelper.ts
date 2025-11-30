@@ -14,22 +14,46 @@ export async function isNfcAvailable(): Promise<boolean> {
   if (isNativeApp()) {
     // 네이티브 앱: Capacitor NFC 플러그인 사용
     try {
+      console.log('[NFC] Checking NFC availability in native app...');
       // 동적 import를 사용하되, 웹 빌드에서는 패키지가 없을 수 있으므로 안전하게 처리
-      const nfcModule = await import('@exxili/capacitor-nfc').catch(() => null);
+      const nfcModule = await import('@exxili/capacitor-nfc').catch((error) => {
+        console.error('[NFC] Failed to import @exxili/capacitor-nfc:', error);
+        console.error('[NFC] Error details:', {
+          message: error?.message,
+          stack: error?.stack,
+          name: error?.name,
+        });
+        return null;
+      });
       if (!nfcModule) {
-        console.warn('[NFC] Native NFC plugin not available');
+        console.warn('[NFC] Native NFC plugin module is null - plugin may not be installed or accessible');
         return false;
       }
+      console.log('[NFC] NFC module loaded successfully:', Object.keys(nfcModule));
       const { Nfc } = nfcModule;
+      if (!Nfc) {
+        console.error('[NFC] Nfc class not found in module');
+        return false;
+      }
+      console.log('[NFC] Checking if NFC is enabled...');
       const result = await Nfc.isEnabled();
+      console.log('[NFC] NFC enabled check result:', result);
       return result.isEnabled;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[NFC] Native NFC check failed:', error);
+      console.error('[NFC] Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+        code: error?.code,
+      });
       return false;
     }
   } else {
     // 웹 브라우저: Web NFC API
-    return typeof window !== 'undefined' && 'NDEFReader' in window;
+    const isWebNfcAvailable = typeof window !== 'undefined' && 'NDEFReader' in window;
+    console.log('[NFC] Web NFC available:', isWebNfcAvailable);
+    return isWebNfcAvailable;
   }
 }
 
@@ -49,13 +73,31 @@ export async function startNativeNfcScan(
   }
 
   try {
+    console.log('[NFC] Starting native NFC scan...');
     // 동적 import를 사용하되, 웹 빌드에서는 패키지가 없을 수 있으므로 안전하게 처리
-    const nfcModule = await import('@exxili/capacitor-nfc').catch(() => null);
+    const nfcModule = await import('@exxili/capacitor-nfc').catch((error) => {
+      console.error('[NFC] Failed to import @exxili/capacitor-nfc for scan:', error);
+      console.error('[NFC] Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+      });
+      return null;
+    });
     if (!nfcModule) {
-      onError?.('NFC 플러그인을 사용할 수 없습니다.');
+      const errorMsg = 'NFC 플러그인을 사용할 수 없습니다. 플러그인이 설치되어 있는지 확인해주세요.';
+      console.error('[NFC]', errorMsg);
+      onError?.(errorMsg);
       return () => {};
     }
+    console.log('[NFC] NFC module loaded for scan:', Object.keys(nfcModule));
     const { Nfc } = nfcModule;
+    if (!Nfc) {
+      const errorMsg = 'NFC 클래스를 찾을 수 없습니다.';
+      console.error('[NFC]', errorMsg);
+      onError?.(errorMsg);
+      return () => {};
+    }
 
     // 리스너 등록
     const listener = await Nfc.addListener('nfcTag', (event: any) => {
@@ -109,7 +151,13 @@ export async function startNativeNfcScan(
     };
   } catch (error: any) {
     console.error('[NFC] Native NFC scan error:', error);
-    onError?.(error.message || 'NFC 스캔 시작 실패');
+    console.error('[NFC] Error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+      code: error?.code,
+    });
+    onError?.(error?.message || 'NFC 스캔 시작 실패');
     return () => {};
   }
 }

@@ -93,61 +93,44 @@ export default function InspectorMain() {
 
   // NFC 스캔 중지 함수 ref
   const stopNfcScanRef = useRef<(() => void) | null>(null);
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // NFC 초기화 (네이티브 앱 + 웹 지원)
+  // NFC 초기화 (지원 여부만 확인)
   useEffect(() => {
-    let mounted = true;
-
-    const initNfc = async () => {
-      // NFC 지원 여부 확인
-      const available = await isNfcAvailable();
-      if (!mounted) return;
-
-      setIsNfcSupported(available);
-      console.log('[InspectorMain] NFC available:', available, 'isNative:', isNativeApp());
-
-      if (!available) return;
-
-      // 이미 초기화되었으면 스킵
-      if ((window as any).__cemNfcListening) return;
-      (window as any).__cemNfcListening = true;
-
-      if (isNativeApp()) {
-        // 네이티브 앱: Capacitor NFC 플러그인 사용
-        try {
-          const stopFn = await startNativeNfcScan(
-            handleNfcTagRead,
-            (error) => toast.error(`NFC 오류: ${error}`)
-          );
-          stopNfcScanRef.current = stopFn;
-          toast.info("NFC 태그를 기기에 가까이 가져다주시면 자동으로 인식합니다.");
-        } catch (error) {
-          console.error('[InspectorMain] Native NFC init error:', error);
+    const checkNfc = async () => {
+      try {
+        console.log('[InspectorMain] Checking NFC availability...');
+        console.log('[InspectorMain] Is native app:', isNativeApp());
+        console.log('[InspectorMain] Capacitor platform:', Capacitor.getPlatform());
+        const available = await isNfcAvailable();
+        setIsNfcSupported(available);
+        console.log('[InspectorMain] NFC available:', available);
+        if (!available && isNativeApp()) {
+          console.warn('[InspectorMain] NFC is not available in native app - check plugin installation and permissions');
         }
-      } else {
-        // 웹 브라우저: Web NFC API 사용
-        try {
-          await startWebNfcScan(
-            handleNfcTagRead,
-            (error) => console.warn('[InspectorMain] Web NFC error:', error)
-          );
-          toast.info("NFC 태그를 기기에 가까이 가져다주시면 자동으로 인식합니다.");
-        } catch (error) {
-          console.warn("[InspectorMain] Web NFC init error:", error);
-        }
+      } catch (error: any) {
+        console.error('[InspectorMain] NFC check error:', error);
+        console.error('[InspectorMain] Error details:', {
+          message: error?.message,
+          stack: error?.stack,
+          name: error?.name,
+        });
+        setIsNfcSupported(false);
       }
     };
-
-    initNfc();
+    checkNfc();
 
     return () => {
-      mounted = false;
+      // 컴포넌트 언마운트 시 스캔 중지
       if (stopNfcScanRef.current) {
         stopNfcScanRef.current();
         stopNfcScanRef.current = null;
       }
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
     };
-  }, [handleNfcTagRead]);
+  }, []);
 
   const handleNfcScan = async () => {
     if (!isNfcSupported) {
@@ -155,9 +138,74 @@ export default function InspectorMain() {
       return;
     }
 
+    // 이미 스캔 중이면 중지
+    if (isNfcScanning) {
+      if (stopNfcScanRef.current) {
+        stopNfcScanRef.current();
+        stopNfcScanRef.current = null;
+      }
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+      setIsNfcScanning(false);
+      toast.info("NFC 스캔을 취소했습니다.");
+      return;
+    }
+
     setIsNfcScanning(true);
-    toast.info("NFC 태그를 기기에 가까이 가져다주세요.");
-    setTimeout(() => setIsNfcScanning(false), 2500);
+    toast.info("NFC 태그를 기기에 가까이 가져다주세요. (60초 후 자동 종료)");
+
+    // 60초 후 자동 종료
+    scanTimeoutRef.current = setTimeout(() => {
+      if (stopNfcScanRef.current) {
+        stopNfcScanRef.current();
+        stopNfcScanRef.current = null;
+      }
+      setIsNfcScanning(false);
+      toast.info("시간이 초과되어 NFC 스캔을 종료합니다.");
+    }, 60000);
+
+    if (isNativeApp()) {
+      try {
+        const stopFn = await startNativeNfcScan(
+          (tagValue) => {
+            // 태그 인식 성공 시 스캔 종료 및 처리
+            if (stopNfcScanRef.current) {
+              stopNfcScanRef.current();
+              stopNfcScanRef.current = null;
+            }
+            if (scanTimeoutRef.current) {
+              clearTimeout(scanTimeoutRef.current);
+            }
+            setIsNfcScanning(false);
+            handleNfcTagRead(tagValue);
+          },
+          (error) => {
+            toast.error(`NFC 오류: ${error}`);
+            setIsNfcScanning(false);
+          }
+        );
+        stopNfcScanRef.current = stopFn;
+      } catch (error) {
+        console.error('[InspectorMain] Native NFC init error:', error);
+        setIsNfcScanning(false);
+        toast.error("NFC 스캔 시작 실패");
+      }
+    } else {
+      // Web NFC
+      try {
+        await startWebNfcScan(
+          (tagValue) => {
+            setIsNfcScanning(false);
+            handleNfcTagRead(tagValue);
+          },
+          (error) => console.warn('[InspectorMain] Web NFC error:', error)
+        );
+      } catch (error) {
+        console.warn("[InspectorMain] Web NFC init error:", error);
+        setIsNfcScanning(false);
+      }
+    }
   };
 
   // 다이얼로그용 NFC 스캔 중지 함수 ref
