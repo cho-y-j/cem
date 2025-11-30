@@ -737,7 +737,12 @@ export default function WorkerMain() {
               } else if (error.name === 'NotSupportedError') {
                 toast.error("이 기기는 생체 인증을 지원하지 않습니다.");
               } else if (error.name === 'SecurityError') {
-                toast.error("보안 오류가 발생했습니다. HTTPS 연결을 확인해주세요.");
+                // Capacitor 앱에서는 secure context이므로 다른 원인일 수 있음
+                if (Capacitor.isNativePlatform()) {
+                  toast.error("생체 인증 오류가 발생했습니다. 앱을 재시작해주세요.");
+                } else {
+                  toast.error("보안 오류가 발생했습니다. HTTPS 연결을 확인해주세요.");
+                }
               } else {
                 toast.error(`생체 인증 실패: ${error.message || error.name || '알 수 없는 오류'}`);
               }
@@ -912,10 +917,17 @@ export default function WorkerMain() {
                   className="w-full h-14 text-base font-semibold border-gray-200 hover:bg-gray-50 active:scale-95 transition-all rounded-xl"
                   onClick={() => {
                     if (!isBiometricAvailable) {
-                      toast.info(
-                        "생체 인증은 HTTPS 환경에서만 사용 가능합니다.",
-                        { duration: 3000 }
-                      );
+                      if (Capacitor.isNativePlatform()) {
+                        toast.info(
+                          "생체 인증을 사용할 수 없습니다. 기기 설정을 확인해주세요.",
+                          { duration: 3000 }
+                        );
+                      } else {
+                        toast.info(
+                          "생체 인증은 HTTPS 환경에서만 사용 가능합니다.",
+                          { duration: 3000 }
+                        );
+                      }
                       return;
                     }
                     handleBiometricCheckIn();
