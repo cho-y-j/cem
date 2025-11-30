@@ -9,6 +9,21 @@ import { AlertTriangle, MapPin, Clock, CheckCircle, XCircle, Loader2 } from "luc
 import { toast } from "sonner";
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
 
+// UTC 시간을 한국 표준시(KST)로 명시적 변환하는 헬퍼 함수
+const formatToKST = (dateString: string | Date) => {
+  const date = new Date(dateString);
+  return date.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+};
+
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 export default function EmergencyAlerts() {
@@ -343,7 +358,7 @@ export default function EmergencyAlerts() {
                                   <div><strong>상세:</strong> {marker.description}</div>
                                 )}
                                 <div className="text-gray-600 text-xs mt-2">
-                                  {new Date(marker.createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
+                                  {formatToKST(marker.createdAt)}
                                 </div>
                               </div>
                             </div>
@@ -414,7 +429,7 @@ export default function EmergencyAlerts() {
                           {getAlertTypeBadge(alert.alert_type)}
                           <span className="text-sm text-muted-foreground">
                             <Clock className="h-3 w-3 inline mr-1" />
-                            {new Date(alert.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
+                            {formatToKST(alert.created_at)}
                           </span>
                         </div>
 
@@ -447,7 +462,7 @@ export default function EmergencyAlerts() {
                           {alert.resolved_at && (
                             <p className="text-sm text-green-600">
                               <CheckCircle className="h-3 w-3 inline mr-1" />
-                              해결: {new Date(alert.resolved_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
+                              해결: {formatToKST(alert.resolved_at)}
                               {alert.resolution_note && ` - ${alert.resolution_note}`}
                             </p>
                           )}
