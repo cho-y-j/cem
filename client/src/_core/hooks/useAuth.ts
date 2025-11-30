@@ -43,10 +43,16 @@ export function useAuth(options?: UseAuthOptions) {
       }
       throw error;
     } finally {
+      // 모바일 앱에서는 localStorage에서 토큰 삭제
+      if (isMobile && typeof window !== 'undefined') {
+        localStorage.removeItem('authToken');
+        // 로그아웃 플래그 설정 (자동 로그인 방지)
+        localStorage.setItem('logoutFlag', Date.now().toString());
+      }
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }
-  }, [logoutMutation, utils]);
+  }, [logoutMutation, utils, isMobile]);
 
   const state = useMemo(() => {
     return {

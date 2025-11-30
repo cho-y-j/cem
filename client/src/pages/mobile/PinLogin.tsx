@@ -35,6 +35,15 @@ export default function PinLogin() {
   });
 
   useEffect(() => {
+    // 로그아웃 플래그 확인 (로그아웃 직후 자동 로그인 방지)
+    const logoutFlag = localStorage.getItem('logoutFlag');
+    if (logoutFlag) {
+      // 로그아웃 플래그가 있으면 제거하고 자동 로그인 건너뛰기
+      localStorage.removeItem('logoutFlag');
+      console.log('[PinLogin] Logout flag detected, skipping auto-login');
+      return;
+    }
+
     const token = localStorage.getItem('authToken');
     if (token && userQuery.data) {
       // 토큰이 있고 사용자 정보를 가져왔으면 역할에 따라 리다이렉션
@@ -79,6 +88,8 @@ export default function PinLogin() {
 
     if (token) {
       localStorage.setItem('authToken', token);
+      // 로그아웃 플래그 제거 (새로운 로그인 성공)
+      localStorage.removeItem('logoutFlag');
       console.log('[PinLogin] Token saved:', token.length, 'chars');
 
       // 로그인 성공 후 FCM 토큰 등록 시도

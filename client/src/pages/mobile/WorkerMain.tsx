@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useFcmToken } from "@/hooks/useFcmToken";
+import { Capacitor } from "@capacitor/core";
 
 export default function WorkerMain() {
   const { user, loading } = useAuth();
@@ -117,7 +118,13 @@ export default function WorkerMain() {
     if (typeof window !== 'undefined') {
       // WebAuthn 지원 체크 (더 유연하게)
       const hasWebAuthn = 'PublicKeyCredential' in window;
-      const isSecureContext = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+      // Capacitor 네이티브 플랫폼은 secure context로 간주 (WebView는 secure context)
+      const isNativePlatform = Capacitor.isNativePlatform();
+      const isSecureContext = isNativePlatform || 
+        window.location.protocol === 'https:' || 
+        window.location.hostname === 'localhost' ||
+        window.location.protocol === 'capacitor:' ||
+        window.location.protocol === 'ionic:';
       const isAvailable = hasWebAuthn && isSecureContext;
 
       setIsBiometricAvailable(isAvailable);
@@ -127,7 +134,8 @@ export default function WorkerMain() {
       console.log('[WorkerMain] Protocol:', window.location.protocol);
       console.log('[WorkerMain] Hostname:', window.location.hostname);
       console.log('[WorkerMain] PublicKeyCredential supported:', hasWebAuthn);
-      console.log('[WorkerMain] Secure context (HTTPS/localhost):', isSecureContext);
+      console.log('[WorkerMain] Is native platform:', isNativePlatform);
+      console.log('[WorkerMain] Secure context (HTTPS/localhost/Capacitor):', isSecureContext);
       console.log('[WorkerMain] Biometric available:', isAvailable);
       console.log('[WorkerMain] User agent:', navigator.userAgent);
 
