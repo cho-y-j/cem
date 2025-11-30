@@ -41,7 +41,7 @@ import { useLocation } from "wouter";
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useFcmToken } from "@/hooks/useFcmToken";
 import { Capacitor } from "@capacitor/core";
-import { isNativeApp, isBiometricAvailable, performNativeBiometricAuth } from "@/utils/biometricAuth";
+import { isNativeApp, isBiometricAvailable as checkBiometricAvailable, performNativeBiometricAuth } from "@/utils/biometricAuth";
 
 export default function WorkerMain() {
   const { user, loading } = useAuth();
@@ -113,6 +113,9 @@ export default function WorkerMain() {
   const [emergencyDetails, setEmergencyDetails] = useState("");
   const [isLocating, setIsLocating] = useState(false);
 
+  // 생체인식 에러 메시지 상태
+  const [biometricError, setBiometricError] = useState<string>("");
+
   // 생체인식 지원 여부 체크 (네이티브 앱 + 웹 WebAuthn)
   useEffect(() => {
     setIsMounted(true);
@@ -126,9 +129,13 @@ export default function WorkerMain() {
 
       if (isNative) {
         // 네이티브 앱: capacitor-native-biometric 사용
-        const result = await isBiometricAvailable();
+        const result = await checkBiometricAvailable();
         console.log('[WorkerMain] Native biometric result:', result);
         setIsBiometricAvailable(result.available);
+        if (!result.available && result.errorMessage) {
+          setBiometricError(result.errorMessage);
+          console.log('[WorkerMain] Biometric error:', result.errorMessage);
+        }
       } else {
         // 웹 브라우저: WebAuthn 사용
         const hasWebAuthn = 'PublicKeyCredential' in window;
@@ -922,10 +929,11 @@ export default function WorkerMain() {
                   onClick={() => {
                     if (!isBiometricAvailable) {
                       if (Capacitor.isNativePlatform()) {
-                        toast.info(
-                          "생체 인증을 사용할 수 없습니다. 기기 설정을 확인해주세요.",
-                          { duration: 3000 }
-                        );
+                        // 더 구체적인 에러 메시지 표시
+                        const errorMsg = biometricError
+                          ? `생체 인증 오류: ${biometricError}\n\n기기 설정에서 지문 또는 얼굴 인식을 등록해주세요.`
+                          : "생체 인증을 사용할 수 없습니다.\n\n기기 설정 > 보안 > 지문/얼굴 인식에서 등록해주세요.";
+                        toast.info(errorMsg, { duration: 5000 });
                       } else {
                         toast.info(
                           "생체 인증은 HTTPS 환경에서만 사용 가능합니다.",
