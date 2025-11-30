@@ -36,7 +36,7 @@ export default function Login() {
             <img
               src={APP_LOGO}
               alt={APP_TITLE}
-              className="h-16 w-16 rounded-xl object-cover shadow"
+              className="h-48 w-48 rounded-xl object-cover shadow"
             />
           </div>
           <div className="text-center">
