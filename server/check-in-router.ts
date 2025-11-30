@@ -21,7 +21,7 @@ export const checkInRouter = router({
         workZoneId: z.string().optional(),
         lat: z.number(),
         lng: z.number(),
-        authMethod: z.enum(["pin", "password", "webauthn"]).default("pin"),
+        authMethod: z.enum(["pin", "password", "webauthn", "native_biometric"]).default("pin"),
         webauthnCredentialId: z.string().optional(),
         notes: z.string().optional(),
       })
@@ -253,7 +253,7 @@ export const checkInRouter = router({
         distanceFromZone,
         isWithinZone,
         authMethod: input.authMethod,
-        webauthnVerified: input.authMethod === "webauthn",
+        webauthnVerified: input.authMethod === "webauthn" || input.authMethod === "native_biometric",
         webauthnCredentialId: input.webauthnCredentialId,
         deviceInfo: ctx.req.headers["user-agent"] || undefined,
         notes: input.notes,

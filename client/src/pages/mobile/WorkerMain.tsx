@@ -41,6 +41,7 @@ import { useLocation } from "wouter";
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useFcmToken } from "@/hooks/useFcmToken";
 import { Capacitor } from "@capacitor/core";
+import { isNativeApp, isBiometricAvailable, performNativeBiometricAuth } from "@/utils/biometricAuth";
 
 export default function WorkerMain() {
   const { user, loading } = useAuth();
@@ -112,42 +113,42 @@ export default function WorkerMain() {
   const [emergencyDetails, setEmergencyDetails] = useState("");
   const [isLocating, setIsLocating] = useState(false);
 
-  // WebAuthn 지원 여부 체크 (클라이언트 사이드에서만)
+  // 생체인식 지원 여부 체크 (네이티브 앱 + 웹 WebAuthn)
   useEffect(() => {
     setIsMounted(true);
-    if (typeof window !== 'undefined') {
-      // WebAuthn 지원 체크 (더 유연하게)
-      const hasWebAuthn = 'PublicKeyCredential' in window;
-      // Capacitor 네이티브 플랫폼은 secure context로 간주 (WebView는 secure context)
-      const isNativePlatform = Capacitor.isNativePlatform();
-      const isSecureContext = isNativePlatform || 
-        window.location.protocol === 'https:' || 
-        window.location.hostname === 'localhost' ||
-        window.location.protocol === 'capacitor:' ||
-        window.location.protocol === 'ionic:';
-      const isAvailable = hasWebAuthn && isSecureContext;
 
-      setIsBiometricAvailable(isAvailable);
+    const checkBiometricAvailability = async () => {
+      if (typeof window === 'undefined') return;
 
-      console.log('[WorkerMain] ===== WebAuthn 지원 체크 =====');
-      console.log('[WorkerMain] URL:', window.location.href);
-      console.log('[WorkerMain] Protocol:', window.location.protocol);
-      console.log('[WorkerMain] Hostname:', window.location.hostname);
-      console.log('[WorkerMain] PublicKeyCredential supported:', hasWebAuthn);
-      console.log('[WorkerMain] Is native platform:', isNativePlatform);
-      console.log('[WorkerMain] Secure context (HTTPS/localhost/Capacitor):', isSecureContext);
-      console.log('[WorkerMain] Biometric available:', isAvailable);
-      console.log('[WorkerMain] User agent:', navigator.userAgent);
+      const isNative = isNativeApp();
+      console.log('[WorkerMain] ===== 생체인식 지원 체크 =====');
+      console.log('[WorkerMain] Is native app:', isNative);
 
-      // 추가 디버깅: WebAuthn 메서드 확인
-      if (hasWebAuthn) {
-        console.log('[WorkerMain] WebAuthn methods available:');
-        console.log('- createCredential:', typeof window.PublicKeyCredential.createCredential);
-        console.log('- getClientCapabilities:', typeof window.PublicKeyCredential.getClientCapabilities);
-        console.log('- isConditionalMediationAvailable:', typeof window.PublicKeyCredential.isConditionalMediationAvailable);
-        console.log('- isUserVerifyingPlatformAuthenticatorAvailable:', typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable);
+      if (isNative) {
+        // 네이티브 앱: capacitor-native-biometric 사용
+        const result = await isBiometricAvailable();
+        console.log('[WorkerMain] Native biometric result:', result);
+        setIsBiometricAvailable(result.available);
+      } else {
+        // 웹 브라우저: WebAuthn 사용
+        const hasWebAuthn = 'PublicKeyCredential' in window;
+        const isSecureContext =
+          window.location.protocol === 'https:' ||
+          window.location.hostname === 'localhost';
+        const isAvailable = hasWebAuthn && isSecureContext;
+
+        console.log('[WorkerMain] WebAuthn supported:', hasWebAuthn);
+        console.log('[WorkerMain] Secure context:', isSecureContext);
+        console.log('[WorkerMain] Biometric available:', isAvailable);
+
+        setIsBiometricAvailable(isAvailable);
       }
-    }
+
+      console.log('[WorkerMain] URL:', window.location.href);
+      console.log('[WorkerMain] User agent:', navigator.userAgent);
+    };
+
+    checkBiometricAvailability();
   }, []);
 
   // PWA 안내 표시 여부 체크
@@ -664,7 +665,7 @@ export default function WorkerMain() {
     }
   };
 
-  // 생체 인증 출근 핸들러
+  // 생체 인증 출근 핸들러 (네이티브 앱 + 웹 WebAuthn 지원)
   const handleBiometricCheckIn = async () => {
     try {
       // 1. GPS 위치 가져오기
@@ -680,122 +681,125 @@ export default function WorkerMain() {
           try {
             const { latitude, longitude } = position.coords;
 
-            // 2. 인증 챌린지 가져오기
-            let authOptions;
-            try {
-              console.log('[BiometricCheckIn] Requesting authentication challenge...');
-              authOptions = await utils.webauthn.generateAuthenticationChallenge.fetch();
-              console.log('[BiometricCheckIn] Challenge received:', {
-                hasChallenge: !!authOptions.challenge,
-                rpId: authOptions.rpId,
-                allowCredentials: authOptions.allowCredentials?.length || 0,
-              });
-            } catch (error: any) {
-              console.error('[BiometricCheckIn] Challenge generation error:', {
-                errorMessage: error.message,
-                errorData: error.data,
-                errorCode: error.code,
-                errorStack: error.stack,
-                errorShape: error.shape,
+            // 네이티브 앱인지 확인
+            const isNative = isNativeApp();
+            console.log('[BiometricCheckIn] Is native app:', isNative);
+
+            if (isNative) {
+              // ========== 네이티브 앱: capacitor-native-biometric 사용 ==========
+              console.log('[BiometricCheckIn] Using native biometric authentication');
+
+              const authResult = await performNativeBiometricAuth({
+                reason: '출근 확인을 위해 생체인식이 필요합니다.',
+                title: '출근 생체인식',
+                subtitle: '',
+                description: '지문 또는 얼굴을 인식해주세요.',
               });
 
-              // 에러 메시지에 따라 다른 메시지 표시
-              if (error.data?.code === 'NOT_FOUND') {
-                toast.error("등록된 생체 인증이 없습니다. 먼저 생체 인증을 등록해주세요.");
-              } else if (error.data?.code === 'INTERNAL_SERVER_ERROR') {
-                toast.error(`서버 오류: ${error.message || '알 수 없는 오류'}`);
-              } else {
-                toast.error(`인증 챌린지 생성 실패: ${error.message || '알 수 없는 오류'}`);
+              if (!authResult.success) {
+                toast.error(authResult.errorMessage || '생체인식 인증에 실패했습니다.');
+                return;
               }
-              return; // 에러 발생 시 출근 기록 생성하지 않음
-            }
 
-            // 3. 생체 인증 (지문/얼굴 스캔)
-            toast.info("생체 인증을 진행해주세요...");
+              console.log('[BiometricCheckIn] Native biometric auth succeeded');
 
-            console.log('[BiometricCheckIn] Starting authentication with options:', {
-              challenge: authOptions.challenge?.substring(0, 20) + '...',
-              rpId: authOptions.rpId,
-              allowCredentials: authOptions.allowCredentials?.length || 0,
-              userVerification: authOptions.userVerification,
-            });
-
-            let authResponse;
-            try {
-              authResponse = await startAuthentication(authOptions);
-            } catch (error: any) {
-              console.error('[BiometricCheckIn] startAuthentication error:', {
-                errorName: error.name,
-                errorMessage: error.message,
-                errorStack: error.stack,
-              });
-
-              if (error.name === 'NotAllowedError') {
-                toast.error("생체 인증이 취소되었습니다.");
-              } else if (error.name === 'InvalidStateError') {
-                toast.error("생체 인증이 이미 사용 중입니다. 잠시 후 다시 시도해주세요.");
-              } else if (error.name === 'NotSupportedError') {
-                toast.error("이 기기는 생체 인증을 지원하지 않습니다.");
-              } else if (error.name === 'SecurityError') {
-                // Capacitor 앱에서는 secure context이므로 다른 원인일 수 있음
-                if (Capacitor.isNativePlatform()) {
-                  toast.error("생체 인증 오류가 발생했습니다. 앱을 재시작해주세요.");
-                } else {
-                  toast.error("보안 오류가 발생했습니다. HTTPS 연결을 확인해주세요.");
-                }
-              } else {
-                toast.error(`생체 인증 실패: ${error.message || error.name || '알 수 없는 오류'}`);
+              // 출근 체크 (네이티브 생체인식 성공)
+              try {
+                await checkInMutation.mutateAsync({
+                  lat: latitude,
+                  lng: longitude,
+                  authMethod: "native_biometric",
+                  webauthnCredentialId: `native_${Date.now()}`, // 네이티브는 credential ID 없음
+                });
+                console.log('[BiometricCheckIn] Check-in mutation succeeded (native)');
+              } catch (error: any) {
+                console.error('[BiometricCheckIn] Check-in mutation error:', error);
+                toast.error(`출근 체크 실패: ${error.message || '알 수 없는 오류'}`);
               }
-              return;
-            }
 
-            console.log('[BiometricCheckIn] Authentication response received:', {
-              hasRawId: !!authResponse.rawId,
-              rawIdType: typeof authResponse.rawId,
-              hasId: !!authResponse.id,
-              hasResponse: !!authResponse.response,
-              type: authResponse.type,
-            });
-
-            // TODO: 서버 검증은 나중에 구현
-            // 현재는 클라이언트에서 지문 인식 성공 시 바로 출근 처리
-            // startAuthentication이 성공했다는 것은 브라우저/OS 레벨에서 지문 인증이 완료되었다는 의미
-
-            console.log('[BiometricCheckIn] Skipping server verification (temporary), proceeding with check-in...');
-
-            // credential ID 추출 (출근 기록에 저장용)
-            // @simplewebauthn/browser는 이미 base64url 문자열로 변환된 id를 제공
-            let credentialId: string;
-            if (authResponse.id) {
-              credentialId = authResponse.id;
-            } else if (authResponse.rawId instanceof ArrayBuffer) {
-              // ArrayBuffer를 base64url로 변환 (브라우저 환경)
-              const bytes = new Uint8Array(authResponse.rawId);
-              let binary = '';
-              for (let i = 0; i < bytes.length; i++) {
-                binary += String.fromCharCode(bytes[i]);
-              }
-              const base64 = btoa(binary);
-              // base64를 base64url로 변환: + -> -, / -> _, = 제거
-              credentialId = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-            } else if (typeof authResponse.rawId === 'string') {
-              credentialId = authResponse.rawId;
             } else {
-              credentialId = String(authResponse.rawId);
-            }
+              // ========== 웹 브라우저: WebAuthn 사용 ==========
+              console.log('[BiometricCheckIn] Using WebAuthn authentication');
 
-            // 5. 출근 체크 (생체 인증 성공)
-            try {
-              await checkInMutation.mutateAsync({
-                lat: latitude,
-                lng: longitude,
-                authMethod: "webauthn",
-                webauthnCredentialId: credentialId,
-              });
-              console.log('[BiometricCheckIn] Check-in mutation succeeded');
-            } catch (error: any) {
-              console.error('[BiometricCheckIn] Check-in mutation error:', error);
-              toast.error(`출근 체크 실패: ${error.message || '알 수 없는 오류'}`);
+              // 인증 챌린지 가져오기
+              let authOptions;
+              try {
+                console.log('[BiometricCheckIn] Requesting authentication challenge...');
+                authOptions = await utils.webauthn.generateAuthenticationChallenge.fetch();
+                console.log('[BiometricCheckIn] Challenge received:', {
+                  hasChallenge: !!authOptions.challenge,
+                  rpId: authOptions.rpId,
+                  allowCredentials: authOptions.allowCredentials?.length || 0,
+                });
+              } catch (error: any) {
+                console.error('[BiometricCheckIn] Challenge generation error:', error);
+
+                if (error.data?.code === 'NOT_FOUND') {
+                  toast.error("등록된 생체 인증이 없습니다. 먼저 생체 인증을 등록해주세요.");
+                } else if (error.data?.code === 'INTERNAL_SERVER_ERROR') {
+                  toast.error(`서버 오류: ${error.message || '알 수 없는 오류'}`);
+                } else {
+                  toast.error(`인증 챌린지 생성 실패: ${error.message || '알 수 없는 오류'}`);
+                }
+                return;
+              }
+
+              // 생체 인증 (지문/얼굴 스캔)
+              toast.info("생체 인증을 진행해주세요...");
+
+              let authResponse;
+              try {
+                authResponse = await startAuthentication(authOptions);
+              } catch (error: any) {
+                console.error('[BiometricCheckIn] startAuthentication error:', error);
+
+                if (error.name === 'NotAllowedError') {
+                  toast.error("생체 인증이 취소되었습니다.");
+                } else if (error.name === 'InvalidStateError') {
+                  toast.error("생체 인증이 이미 사용 중입니다. 잠시 후 다시 시도해주세요.");
+                } else if (error.name === 'NotSupportedError') {
+                  toast.error("이 기기는 생체 인증을 지원하지 않습니다.");
+                } else if (error.name === 'SecurityError') {
+                  toast.error("보안 오류가 발생했습니다. HTTPS 연결을 확인해주세요.");
+                } else {
+                  toast.error(`생체 인증 실패: ${error.message || error.name || '알 수 없는 오류'}`);
+                }
+                return;
+              }
+
+              console.log('[BiometricCheckIn] WebAuthn authentication succeeded');
+
+              // credential ID 추출
+              let credentialId: string;
+              if (authResponse.id) {
+                credentialId = authResponse.id;
+              } else if (authResponse.rawId instanceof ArrayBuffer) {
+                const bytes = new Uint8Array(authResponse.rawId);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                  binary += String.fromCharCode(bytes[i]);
+                }
+                const base64 = btoa(binary);
+                credentialId = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+              } else if (typeof authResponse.rawId === 'string') {
+                credentialId = authResponse.rawId;
+              } else {
+                credentialId = String(authResponse.rawId);
+              }
+
+              // 출근 체크 (WebAuthn 성공)
+              try {
+                await checkInMutation.mutateAsync({
+                  lat: latitude,
+                  lng: longitude,
+                  authMethod: "webauthn",
+                  webauthnCredentialId: credentialId,
+                });
+                console.log('[BiometricCheckIn] Check-in mutation succeeded (webauthn)');
+              } catch (error: any) {
+                console.error('[BiometricCheckIn] Check-in mutation error:', error);
+                toast.error(`출근 체크 실패: ${error.message || '알 수 없는 오류'}`);
+              }
             }
           } catch (error: any) {
             console.error('[BiometricCheckIn] Error:', error);
