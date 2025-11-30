@@ -147,16 +147,16 @@ export async function getAllUsers(): Promise<User[]> {
     console.warn("[Database] Supabase Admin not available, falling back to regular client");
     const regularSupabase = getSupabase();
     if (!regularSupabase) return [];
-    
+
     const { data, error } = await regularSupabase
       .from('users')
       .select('*');
-    
+
     if (error) {
       console.error("[Database] Error getting users:", error);
       return [];
     }
-    
+
     return toCamelCaseArray(data || []) as User[];
   }
 
@@ -173,7 +173,7 @@ export async function getAllUsers(): Promise<User[]> {
   // Supabase Auth에서 사용자 목록 조회 (동기화 확인용)
   try {
     const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-    
+
     if (authError) {
       console.warn("[Database] Could not list Auth users (non-critical):", authError.message);
     } else if (authData?.users) {
@@ -182,20 +182,20 @@ export async function getAllUsers(): Promise<User[]> {
       const orphanedAuthUsers = authData.users.filter(
         (authUser) => !dbUserIds.has(authUser.id)
       );
-      
+
       if (orphanedAuthUsers.length > 0) {
         console.warn(
           `[Database] Found ${orphanedAuthUsers.length} Auth users without DB records:`,
           orphanedAuthUsers.map((u) => ({ id: u.id, email: u.email }))
         );
       }
-      
+
       // DB에 있지만 Auth에 없는 사용자 감지
       const authUserIds = new Set(authData.users.map((u) => u.id));
       const orphanedDbUsers = (dbUsers || []).filter(
         (dbUser: any) => !authUserIds.has(dbUser.id)
       );
-      
+
       if (orphanedDbUsers.length > 0) {
         console.warn(
           `[Database] Found ${orphanedDbUsers.length} DB users without Auth records:`,
@@ -713,14 +713,14 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
       // BP 자신이 조회하는 경우: 해당 BP 회사에 대한 반입요청에서 승인된 장비만 조회
       // current_bp_id는 제거 (모든 BP 회사에 할당된 장비를 보여주는 것이 아님)
       const equipmentIdsSet = new Set<string>();
-      
+
       // 1. deployments의 장비 (pending, active, extended 모두 포함)
       const { data: bpDeployments, error: depError } = await supabase
         .from('deployments')
         .select('equipment_id')
         .eq('bp_company_id', bpCompanyId)
         .in('status', ['pending', 'active', 'extended']);
-      
+
       if (depError) {
         console.error("[Database] Error getting deployments for BP equipment:", depError);
       } else if (bpDeployments) {
@@ -728,25 +728,25 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
           if (dep.equipment_id) equipmentIdsSet.add(dep.equipment_id);
         });
       }
-      
+
       // 2. EP 승인된 반입요청의 장비 (해당 BP 회사에 대한 요청만)
       const { data: approvedRequests, error: reqError } = await supabase
         .from('entry_requests')
         .select('id')
         .eq('status', 'ep_approved')
         .or(`target_bp_company_id.eq.${bpCompanyId},bp_company_id.eq.${bpCompanyId}`);
-      
+
       if (reqError) {
         console.error("[Database] Error getting approved entry requests for BP equipment:", reqError);
       } else if (approvedRequests && approvedRequests.length > 0) {
         const requestIds = approvedRequests.map((r: any) => r.id);
-        
+
         const { data: requestItems, error: itemsError } = await supabase
           .from('entry_request_items')
           .select('item_id')
           .in('entry_request_id', requestIds)
           .eq('item_type', 'equipment');
-        
+
         if (itemsError) {
           console.error("[Database] Error getting entry request items for BP equipment:", itemsError);
         } else if (requestItems) {
@@ -755,7 +755,7 @@ export async function getEquipmentWithFilters(filters: EquipmentFilterOptions = 
           });
         }
       }
-      
+
       // Set을 배열로 변환하여 필터링
       if (equipmentIdsSet.size > 0) {
         equipmentIdsFromBp = Array.from(equipmentIdsSet);
@@ -1110,7 +1110,7 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
 
   if (bpCompanyId) {
     const workerIdsSet = new Set<string>();
-    
+
     // 1. deployments의 worker_id와 guide_worker_id (pending, active, extended 모두 포함)
     const { data: deployments, error: depError } = await supabase
       .from('deployments')
@@ -1126,25 +1126,25 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
         if (dep.guide_worker_id) workerIdsSet.add(dep.guide_worker_id); // 유도원도 포함
       });
     }
-    
+
     // 2. EP 승인된 반입요청의 인력
     const { data: approvedRequests, error: reqError } = await supabase
       .from('entry_requests')
       .select('id')
       .eq('status', 'ep_approved')
       .or(`target_bp_company_id.eq.${bpCompanyId},bp_company_id.eq.${bpCompanyId}`);
-    
+
     if (reqError) {
       console.error("[Database] Error getting approved entry requests for BP workers:", reqError);
     } else if (approvedRequests && approvedRequests.length > 0) {
       const requestIds = approvedRequests.map((r: any) => r.id);
-      
+
       const { data: requestItems, error: itemsError } = await supabase
         .from('entry_request_items')
         .select('item_id')
         .in('entry_request_id', requestIds)
         .eq('item_type', 'worker');
-      
+
       if (itemsError) {
         console.error("[Database] Error getting entry request items for BP workers:", itemsError);
       } else if (requestItems) {
@@ -1153,7 +1153,7 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
         });
       }
     }
-    
+
     // Set을 배열로 변환하여 collectWorkerIds 호출
     if (workerIdsSet.size > 0) {
       collectWorkerIds(Array.from(workerIdsSet));
@@ -1188,7 +1188,7 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
       .from('workers')
       .select('id')
       .eq('owner_company_id', ownerCompanyId);
-    
+
     if (ownerWorkers) {
       ownerCompanyWorkerIds = ownerWorkers.map((w: any) => w.id);
     }
@@ -1201,10 +1201,10 @@ export async function getWorkersWithFilters(filters: WorkerFilterOptions = {}): 
     // 두 조건이 모두 있는 경우 OR로 결합
     const deploymentWorkerIds = allowedWorkerIds ? Array.from(allowedWorkerIds) : [];
     const createdWorkerIds = ownerCompanyWorkerIds || [];
-    
+
     // 두 배열을 합쳐서 Set으로 변환 (중복 제거)
     const allWorkerIds = [...new Set([...deploymentWorkerIds, ...createdWorkerIds])];
-    
+
     if (allWorkerIds.length > 0) {
       allowedWorkerIds = new Set(allWorkerIds);
     } else {
@@ -1491,18 +1491,18 @@ export async function getDocsComplianceForEp(epCompanyId: string): Promise<DocsC
       .select('*')
       .eq('target_type', 'equipment')
       .in('target_id', equipmentIds);
-    
+
     const { data: workerDocs, error: workerError } = await supabase
       .from('docs_compliance')
       .select('*')
       .eq('target_type', 'worker')
       .in('target_id', workerIds);
-    
+
     if (equipError || workerError) {
       console.error("[Database] Error getting docs compliance for EP:", equipError || workerError);
       return [];
     }
-    
+
     return toCamelCaseArray([...(equipDocs || []), ...(workerDocs || [])]) as DocsCompliance[];
   } else if (equipmentIds.length > 0) {
     const { data, error } = await supabase
@@ -1510,12 +1510,12 @@ export async function getDocsComplianceForEp(epCompanyId: string): Promise<DocsC
       .select('*')
       .eq('target_type', 'equipment')
       .in('target_id', equipmentIds);
-    
+
     if (error) {
       console.error("[Database] Error getting docs compliance for EP:", error);
       return [];
     }
-    
+
     return toCamelCaseArray(data || []) as DocsCompliance[];
   } else if (workerIds.length > 0) {
     const { data, error } = await supabase
@@ -1523,12 +1523,12 @@ export async function getDocsComplianceForEp(epCompanyId: string): Promise<DocsC
       .select('*')
       .eq('target_type', 'worker')
       .in('target_id', workerIds);
-    
+
     if (error) {
       console.error("[Database] Error getting docs compliance for EP:", error);
       return [];
     }
-    
+
     return toCamelCaseArray(data || []) as DocsCompliance[];
   } else {
     return [];
@@ -1575,7 +1575,7 @@ export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsC
     console.error("[Database] Error getting approved entry requests for BP docs:", reqError);
   } else if (approvedRequests && approvedRequests.length > 0) {
     const requestIds = approvedRequests.map((r: any) => r.id);
-    
+
     // 반입요청의 아이템 조회
     const { data: requestItems, error: itemsError } = await supabase
       .from('entry_request_items')
@@ -1615,18 +1615,18 @@ export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsC
       .select('*')
       .eq('target_type', 'equipment')
       .in('target_id', equipmentIdsArray);
-    
+
     const { data: workerDocs, error: workerError } = await supabase
       .from('docs_compliance')
       .select('*')
       .eq('target_type', 'worker')
       .in('target_id', workerIdsArray);
-    
+
     if (equipError || workerError) {
       console.error("[Database] Error getting docs compliance for BP:", equipError || workerError);
       return [];
     }
-    
+
     return toCamelCaseArray([...(equipDocs || []), ...(workerDocs || [])]) as DocsCompliance[];
   } else if (equipmentIdsArray.length > 0) {
     const { data, error } = await supabase
@@ -1634,12 +1634,12 @@ export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsC
       .select('*')
       .eq('target_type', 'equipment')
       .in('target_id', equipmentIdsArray);
-    
+
     if (error) {
       console.error("[Database] Error getting docs compliance for BP:", error);
       return [];
     }
-    
+
     return toCamelCaseArray(data || []) as DocsCompliance[];
   } else if (workerIdsArray.length > 0) {
     const { data, error } = await supabase
@@ -1647,12 +1647,12 @@ export async function getDocsComplianceForBp(bpCompanyId: string): Promise<DocsC
       .select('*')
       .eq('target_type', 'worker')
       .in('target_id', workerIdsArray);
-    
+
     if (error) {
       console.error("[Database] Error getting docs compliance for BP:", error);
       return [];
     }
-    
+
     return toCamelCaseArray(data || []) as DocsCompliance[];
   } else {
     return [];
@@ -1698,18 +1698,18 @@ export async function getDocsComplianceForOwner(ownerCompanyId: string, ownerId:
       .select('*')
       .eq('target_type', 'equipment')
       .in('target_id', equipmentIds);
-    
+
     const { data: workerDocs, error: workerError } = await supabase
       .from('docs_compliance')
       .select('*')
       .eq('target_type', 'worker')
       .in('target_id', workerIds);
-    
+
     if (equipError || workerError) {
       console.error("[Database] Error getting docs compliance for Owner:", equipError || workerError);
       return [];
     }
-    
+
     return toCamelCaseArray([...(equipDocs || []), ...(workerDocs || [])]) as DocsCompliance[];
   } else if (equipmentIds.length > 0) {
     const { data, error } = await supabase
@@ -1717,12 +1717,12 @@ export async function getDocsComplianceForOwner(ownerCompanyId: string, ownerId:
       .select('*')
       .eq('target_type', 'equipment')
       .in('target_id', equipmentIds);
-    
+
     if (error) {
       console.error("[Database] Error getting docs compliance for Owner:", error);
       return [];
     }
-    
+
     return toCamelCaseArray(data || []) as DocsCompliance[];
   } else if (workerIds.length > 0) {
     const { data, error } = await supabase
@@ -1730,12 +1730,12 @@ export async function getDocsComplianceForOwner(ownerCompanyId: string, ownerId:
       .select('*')
       .eq('target_type', 'worker')
       .in('target_id', workerIds);
-    
+
     if (error) {
       console.error("[Database] Error getting docs compliance for Owner:", error);
       return [];
     }
-    
+
     return toCamelCaseArray(data || []) as DocsCompliance[];
   } else {
     return [];
@@ -1964,7 +1964,7 @@ export async function getWorkJournals(filters?: {
       *,
       worker:workers!work_journal_worker_id_fkey(id, name, license_num)
     `)
-    .order('work_date', { ascending: false});
+    .order('work_date', { ascending: false });
 
   if (filters?.workerId) {
     query = query.eq('worker_id', filters.workerId);
@@ -2503,12 +2503,12 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     console.error('[Database] getUserByEmail error:', error);
     return null;
   }
-  
+
   if (!data) {
     console.log('[Database] getUserByEmail: No user found for email:', email);
     return null;
   }
-  
+
   console.log('[Database] getUserByEmail: Found user:', data.id, data.email);
   return toCamelCase(data) as User;
 }
@@ -2663,7 +2663,7 @@ export async function analyzeLocationHistory(
   }>;
 }> {
   const history = await getLocationHistory(workerId, startDate, endDate);
-  
+
   if (history.length === 0) {
     return {
       totalDistance: 0,
@@ -2686,14 +2686,14 @@ export async function analyzeLocationHistory(
   // 총 이동 거리 계산
   let totalDistance = 0;
   const speeds: number[] = [];
-  
+
   for (let i = 1; i < path.length; i++) {
     const prev = path[i - 1];
     const curr = path[i];
-    
+
     const distance = calculateDistance(prev.lat, prev.lng, curr.lat, curr.lng);
     totalDistance += distance;
-    
+
     // 속도 계산 (m/s)
     const timeDiff = (curr.timestamp.getTime() - prev.timestamp.getTime()) / 1000; // 초
     if (timeDiff > 0) {
@@ -2712,15 +2712,15 @@ export async function analyzeLocationHistory(
     duration: number;
     location: string;
   }> = [];
-  
+
   const STAY_THRESHOLD = 50; // 50미터 이내면 같은 위치로 간주
   const MIN_STAY_DURATION = 5 * 60; // 최소 5분 이상 머물러야 체류 지점으로 인정
-  
+
   let currentStayStart: { lat: number; lng: number; time: Date } | null = null;
-  
+
   for (let i = 0; i < path.length; i++) {
     const point = path[i];
-    
+
     if (!currentStayStart) {
       currentStayStart = { lat: point.lat, lng: point.lng, time: point.timestamp };
     } else {
@@ -2730,7 +2730,7 @@ export async function analyzeLocationHistory(
         point.lat,
         point.lng
       );
-      
+
       if (distance > STAY_THRESHOLD) {
         // 체류 지점 종료
         const duration = (point.timestamp.getTime() - currentStayStart.time.getTime()) / 1000;
@@ -2748,7 +2748,7 @@ export async function analyzeLocationHistory(
       }
     }
   }
-  
+
   // 마지막 체류 지점 처리
   if (currentStayStart && path.length > 0) {
     const lastPoint = path[path.length - 1];
@@ -4052,15 +4052,15 @@ export async function getSafetyInspectionsForReview(filters: SafetyInspectionRev
         !normalizedSearch ||
         Boolean(
           inspection.vehicleNumber &&
-            inspection.vehicleNumber
-              .toLowerCase()
-              .includes(normalizedSearch)
+          inspection.vehicleNumber
+            .toLowerCase()
+            .includes(normalizedSearch)
         ) ||
         Boolean(
           inspection.equipmentName &&
-            inspection.equipmentName
-              .toLowerCase()
-              .includes(normalizedSearch)
+          inspection.equipmentName
+            .toLowerCase()
+            .includes(normalizedSearch)
         );
 
       if (!matchesOwner || !matchesBp || !matchesEp || !matchesSearch) {
@@ -4801,7 +4801,7 @@ export async function getAllActiveLocations(filters?: {
   // 권한별 기본 필터링
   if (filters?.userRole) {
     const role = filters.userRole.toLowerCase();
-    
+
     if (role === 'owner') {
       // Owner: 자신의 회사 장비/인력만
       // Owner의 경우 userCompanyId는 company ID입니다 (check-in-router.ts 참고)
@@ -4813,30 +4813,30 @@ export async function getAllActiveLocations(filters?: {
       // EP: 본인 회사에 투입된 장비만 (deployment에서 확인)
       if (filters.userCompanyId) {
         console.log('[getAllActiveLocations] EP 필터링 시작 - userCompanyId:', filters.userCompanyId);
-        
+
         // 먼저 활성 deployment 조회
         const { data: deployments, error: deploymentError } = await supabase
           .from('deployments')
           .select('equipment_id, worker_id')
           .eq('ep_company_id', filters.userCompanyId)
           .eq('status', 'active');
-        
+
         console.log('[getAllActiveLocations] EP deployment 조회 결과:', {
           count: deployments?.length || 0,
           error: deploymentError,
           deployments: deployments?.slice(0, 5), // 처음 5개만 로그
         });
-        
+
         if (deploymentError) {
           console.error('[getAllActiveLocations] EP deployment 조회 에러:', deploymentError);
         }
-        
+
         if (deployments && deployments.length > 0) {
           const equipmentIds = deployments.map((d: any) => d.equipment_id).filter(Boolean);
           const workerIds = deployments.map((d: any) => d.worker_id).filter(Boolean);
-          
+
           console.log('[getAllActiveLocations] EP 필터링 - equipmentIds:', equipmentIds.length, 'workerIds:', workerIds.length);
-          
+
           if (equipmentIds.length > 0 || workerIds.length > 0) {
             // Supabase PostgREST의 .or() 구문 사용
             // 형식: "column1.in.(value1,value2),column2.in.(value3,value4)"
@@ -4847,12 +4847,12 @@ export async function getAllActiveLocations(filters?: {
             if (workerIds.length > 0) {
               conditions.push(`worker_id.in.(${workerIds.join(',')})`);
             }
-            
+
             // .or() 사용 (PostgREST 구문: 조건을 쉼표로 구분)
             if (conditions.length > 0) {
               query = query.or(conditions.join(','));
             }
-            
+
             console.log('[getAllActiveLocations] EP 필터링 조건 적용:', conditions);
           } else {
             // 투입된 장비가 없으면 빈 결과 반환
@@ -4883,11 +4883,11 @@ export async function getAllActiveLocations(filters?: {
       .select('equipment_id, worker_id')
       .eq('bp_company_id', filters.bpCompanyId)
       .eq('status', 'active');
-    
+
     if (deployments && deployments.length > 0) {
       const equipmentIds = deployments.map(d => d.equipment_id).filter(Boolean);
       const workerIds = deployments.map(d => d.worker_id).filter(Boolean);
-      
+
       if (equipmentIds.length > 0 || workerIds.length > 0) {
         const conditions: string[] = [];
         if (equipmentIds.length > 0) {
@@ -4911,11 +4911,11 @@ export async function getAllActiveLocations(filters?: {
       .select('equipment_id, worker_id')
       .eq('ep_company_id', filters.epCompanyId)
       .eq('status', 'active');
-    
+
     if (deployments && deployments.length > 0) {
       const equipmentIds = deployments.map(d => d.equipment_id).filter(Boolean);
       const workerIds = deployments.map(d => d.worker_id).filter(Boolean);
-      
+
       if (equipmentIds.length > 0 || workerIds.length > 0) {
         const conditions: string[] = [];
         if (equipmentIds.length > 0) {
@@ -4966,13 +4966,13 @@ export async function getAllActiveLocations(filters?: {
   // worker 정보 별도 조회 (Supabase 관계 에러 방지)
   const workerIds = [...new Set(data.map((loc: any) => loc.worker_id).filter(Boolean))];
   const workerMap = new Map();
-  
+
   if (workerIds.length > 0) {
     const { data: workers } = await supabase
       .from('workers')
       .select('id, name, phone, owner_company_id')
       .in('id', workerIds);
-    
+
     if (workers) {
       workers.forEach((w: any) => {
         workerMap.set(w.id, toCamelCase(w));
@@ -4983,31 +4983,31 @@ export async function getAllActiveLocations(filters?: {
   // equipment 정보 별도 조회
   const equipmentIds = [...new Set(data.map((loc: any) => loc.equipment_id).filter(Boolean))];
   const equipmentMap = new Map();
-  
+
   if (equipmentIds.length > 0) {
     const { data: equipment } = await supabase
       .from('equipment')
       .select('id, reg_num, equip_type_id, owner_company_id')
       .in('id', equipmentIds);
-    
+
     if (equipment) {
       // equip_types 정보 별도 조회
       const equipTypeIds = [...new Set(equipment.map((e: any) => e.equip_type_id).filter(Boolean))];
       const equipTypeMap = new Map();
-      
+
       if (equipTypeIds.length > 0) {
         const { data: equipTypes } = await supabase
           .from('equip_types')
           .select('id, name')
           .in('id', equipTypeIds);
-        
+
         if (equipTypes) {
           equipTypes.forEach((et: any) => {
             equipTypeMap.set(et.id, toCamelCase(et));
           });
         }
       }
-      
+
       equipment.forEach((e: any) => {
         const equipData = toCamelCase(e);
         if (e.equip_type_id && equipTypeMap.has(e.equip_type_id)) {
@@ -5020,7 +5020,7 @@ export async function getAllActiveLocations(filters?: {
 
   // 클라이언트 사이드 필터링 (차량번호, 차종, 운전자)
   let filteredData = data || [];
-  
+
   if (filters?.vehicleNumber) {
     filteredData = filteredData.filter((loc: any) => {
       const regNum = loc.equipment?.reg_num || '';
@@ -5054,27 +5054,27 @@ export async function getAllActiveLocations(filters?: {
   // worker와 equipment 정보를 location 객체에 매핑
   let result = Array.from(latestByWorker.values()).map((loc: any) => {
     const mappedLoc = { ...loc };
-    
+
     // worker 정보 매핑
     if (loc.worker_id && workerMap.has(loc.worker_id)) {
       mappedLoc.workers = workerMap.get(loc.worker_id);
     }
-    
+
     // equipment 정보 매핑
     if (loc.equipment_id && equipmentMap.has(loc.equipment_id)) {
       mappedLoc.equipment = equipmentMap.get(loc.equipment_id);
     }
-    
+
     return mappedLoc;
   });
-  
+
   // Owner 권한 필터링은 deployment 정보가 매핑된 후에 수행 (출근 현황과 동일한 로직)
   // 여기서는 일단 deployment 정보를 가져온 후 필터링하도록 주석 처리
   // 실제 필터링은 deployment 매핑 후에 수행
-  
+
   const resultEquipmentIds = result.map((loc: any) => loc.equipment_id).filter(Boolean);
   const resultWorkerIds = result.map((loc: any) => loc.worker_id).filter(Boolean);
-  
+
   // 각 worker의 현재 작업 세션 상태 조회
   const workSessionMap = new Map<string, any>();
   if (resultWorkerIds.length > 0) {
@@ -5084,7 +5084,7 @@ export async function getAllActiveLocations(filters?: {
       .in('worker_id', resultWorkerIds)
       .is('end_time', null) // 진행 중인 세션만
       .order('start_time', { ascending: false });
-    
+
     if (workSessions) {
       // 각 worker별 최신 세션만 저장
       workSessions.forEach((ws: any) => {
@@ -5094,14 +5094,14 @@ export async function getAllActiveLocations(filters?: {
       });
     }
   }
-  
+
   // 각 location에 작업 세션 상태 추가
   result.forEach((loc: any) => {
     if (loc.worker_id && workSessionMap.has(loc.worker_id)) {
       loc.workSession = workSessionMap.get(loc.worker_id);
     }
   });
-  
+
   if (resultEquipmentIds.length > 0) {
     // 모든 활성 deployment 조회 (worker_id, owner_id도 함께 조회)
     const { data: deployments } = await supabase
@@ -5173,7 +5173,7 @@ export async function getAllActiveLocations(filters?: {
           .from('companies')
           .select('id, name')
           .in('id', Array.from(ownerCompanyIds));
-        
+
         if (ownerCompanies) {
           ownerCompanies.forEach((company: any) => {
             ownerCompaniesMap.set(company.id, company);
@@ -5185,45 +5185,45 @@ export async function getAllActiveLocations(filters?: {
       result.forEach((loc: any) => {
         if (loc.equipment_id && deploymentMap.has(loc.equipment_id)) {
           const dep = deploymentMap.get(loc.equipment_id);
-          
+
           // deployment의 worker_id로 worker 정보 확인 및 매핑
           if (dep.worker_id && workerMap.has(dep.worker_id)) {
             dep.worker = workerMap.get(dep.worker_id);
           }
-          
+
           // equipment 정보가 있으면 deployment에 포함
           if (loc.equipment) {
             dep.equipment = {
               ...loc.equipment,
             };
-            
+
             // 오너사 정보 추가
             if (loc.equipment.owner_company_id && ownerCompaniesMap.has(loc.equipment.owner_company_id)) {
               dep.equipment.ownerCompanies = ownerCompaniesMap.get(loc.equipment.owner_company_id);
             }
           }
-          
+
           loc.deployment = toCamelCase(dep);
         }
       });
-      
+
       // Owner 권한 필터링 (deployment 정보가 매핑된 후, 출근 현황과 동일한 로직)
       if (filters?.userRole?.toLowerCase() === 'owner' && filters.userCompanyId) {
         // 모든 deployment의 owner_id 수집
         const ownerIds = [...new Set(result.map((loc: any) => loc.deployment?.ownerId || loc.deployment?.owner_id).filter(Boolean))];
-        
+
         if (ownerIds.length > 0) {
           // 한 번에 owner 정보 조회
           const { data: owners } = await supabase
             .from('users')
             .select('id, company_id')
             .in('id', ownerIds);
-          
+
           // owner의 company_id가 필터와 일치하는 owner_id만 수집
           const validOwnerIds = new Set(
             owners?.filter((o: any) => o.company_id === filters.userCompanyId).map((o: any) => o.id) || []
           );
-          
+
           // 해당 owner_id를 가진 deployment의 location만 필터링
           result = result.filter((loc: any) => {
             const ownerId = loc.deployment?.ownerId || loc.deployment?.owner_id;
@@ -5237,7 +5237,7 @@ export async function getAllActiveLocations(filters?: {
             }
             return matches;
           });
-          
+
           console.log('[getAllActiveLocations] Owner 필터링 후 개수:', result.length);
         } else {
           // owner_id가 없으면 빈 결과
@@ -5265,7 +5265,7 @@ export async function getAllActiveLocations(filters?: {
       deploymentEpCompanyId: loc.deployment?.ep_company_id || loc.deployment?.epCompanyId,
     })));
   }
-  
+
   return toCamelCaseArray(result);
 }
 
@@ -5281,7 +5281,7 @@ export async function getExpectedWorkersForLocationTracking(filters?: {
   if (!supabase) return 0;
 
   const userRole = filters?.userRole?.toLowerCase();
-  
+
   // 권한별 필터링
   let deploymentQuery = supabase
     .from("deployments")
@@ -5322,19 +5322,19 @@ export async function getExpectedWorkersForLocationTracking(filters?: {
 
   // Supabase는 snake_case를 반환하므로 camelCase로 변환
   const activeDeployments = toCamelCaseArray(activeDeploymentsRaw);
-  
+
   // 각 deployment의 ep_company_id에 해당하는 활성 work_zone이 있는지 확인
   const epCompanyIds = [...new Set(
     activeDeployments.map((d: any) => d.epCompanyId || d.ep_company_id).filter(Boolean)
   )];
-  
+
   console.log('[getExpectedWorkersForLocationTracking] EP Company IDs:', epCompanyIds);
-  
+
   if (epCompanyIds.length === 0) {
     console.log('[getExpectedWorkersForLocationTracking] ❌ EP Company ID가 없음');
     return 0;
   }
-  
+
   const { data: workZonesRaw, error: workZonesError } = await supabase
     .from("work_zones")
     .select("company_id, id, name, is_active")
@@ -5351,13 +5351,13 @@ export async function getExpectedWorkersForLocationTracking(filters?: {
   }
 
   const workZones = workZonesRaw ? toCamelCaseArray(workZonesRaw) : [];
-  
+
   const validEpCompanyIds = new Set(
     workZones.map((wz: any) => wz.companyId || wz.company_id).filter(Boolean)
   );
-  
+
   console.log('[getExpectedWorkersForLocationTracking] Valid EP Company IDs (work_zone이 있는):', Array.from(validEpCompanyIds));
-  
+
   // work_zone이 있는 deployment만 출근 대상으로 계산
   const validDeployments = activeDeployments.filter((d: any) => {
     const epCompanyId = d.epCompanyId || d.ep_company_id;
@@ -5693,13 +5693,13 @@ export async function getCheckIns(filters?: {
   // worker 정보 별도 조회 (Supabase 관계 에러 방지)
   const workerIds = [...new Set(checkIns.map((ci: any) => ci.workerId).filter(Boolean))];
   const workerMap = new Map();
-  
+
   if (workerIds.length > 0) {
     const { data: workers } = await supabase
       .from('workers')
       .select('id, user_id, name, worker_type_id')
       .in('id', workerIds);
-    
+
     if (workers) {
       workers.forEach((w: any) => {
         workerMap.set(w.id, toCamelCase(w));
@@ -5710,13 +5710,13 @@ export async function getCheckIns(filters?: {
   // work_zone 정보 별도 조회
   const workZoneIds = [...new Set(checkIns.map((ci: any) => ci.workZoneId).filter(Boolean))];
   const workZoneMap = new Map();
-  
+
   if (workZoneIds.length > 0) {
     const { data: workZones } = await supabase
       .from('work_zones')
       .select('id, name')
       .in('id', workZoneIds);
-    
+
     if (workZones) {
       workZones.forEach((wz: any) => {
         workZoneMap.set(wz.id, toCamelCase(wz));
@@ -5727,13 +5727,13 @@ export async function getCheckIns(filters?: {
   // deployment 정보 별도 조회 (nested join 제한으로 인해)
   const deploymentIds = [...new Set(checkIns.map((ci: any) => ci.deploymentId).filter(Boolean))];
   const deploymentMap = new Map();
-  
+
   if (deploymentIds.length > 0) {
     const { data: deployments } = await supabase
       .from('deployments')
       .select('id, bp_company_id, ep_company_id, owner_id')
       .in('id', deploymentIds);
-    
+
     if (deployments) {
       deployments.forEach((dep: any) => {
         deploymentMap.set(dep.id, toCamelCase(dep));
@@ -5757,14 +5757,14 @@ export async function getCheckIns(filters?: {
     if (dep.bpCompanyId) companyIds.add(dep.bpCompanyId);
     if (dep.epCompanyId) companyIds.add(dep.epCompanyId);
   });
-  
+
   const companyMap = new Map();
   if (companyIds.size > 0) {
     const { data: companies } = await supabase
       .from('companies')
       .select('id, name, company_type')
       .in('id', Array.from(companyIds));
-    
+
     if (companies) {
       companies.forEach((comp: any) => {
         companyMap.set(comp.id, toCamelCase(comp));
@@ -5777,13 +5777,13 @@ export async function getCheckIns(filters?: {
     Array.from(workerMap.values()).map((w: any) => w.workerTypeId).filter(Boolean)
   )];
   const workerTypeMap = new Map();
-  
+
   if (workerTypeIds.length > 0) {
     const { data: workerTypes } = await supabase
       .from('worker_types')
       .select('id, name')
       .in('id', workerTypeIds);
-    
+
     if (workerTypes) {
       workerTypes.forEach((wt: any) => {
         workerTypeMap.set(wt.id, toCamelCase(wt));
@@ -5794,13 +5794,13 @@ export async function getCheckIns(filters?: {
   // user 정보 별도 조회
   const userIds = [...new Set(checkIns.map((ci: any) => ci.userId).filter(Boolean))];
   const userMap = new Map();
-  
+
   if (userIds.length > 0) {
     const { data: users } = await supabase
       .from('users')
       .select('id, name, email, role')
       .in('id', userIds);
-    
+
     if (users) {
       users.forEach((user: any) => {
         userMap.set(user.id, toCamelCase(user));
@@ -5872,21 +5872,21 @@ export async function getCheckIns(filters?: {
     // Owner 필터링: deployment의 owner_id를 통해 owner의 company_id 확인
     // 모든 deployment의 owner_id 수집
     const ownerIds = [...new Set(checkIns.map((ci: any) => ci.deployment?.ownerId).filter(Boolean))];
-    
+
     if (ownerIds.length > 0) {
       // 한 번에 owner 정보 조회
       const { data: owners } = await supabase
         .from('users')
         .select('id, company_id')
         .in('id', ownerIds);
-      
+
       // owner의 company_id가 필터와 일치하는 owner_id만 수집
       const validOwnerIds = new Set(
         owners?.filter((o: any) => o.company_id === filters.ownerCompanyId).map((o: any) => o.id) || []
       );
-      
+
       // 해당 owner_id를 가진 deployment의 check-in만 필터링
-      checkIns = checkIns.filter((ci: any) => 
+      checkIns = checkIns.filter((ci: any) =>
         ci.deployment?.ownerId && validOwnerIds.has(ci.deployment.ownerId)
       );
     } else {
@@ -5896,14 +5896,14 @@ export async function getCheckIns(filters?: {
   }
 
   if (filters?.workerTypeId) {
-    checkIns = checkIns.filter((ci: any) => 
+    checkIns = checkIns.filter((ci: any) =>
       ci.worker?.workerTypeId === filters.workerTypeId
     );
   }
 
   if (filters?.workerName) {
     const nameLower = filters.workerName.toLowerCase();
-    checkIns = checkIns.filter((ci: any) => 
+    checkIns = checkIns.filter((ci: any) =>
       ci.worker?.name?.toLowerCase().includes(nameLower) ||
       ci.user?.name?.toLowerCase().includes(nameLower)
     );
@@ -6375,6 +6375,23 @@ export async function updateUserFcmToken(userId: string, fcmToken: string): Prom
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not available");
 
+  // 1. 먼저 다른 사용자에게 같은 FCM 토큰이 있으면 제거
+  // (같은 기기에서 다른 사용자가 로그인한 경우)
+  const { error: clearError } = await supabase
+    .from('users')
+    .update({
+      fcm_token: null,
+      fcm_token_updated_at: new Date().toISOString(),
+    })
+    .eq('fcm_token', fcmToken)
+    .neq('id', userId);
+
+  if (clearError) {
+    console.warn("[Database] Error clearing old FCM tokens:", clearError);
+    // 에러가 나도 계속 진행 (새 토큰 등록은 해야 함)
+  }
+
+  // 2. 현재 사용자에게 FCM 토큰 등록
   const { error } = await supabase
     .from('users')
     .update({
@@ -6387,6 +6404,8 @@ export async function updateUserFcmToken(userId: string, fcmToken: string): Prom
     console.error("[Database] Error updating FCM token:", error);
     throw error;
   }
+
+  console.log(`[Database] FCM token registered for user ${userId}, cleared from other users`);
 }
 
 /**
@@ -6472,6 +6491,31 @@ export async function getUserFcmToken(userId: string): Promise<string | null> {
   }
 
   return data.fcm_token;
+}
+
+/**
+ * 사용자의 FCM 토큰 업데이트
+ */
+export async function updateUserFcmToken(userId: string, fcmToken: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({ fcm_token: fcmToken })
+      .eq('id', userId);
+
+    if (error) {
+      console.error(`[Database] Error updating FCM token for user ${userId}:`, error);
+      throw error;
+    }
+
+    console.log(`[Database] FCM token updated for user ${userId}`);
+  } catch (error) {
+    console.error(`[Database] Failed to update FCM token for user ${userId}:`, error);
+    throw error;
+  }
 }
 
 /**
@@ -6561,7 +6605,7 @@ async function sendDocumentExpiryNotification(
           linkId: doc.id,
         };
         const createdNotification = await createNotification(notification);
-        
+
         // FCM 푸시 알림 발송 (모바일 앱 사용자만)
         if (createdNotification) {
           try {
@@ -6618,7 +6662,7 @@ async function sendDocumentExpiryNotification(
       linkId: doc.id,
     };
     const createdNotification = await createNotification(notification);
-    
+
     // FCM 푸시 알림 발송 (모바일 앱 사용자만)
     if (createdNotification) {
       try {
@@ -6764,8 +6808,8 @@ export async function getExpiringDocuments(params: {
       daysUntilExpiry,
       isExpired: daysUntilExpiry < 0,
       urgencyLevel: daysUntilExpiry < 0 ? 'expired' :
-                    daysUntilExpiry <= 3 ? 'urgent' :
-                    daysUntilExpiry <= 7 ? 'warning' : 'normal',
+        daysUntilExpiry <= 3 ? 'urgent' :
+          daysUntilExpiry <= 7 ? 'warning' : 'normal',
     };
   });
 }
