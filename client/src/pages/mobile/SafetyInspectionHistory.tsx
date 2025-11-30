@@ -95,7 +95,7 @@ export default function SafetyInspectionHistory() {
   };
 
   return (
-    <MobileLayout title="점검 내역" showBottomNav={false}>
+    <MobileLayout title="점검 내역" showBottomNav={true} navItems={inspectorNavItems}>
       <div className="p-4 space-y-4 pb-32">
         {/* 검색 필터 */}
         <Card>
@@ -244,10 +244,10 @@ export default function SafetyInspectionHistory() {
                         {inspection.checkFrequency === "daily"
                           ? "일일"
                           : inspection.checkFrequency === "weekly"
-                          ? "주간"
-                          : inspection.checkFrequency === "monthly"
-                          ? "월간"
-                          : "필요시"}
+                            ? "주간"
+                            : inspection.checkFrequency === "monthly"
+                              ? "월간"
+                              : "필요시"}
                       </Badge>
                     </div>
 
@@ -338,10 +338,10 @@ export default function SafetyInspectionHistory() {
                       {inspectionDetail.checkFrequency === "daily"
                         ? "일일"
                         : inspectionDetail.checkFrequency === "weekly"
-                        ? "주간"
-                        : inspectionDetail.checkFrequency === "monthly"
-                        ? "월간"
-                        : "필요시"}
+                          ? "주간"
+                          : inspectionDetail.checkFrequency === "monthly"
+                            ? "월간"
+                            : "필요시"}
                     </Badge>
                   </div>
                 </CardContent>

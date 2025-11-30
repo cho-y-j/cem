@@ -26,10 +26,10 @@ import { isNfcAvailable, startNativeNfcScan, startWebNfcScan, isNativeApp } from
 export default function InspectorMain() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  
+
   // FCM 토큰 등록 (모바일 앱에서만 작동)
   useFcmToken();
-  
+
   // 푸시 알림 리스너 설정 (모바일 앱에서만 작동)
   useEffect(() => {
     setupPushNotificationListeners(setLocation);
@@ -318,7 +318,7 @@ export default function InspectorMain() {
   };
 
   return (
-    <MobileLayout title="안전점검" showBottomNav={false}>
+    <MobileLayout title="안전점검" showBottomNav={true} navItems={inspectorNavItems}>
       <div className="p-4 space-y-5 pb-32">
         <div className="space-y-1.5">
           <p className="text-sm font-semibold text-slate-700">장비 검색</p>
@@ -417,29 +417,29 @@ export default function InspectorMain() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-            {lastNfcTag && (
-              <div className="mb-3">
-                <Badge variant="outline" className="text-xs">
-                  NFC 태그 인식: {lastNfcTag}
-                </Badge>
-                <p className="text-xs text-muted-foreground mt-1">
-                  태그와 연결된 장비를 확인 후 선택해 주세요.
-                </p>
-              </div>
-            )}
-            {pendingNfcTag && (
-              <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-                <div className="flex items-center gap-2">
+              {lastNfcTag && (
+                <div className="mb-3">
                   <Badge variant="outline" className="text-xs">
-                    등록되지 않은 태그
+                    NFC 태그 인식: {lastNfcTag}
                   </Badge>
-                  <span className="text-xs font-medium text-slate-700">{pendingNfcTag}</span>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    태그와 연결된 장비를 확인 후 선택해 주세요.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  장비를 검색한 뒤 카드의 <strong>태그 등록</strong> 버튼을 눌러 연결해 주세요.
-                </p>
-              </div>
-            )}
+              )}
+              {pendingNfcTag && (
+                <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      등록되지 않은 태그
+                    </Badge>
+                    <span className="text-xs font-medium text-slate-700">{pendingNfcTag}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    장비를 검색한 뒤 카드의 <strong>태그 등록</strong> 버튼을 눌러 연결해 주세요.
+                  </p>
+                </div>
+              )}
               <div className="space-y-3">
                 {searchResults.map((equipment) => (
                   <button
@@ -614,8 +614,6 @@ export default function InspectorMain() {
           </CardContent>
         </Card>
       </div>
-
-      <MobileBottomNav items={inspectorNavItems} />
 
       <Dialog
         open={tagDialogOpen}
