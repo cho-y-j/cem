@@ -498,10 +498,9 @@ export default function InspectorMain() {
               )}
               <div className="space-y-3">
                 {searchResults.map((equipment) => (
-                  <button
+                  <div
                     key={equipment.id}
-                    onClick={() => setLocation(`/mobile/inspector/inspection/${equipment.id}`)}
-                    className="w-full text-left p-5 border-2 rounded-xl hover:bg-blue-50 hover:border-blue-300 transition-all active:scale-98"
+                    className="w-full text-left p-5 border-2 rounded-xl hover:bg-blue-50 hover:border-blue-300 transition-all cursor-pointer"
                   >
                     <div className="flex items-center gap-4">
                       <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -595,7 +594,7 @@ export default function InspectorMain() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </CardContent>
