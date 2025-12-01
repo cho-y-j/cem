@@ -1393,18 +1393,16 @@ export default function WorkerMain() {
                       }
 
                       console.log('[Emergency] Sending alert:', {
-                        workerId: workerInfo.id,
                         equipmentId: assignedEquipment.id,
-                        alertType: selectedEmergencyType.id,
+                        alertType: selectedEmergencyType.type,
                         latitude: finalLat,
                         longitude: finalLng,
                         description: emergencyDetails
                       });
 
-                      createEmergencyAlertMutation.mutate({
-                        workerId: workerInfo.id,
+                      sendEmergencyMutation.mutate({
                         equipmentId: assignedEquipment.id,
-                        alertType: selectedEmergencyType.id,
+                        alertType: selectedEmergencyType.type,
                         latitude: finalLat,
                         longitude: finalLng,
                         description: emergencyDetails,
