@@ -9,6 +9,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import * as db from "./db";
+import { sendFcmNotifications } from "./_core/fcm";
 
 /**
  * Context에서 Worker ID 가져오기 (헬퍼 함수)
@@ -605,7 +606,7 @@ export const mobileRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const workerId = await getWorkerIdFromContext(ctx);
-        const id = nanoid();
+        const id = `emergency-${nanoid()}`;
 
         await db.createEmergencyAlert({
           id,
@@ -616,6 +617,54 @@ export const mobileRouter = router({
           latitude: input.latitude,
           longitude: input.longitude,
         });
+
+        console.log(`[Emergency] ALERT created: ${id} by Worker ${workerId} - ${input.alertType}`);
+
+        // FCM 푸시 알림 발송 (관리자, Owner, BP, EP에게)
+        try {
+          // Worker 정보 조회
+          const worker = await db.getWorkerById(workerId);
+          const workerName = worker?.name || "알 수 없음";
+
+          // 긴급 알림 유형 한글화
+          const alertTypeKorean: Record<string, string> = {
+            emergency: "긴급 상황",
+            accident: "사고 발생",
+            injury: "부상 발생",
+            equipment_failure: "장비 고장",
+            weather: "기상 악화",
+            other: "기타 알림",
+          };
+          const alertTitle = `🚨 ${alertTypeKorean[input.alertType] || "긴급 알림"}`;
+
+          // 관리자 역할들에게 FCM 토큰 조회
+          console.log(`[Emergency] Fetching FCM tokens for roles: admin, owner, bp, ep`);
+          const recipients = await db.getUsersFcmTokensByRoles(["admin", "owner", "bp", "ep"]);
+          console.log(`[Emergency] Found ${recipients.length} recipients for push notification`);
+
+          if (recipients.length > 0) {
+            console.log(`[Emergency] Sending FCM to ${recipients.length} devices`);
+            const result = await sendFcmNotifications(
+              recipients.map((r) => ({ userId: r.userId, fcmToken: r.fcmToken })),
+              {
+                title: alertTitle,
+                body: `${workerName}님이 긴급 상황을 신고했습니다.\n${input.description || "상세 내용 없음"}`,
+                data: {
+                  type: "emergency",
+                  alertId: id,
+                  alertType: input.alertType,
+                  workerId: workerId,
+                },
+              }
+            );
+            console.log(`[Emergency] FCM 푸시 발송 완료: 성공 ${result.success}건, 실패 ${result.failed}건`);
+          } else {
+            console.log("[Emergency] FCM 토큰이 등록된 관리자가 없습니다.");
+          }
+        } catch (fcmError) {
+          console.error("[Emergency] FCM 푸시 발송 실패:", fcmError);
+          // 푸시 실패해도 긴급 알림 자체는 성공 처리
+        }
 
         return { id };
       }),
