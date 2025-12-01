@@ -9,9 +9,18 @@ import { AlertTriangle, MapPin, Clock, CheckCircle, XCircle, Loader2 } from "luc
 import { toast } from "sonner";
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from "@vis.gl/react-google-maps";
 
-// UTC 시간을 한국 표준시(KST)로 명시적 변환하는 헬퍼 함수
+// DB 시간을 한국 표준시(KST)로 변환하는 헬퍼 함수
+// DB에 타임존 없이 저장된 경우를 처리
 const formatToKST = (dateString: string | Date) => {
-  const date = new Date(dateString);
+  let dateStr = typeof dateString === 'string' ? dateString : dateString.toISOString();
+
+  // DB에서 타임존 정보 없이 저장된 경우 (예: "2025-12-01T03:48:40.787")
+  // 이미 UTC로 저장되었으므로 'Z'를 붙여서 UTC로 해석되도록 함
+  if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+    dateStr = dateStr + 'Z';
+  }
+
+  const date = new Date(dateStr);
   return date.toLocaleString("ko-KR", {
     timeZone: "Asia/Seoul",
     year: 'numeric',
