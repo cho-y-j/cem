@@ -55,7 +55,9 @@
       "Bash(timeout /t 3)",
       "Bash(timeout /t 10)",
       "Bash(npx cap:*)",
-      "Bash(npm search:*)"
+      "Bash(npm search:*)",
+      "Bash(echo:*)",
+      "Bash(PGPASSWORD='cho2239148!' psql -h db.zlgehckxiuhjpfjlaycf.supabase.co -p 5432 -U postgres -d postgres -c \"SELECT id, alert_type, created_at, created_at AT TIME ZONE ''Asia/Seoul'' as kst_time FROM emergency_alerts ORDER BY created_at DESC LIMIT 5;\")"
     ],
     "deny": [],
     "ask": []

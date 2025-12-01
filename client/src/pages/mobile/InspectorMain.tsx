@@ -100,12 +100,22 @@ export default function InspectorMain() {
     const checkNfc = async () => {
       try {
         console.log('[InspectorMain] Checking NFC availability...');
-        console.log('[InspectorMain] Is native app:', isNativeApp());
-        console.log('[InspectorMain] Capacitor platform:', Capacitor.getPlatform());
+        const native = isNativeApp();
+        const platform = Capacitor.getPlatform();
+        console.log('[InspectorMain] Is native app:', native);
+        console.log('[InspectorMain] Capacitor platform:', platform);
+
+        // 네이티브 앱이면 NFC 버튼 무조건 활성화 (플러그인 체크 건너뛰기)
+        if (native && platform === 'android') {
+          console.log('[InspectorMain] Native Android app - enabling NFC button');
+          setIsNfcSupported(true);
+          return;
+        }
+
         const available = await isNfcAvailable();
         setIsNfcSupported(available);
         console.log('[InspectorMain] NFC available:', available);
-        if (!available && isNativeApp()) {
+        if (!available && native) {
           console.warn('[InspectorMain] NFC is not available in native app - check plugin installation and permissions');
         }
       } catch (error: any) {
@@ -115,7 +125,12 @@ export default function InspectorMain() {
           stack: error?.stack,
           name: error?.name,
         });
-        setIsNfcSupported(false);
+        // 네이티브 앱이면 에러가 나도 버튼 활성화
+        if (isNativeApp() && Capacitor.getPlatform() === 'android') {
+          setIsNfcSupported(true);
+        } else {
+          setIsNfcSupported(false);
+        }
       }
     };
     checkNfc();
