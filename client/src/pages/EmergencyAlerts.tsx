@@ -15,8 +15,13 @@ const formatToKST = (dateString: string | Date) => {
   let dateStr = typeof dateString === 'string' ? dateString : dateString.toISOString();
 
   // DB에서 타임존 정보 없이 저장된 경우 (예: "2025-12-01T03:48:40.787")
-  // 이미 UTC로 저장되었으므로 'Z'를 붙여서 UTC로 해석되도록 함
-  if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+  // 'Z'나 '+' 또는 시간 부분 뒤의 '+'/'-'가 없으면 UTC로 해석되도록 'Z' 추가
+  // 시간 형식: 2025-12-01T03:48:40.787 (타임존 없음)
+  const hasTimezone = dateStr.endsWith('Z') ||
+                      dateStr.includes('+', 10) ||
+                      /T\d{2}:\d{2}:\d{2}.*[+-]\d{2}/.test(dateStr);
+
+  if (!hasTimezone) {
     dateStr = dateStr + 'Z';
   }
 
