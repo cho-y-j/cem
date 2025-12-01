@@ -1,5 +1,23 @@
-import { useLocation } from 'wouter';
 import { toast } from 'sonner';
+
+/**
+ * 홈을 경유한 후 목적지로 이동 (뒤로가기 시 홈으로 갈 수 있도록)
+ * @param setLocation wouter의 setLocation 함수
+ * @param targetPath 목적지 경로
+ * @param homePath 홈 경로 (기본값: '/')
+ */
+function navigateViaHome(
+  setLocation: (path: string) => void,
+  targetPath: string,
+  homePath: string = '/'
+) {
+  // 먼저 홈으로 이동 (히스토리에 홈 추가)
+  setLocation(homePath);
+  // 약간의 딜레이 후 목적지로 이동
+  setTimeout(() => {
+    setLocation(targetPath);
+  }, 50);
+}
 
 /**
  * 푸시 알림 이벤트 리스너 설정
@@ -29,12 +47,8 @@ export function setupPushNotificationListeners(setLocation: (path: string) => vo
         action: {
           label: '확인',
           onClick: () => {
-            // 알림 클릭 시 처리 로직과 동일하게 이동
-            if (notification.data?.notificationId) {
-              setLocation('/mobile/notifications');
-            } else {
-              setLocation('/mobile/notifications');
-            }
+            // 알림 클릭 시 알림 목록으로 이동
+            setLocation('/mobile/notifications');
           },
         },
       });
@@ -46,12 +60,7 @@ export function setupPushNotificationListeners(setLocation: (path: string) => vo
 
       const data = action.notification.data;
 
-      // 알림 목록 페이지로 이동
-      if (data?.notificationId) {
-        setLocation('/mobile/notifications');
-      }
-
-      // 링크가 있으면 해당 페이지로 이동
+      // 링크가 있으면 해당 페이지로 이동 (홈 경유)
       if (data?.linkType && data?.linkId) {
         const linkMap: Record<string, string> = {
           document: `/documents?id=${data.linkId}`,
@@ -60,12 +69,13 @@ export function setupPushNotificationListeners(setLocation: (path: string) => vo
         };
         const link = linkMap[data.linkType];
         if (link) {
-          setLocation(link);
+          navigateViaHome(setLocation, link);
         } else {
-          setLocation('/mobile/notifications');
+          navigateViaHome(setLocation, '/mobile/notifications');
         }
       } else {
-        setLocation('/mobile/notifications');
+        // 기본: 알림 목록 페이지로 이동 (홈 경유)
+        navigateViaHome(setLocation, '/mobile/notifications');
       }
     });
   }).catch((error) => {

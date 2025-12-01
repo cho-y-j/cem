@@ -162,12 +162,20 @@ function DashboardLayoutContent({
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
+
+  // 모바일에서 메뉴 클릭 시 사이드바 닫기
+  const handleMenuClick = (path: string) => {
+    setLocation(path);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   // FCM 토큰 등록 (앱에서 푸시 알림 수신을 위해)
   // admin, owner, bp, ep 사용자가 앱에서 접속 시 FCM 토큰 자동 등록
@@ -272,7 +280,7 @@ function DashboardLayoutContent({
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton
                         isActive={isActive}
-                        onClick={() => setLocation(item.path)}
+                        onClick={() => handleMenuClick(item.path)}
                         tooltip={item.label}
                         className={`h-10 transition-all font-normal`}
                       >
@@ -299,7 +307,7 @@ function DashboardLayoutContent({
                       <SidebarMenuItem key={item.path}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => setLocation(item.path)}
+                          onClick={() => handleMenuClick(item.path)}
                           tooltip={item.label}
                           className={`h-10 transition-all font-normal`}
                         >
