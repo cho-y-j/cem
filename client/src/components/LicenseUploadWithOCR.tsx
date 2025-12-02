@@ -301,7 +301,11 @@ export function LicenseUploadWithOCR({
           <div className="grid grid-cols-2 gap-3">
             <Button
               type="button"
-              onClick={() => cameraInputRef.current?.click()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cameraInputRef.current?.click();
+              }}
               disabled={isProcessing}
               className="h-16 flex-col gap-1 bg-blue-600 hover:bg-blue-700"
             >
@@ -311,14 +315,18 @@ export function LicenseUploadWithOCR({
             <Button
               type="button"
               variant="outline"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
               disabled={isProcessing}
               className="h-16 flex-col gap-1"
             >
               <Upload className="h-5 w-5" />
               <span className="text-sm">갤러리 선택</span>
             </Button>
-            {/* 숨겨진 카메라 input */}
+            {/* 숨겨진 카메라 input - form validation 우회 */}
             <input
               ref={cameraInputRef}
               type="file"
@@ -326,14 +334,16 @@ export function LicenseUploadWithOCR({
               capture="environment"
               className="hidden"
               onChange={handleCameraCapture}
+              formNoValidate
             />
-            {/* 숨겨진 갤러리 input */}
+            {/* 숨겨진 갤러리 input - form validation 우회 */}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
               className="hidden"
               onChange={(e) => handleImageUpload(e, false)}
+              formNoValidate
             />
           </div>
         ) : (

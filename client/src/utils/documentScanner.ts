@@ -66,29 +66,82 @@ function orderPoints(points: Point[]): Corners {
 
 /**
  * 이미지에서 문서 모서리 자동 감지
+ * 여러 전처리 방법을 시도하여 가장 좋은 결과 반환
  */
 export function detectDocumentCorners(cv: any, imageSrc: HTMLImageElement | HTMLCanvasElement): Corners | null {
   try {
     // 이미지를 Mat으로 변환
     const src = cv.imread(imageSrc);
-    const gray = new cv.Mat();
-    const blurred = new cv.Mat();
-    const edges = new cv.Mat();
-    const contours = new cv.MatVector();
-    const hierarchy = new cv.Mat();
+    const imgArea = src.rows * src.cols;
 
+    console.log('[DocumentScanner] 이미지 크기:', src.cols, 'x', src.rows);
+
+    // 여러 방법으로 시도
+    const methods = [
+      { cannyLow: 30, cannyHigh: 100, blur: 5, approxEpsilon: 0.02 },
+      { cannyLow: 50, cannyHigh: 150, blur: 5, approxEpsilon: 0.02 },
+      { cannyLow: 20, cannyHigh: 80, blur: 7, approxEpsilon: 0.03 },
+      { cannyLow: 75, cannyHigh: 200, blur: 5, approxEpsilon: 0.02 },
+      { cannyLow: 10, cannyHigh: 50, blur: 9, approxEpsilon: 0.04 },
+    ];
+
+    let bestCorners: Point[] | null = null;
+    let bestArea = 0;
+
+    for (const method of methods) {
+      const result = tryDetectCorners(cv, src, method, imgArea);
+      if (result && result.area > bestArea) {
+        bestArea = result.area;
+        bestCorners = result.corners;
+        console.log('[DocumentScanner] 방법 성공:', method, '면적:', result.area);
+      }
+    }
+
+    // 메모리 해제
+    src.delete();
+
+    if (bestCorners && bestCorners.length === 4) {
+      console.log('[DocumentScanner] 문서 감지 성공');
+      return orderPoints(bestCorners);
+    }
+
+    console.log('[DocumentScanner] 문서 감지 실패, 기본 모서리 사용');
+    return null;
+  } catch (error) {
+    console.error('[DocumentScanner] 모서리 감지 오류:', error);
+    return null;
+  }
+}
+
+/**
+ * 주어진 파라미터로 모서리 감지 시도
+ */
+function tryDetectCorners(
+  cv: any,
+  src: any,
+  params: { cannyLow: number; cannyHigh: number; blur: number; approxEpsilon: number },
+  imgArea: number
+): { corners: Point[]; area: number } | null {
+  const gray = new cv.Mat();
+  const blurred = new cv.Mat();
+  const edges = new cv.Mat();
+  const contours = new cv.MatVector();
+  const hierarchy = new cv.Mat();
+
+  try {
     // 1. 그레이스케일 변환
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
     // 2. 가우시안 블러 (노이즈 제거)
-    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+    cv.GaussianBlur(gray, blurred, new cv.Size(params.blur, params.blur), 0);
 
-    // 3. Canny 엣지 감지
-    cv.Canny(blurred, edges, 75, 200);
+    // 3. Canny 엣지 감지 (더 낮은 threshold로 더 많은 엣지 감지)
+    cv.Canny(blurred, edges, params.cannyLow, params.cannyHigh);
 
-    // 4. 팽창 (엣지 연결)
-    const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+    // 4. 팽창 (엣지 연결) - 더 큰 커널
+    const kernel = cv.Mat.ones(5, 5, cv.CV_8U);
     cv.dilate(edges, edges, kernel);
+    kernel.delete();
 
     // 5. 컨투어 찾기
     cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
@@ -96,29 +149,31 @@ export function detectDocumentCorners(cv: any, imageSrc: HTMLImageElement | HTML
     // 6. 가장 큰 사각형 컨투어 찾기
     let maxArea = 0;
     let docCorners: Point[] | null = null;
-    const imgArea = src.rows * src.cols;
 
     for (let i = 0; i < contours.size(); i++) {
       const contour = contours.get(i);
       const area = cv.contourArea(contour);
 
-      // 이미지 면적의 10% 이상인 컨투어만 고려
-      if (area < imgArea * 0.1) continue;
+      // 이미지 면적의 5% 이상인 컨투어만 고려 (더 작은 문서도 감지)
+      if (area < imgArea * 0.05) continue;
 
       // 컨투어 근사화
       const peri = cv.arcLength(contour, true);
       const approx = new cv.Mat();
-      cv.approxPolyDP(contour, approx, 0.02 * peri, true);
+      cv.approxPolyDP(contour, approx, params.approxEpsilon * peri, true);
 
       // 4개의 꼭지점을 가진 컨투어 (사각형)
       if (approx.rows === 4 && area > maxArea) {
-        maxArea = area;
-        docCorners = [];
-        for (let j = 0; j < 4; j++) {
-          docCorners.push({
-            x: approx.data32S[j * 2],
-            y: approx.data32S[j * 2 + 1]
-          });
+        // 볼록한 사각형인지 확인
+        if (cv.isContourConvex(approx)) {
+          maxArea = area;
+          docCorners = [];
+          for (let j = 0; j < 4; j++) {
+            docCorners.push({
+              x: approx.data32S[j * 2],
+              y: approx.data32S[j * 2 + 1]
+            });
+          }
         }
       }
 
@@ -126,21 +181,24 @@ export function detectDocumentCorners(cv: any, imageSrc: HTMLImageElement | HTML
     }
 
     // 메모리 해제
-    src.delete();
     gray.delete();
     blurred.delete();
     edges.delete();
     contours.delete();
     hierarchy.delete();
-    kernel.delete();
 
     if (docCorners && docCorners.length === 4) {
-      return orderPoints(docCorners);
+      return { corners: docCorners, area: maxArea };
     }
 
     return null;
   } catch (error) {
-    console.error('[DocumentScanner] 모서리 감지 오류:', error);
+    // 메모리 해제
+    gray.delete();
+    blurred.delete();
+    edges.delete();
+    contours.delete();
+    hierarchy.delete();
     return null;
   }
 }
