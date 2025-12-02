@@ -792,6 +792,7 @@ export default function Workers() {
               로딩 중...
             </div>
           ) : filteredWorkersList && filteredWorkersList.length > 0 ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -890,6 +891,7 @@ export default function Workers() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               등록된 인력이 없습니다.
@@ -899,7 +901,7 @@ export default function Workers() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-2xl max-h-[88vh] overflow-y-auto p-2 sm:p-4">
+        <DialogContent className="w-full max-w-lg sm:max-w-2xl max-h-[85vh] overflow-y-auto p-3 sm:p-4">
           <DialogHeader>
             <DialogTitle>{editingId ? "인력 수정" : "인력 등록"}</DialogTitle>
             <DialogDescription>
