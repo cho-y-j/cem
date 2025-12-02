@@ -587,9 +587,9 @@ export default function Workers() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* 필터 UI - 한 줄 통일 디자인 */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[200px]">
+          {/* 필터 UI - 모바일에서는 세로 배치 */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="col-span-2 sm:col-span-1">
               <Label className="text-sm font-medium mb-1.5 block">검색</Label>
               <Input
                 id="worker-search"
@@ -601,7 +601,7 @@ export default function Workers() {
             </div>
 
             {(role === "admin" || role === "bp" || role === "ep") && (
-              <div className="flex-1 min-w-[200px]">
+              <div>
                 <Label className="text-sm font-medium mb-1.5 block">Owner 회사</Label>
                 <Select
                   value={ownerCompanyFilter || "all"}
@@ -623,7 +623,7 @@ export default function Workers() {
             )}
 
             {(role === "admin" || role === "ep" || role === "owner") && (
-              <div className="flex-1 min-w-[200px]">
+              <div>
                 <Label className="text-sm font-medium mb-1.5 block">BP 회사</Label>
                 <Select
                   value={bpCompanyFilter || "all"}
@@ -645,7 +645,7 @@ export default function Workers() {
             )}
 
             {role === "admin" && (
-              <div className="flex-1 min-w-[200px]">
+              <div>
                 <Label className="text-sm font-medium mb-1.5 block">EP 회사</Label>
                 <Select
                   value={epCompanyFilter || "all"}
@@ -666,7 +666,7 @@ export default function Workers() {
               </div>
             )}
 
-            <div className="flex-1 min-w-[200px]">
+            <div>
               <Label className="text-sm font-medium mb-1.5 block">인력 유형</Label>
               <Select
                 value={workerTypeFilter || "all"}
@@ -686,7 +686,7 @@ export default function Workers() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[200px]">
+            <div>
               <Label className="text-sm font-medium mb-1.5 block">면허 상태</Label>
               <Select
                 value={licenseStatusFilter || "all"}
