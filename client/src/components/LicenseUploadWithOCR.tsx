@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Camera, Upload, Loader2, CheckCircle2, XCircle, AlertCircle, Crop } from 'lucide-react';
+import { Camera, Upload, Loader2, CheckCircle2, XCircle, AlertCircle, Crop, ScanLine } from 'lucide-react';
 import { useLicenseOCR, LicenseInfo, LICENSE_TYPES } from '@/hooks/useLicenseOCR';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { maskResidentNumberPrecise, base64ToFile } from '@/utils/imageMasking';
 import { ImageCropModal } from './ImageCropModal';
+import { DocumentScanner } from './DocumentScanner';
 
 export interface LicenseUploadProps {
   // 자동 채워질 폼 데이터
@@ -64,25 +65,60 @@ export function LicenseUploadWithOCR({
   const [showCropModal, setShowCropModal] = useState(false);
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
 
+  // 문서 스캐너 상태
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerImageSrc, setScannerImageSrc] = useState<string | null>(null);
+
   const { isProcessing, extractedInfo, error: ocrError, processImage, reset: resetOCR } = useLicenseOCR();
   
   const verifyLicenseMutation = trpc.workers.verifyLicense.useMutation();
 
-  // 이미지 업로드 핸들러 - 크롭 모달 먼저 표시
+  // 이미지 업로드 핸들러 - 모바일이면 스캐너, 아니면 크롭 모달
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('[LicenseUpload] File selected:', { name: file.name, type: file.type, isMobile });
     setVerificationStatus('idle');
 
-    // 파일을 base64로 변환하여 크롭 모달에 전달
+    // 파일을 base64로 변환
     const reader = new FileReader();
     reader.onload = (event) => {
       const imageSrc = event.target?.result as string;
-      setOriginalImageSrc(imageSrc);
-      setShowCropModal(true);
+
+      if (isMobile) {
+        // 모바일: 문서 스캐너 먼저 열기
+        console.log('[LicenseUpload] Opening scanner for mobile');
+        setScannerImageSrc(imageSrc);
+        setShowScanner(true);
+      } else {
+        // 데스크톱: 크롭 모달 바로 열기
+        console.log('[LicenseUpload] Opening crop modal for desktop');
+        setOriginalImageSrc(imageSrc);
+        setShowCropModal(true);
+      }
     };
     reader.readAsDataURL(file);
+
+    // input 초기화
+    e.target.value = '';
+  };
+
+  // 스캔 완료 후 크롭 모달로 이동
+  const handleScanComplete = (scannedImageDataUrl: string) => {
+    console.log('[LicenseUpload] Scan complete, opening crop modal');
+    setShowScanner(false);
+    setScannerImageSrc(null);
+
+    // 스캔된 이미지로 크롭 모달 열기
+    setOriginalImageSrc(scannedImageDataUrl);
+    setShowCropModal(true);
+  };
+
+  // 스캔 취소
+  const handleScanCancel = () => {
+    setShowScanner(false);
+    setScannerImageSrc(null);
   };
 
   // 크롭 완료 후 OCR 및 마스킹 처리
@@ -431,6 +467,15 @@ export function LicenseUploadWithOCR({
           </Alert>
         )}
       </div>
+
+      {/* 문서 스캐너 */}
+      {showScanner && scannerImageSrc && (
+        <DocumentScanner
+          imageSrc={scannerImageSrc}
+          onComplete={handleScanComplete}
+          onCancel={handleScanCancel}
+        />
+      )}
 
       {/* 이미지 크롭 모달 */}
       {originalImageSrc && (

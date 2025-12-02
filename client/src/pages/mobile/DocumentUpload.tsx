@@ -36,24 +36,39 @@ export default function DocumentUpload() {
   // 이미지 파일을 스캔할지 여부 확인
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean = false) => {
     const files = Array.from(event.target.files || []);
+    console.log('[DocumentUpload] handleFileSelect:', { filesCount: files.length, fromCamera });
     if (files.length === 0) return;
 
-    // 이미지 파일만 스캔 가능
-    files.forEach((file, index) => {
-      if (file.type.startsWith('image/') && fromCamera) {
-        // 카메라로 촬영한 경우 스캔 화면 열기
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImageToScan(reader.result as string);
-          setPendingFileIndex(selectedFiles.length + index);
-          setScannerOpen(true);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // 일반 파일 선택 또는 PDF는 바로 추가
-        addFileToList(file);
-      }
-    });
+    // 첫 번째 이미지 파일만 스캔 (카메라는 한 장씩)
+    const file = files[0];
+    console.log('[DocumentUpload] Processing file:', { name: file.name, type: file.type, fromCamera });
+
+    if (file.type.startsWith('image/') && fromCamera) {
+      // 카메라로 촬영한 경우 스캔 화면 열기
+      console.log('[DocumentUpload] Opening scanner for camera image...');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        console.log('[DocumentUpload] Image loaded, opening scanner');
+        setImageToScan(reader.result as string);
+        setPendingFileIndex(selectedFiles.length);
+        setScannerOpen(true);
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type.startsWith('image/')) {
+      // 갤러리에서 선택한 이미지도 스캔 화면 열기 (선택 사항)
+      console.log('[DocumentUpload] Opening scanner for gallery image...');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImageToScan(reader.result as string);
+        setPendingFileIndex(selectedFiles.length);
+        setScannerOpen(true);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // PDF 등 다른 파일은 바로 추가
+      console.log('[DocumentUpload] Adding non-image file directly');
+      addFileToList(file);
+    }
 
     // input 초기화
     event.target.value = '';
