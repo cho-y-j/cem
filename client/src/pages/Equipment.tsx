@@ -331,7 +331,11 @@ export default function Equipment() {
       reader.onloadend = () => {
         setDocImageToScan(reader.result as string);
         setPendingDocTypeId(docTypeId);
-        setDocScannerOpen(true);
+        // Dialog를 닫고 스캐너 열기 (Dialog focus trap 회피)
+        setIsDialogOpen(false);
+        setTimeout(() => {
+          setDocScannerOpen(true);
+        }, 100);
       };
       reader.readAsDataURL(file);
     } else {
@@ -357,6 +361,10 @@ export default function Equipment() {
       setDocScannerOpen(false);
       setDocImageToScan(null);
       setPendingDocTypeId(null);
+      // 스캔 완료 후 Dialog 다시 열기
+      setTimeout(() => {
+        setIsDialogOpen(true);
+      }, 100);
     }
   };
 
@@ -365,6 +373,10 @@ export default function Equipment() {
     setDocScannerOpen(false);
     setDocImageToScan(null);
     setPendingDocTypeId(null);
+    // 취소 시에도 Dialog 다시 열기
+    setTimeout(() => {
+      setIsDialogOpen(true);
+    }, 100);
   };
 
   const handleDateChange = (
@@ -752,26 +764,47 @@ export default function Equipment() {
                         </div>
                         
                         <div className="space-y-2">
-                          <Label htmlFor={`file-${doc.docTypeId}`}>
+                          <Label>
                             파일 업로드 {doc.isMandatory && "*"}
                           </Label>
-                          <Input
-                            id={`file-${doc.docTypeId}`}
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                handleDocImageSelect(doc.docTypeId, file);
-                              }
-                              e.target.value = '';
-                            }}
-                          />
-                          {doc.file && (
-                            <p className="text-xs text-muted-foreground">
-                              ✓ {doc.file.name} ({(doc.file.size / 1024).toFixed(1)} KB)
-                            </p>
-                          )}
+                          {/* 버튼 스타일 파일 선택 */}
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="flex-shrink-0"
+                              onClick={() => {
+                                const input = document.getElementById(`file-${doc.docTypeId}`) as HTMLInputElement;
+                                input?.click();
+                              }}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              파일 선택
+                            </Button>
+                            <input
+                              id={`file-${doc.docTypeId}`}
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleDocImageSelect(doc.docTypeId, file);
+                                }
+                                e.target.value = '';
+                              }}
+                            />
+                            {doc.file ? (
+                              <span className="text-sm text-green-600 truncate flex-1">
+                                ✓ {doc.file.name}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                선택된 파일 없음
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {doc.hasExpiry && (
