@@ -159,53 +159,62 @@ export function DocumentScanner({ imageSrc, onComplete, onCancel }: DocumentScan
     );
   }
 
+  // 화면 높이 계산 (헤더 56px + 하단 버튼 약 180px 제외)
+  const availableHeight = typeof window !== 'undefined' ? window.innerHeight - 240 : 400;
+  const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 32 : 360;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* 헤더 */}
-      <div className="bg-gray-900 text-white p-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+      {/* 헤더 - 높이 고정 */}
+      <div className="flex-shrink-0 bg-gray-900 text-white p-3 flex items-center justify-between">
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          onClick={step === 'corners' ? onCancel : handleBack}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            step === 'corners' ? onCancel() : handleBack();
+          }}
           className="text-white hover:bg-gray-800"
         >
           <X className="h-5 w-5 mr-1" />
           {step === 'corners' ? '취소' : '이전'}
         </Button>
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-base font-semibold">
           {step === 'corners' ? '영역 선택' : '필터 선택'}
         </h2>
-        <div className="w-20" /> {/* 균형을 위한 빈 공간 */}
+        <div className="w-16" />
       </div>
 
-      {/* 메인 콘텐츠 */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
+      {/* 메인 콘텐츠 - 스크롤 없이 화면에 맞춤 */}
+      <div className="flex-1 flex flex-col items-center justify-center p-2 overflow-hidden">
         {step === 'corners' ? (
           <>
-            {/* 모서리 선택 UI */}
-            <div className="mb-4">
+            {/* 모서리 선택 UI - 화면에 맞게 크기 조절 */}
+            <div className="flex-shrink-0">
               <CornerSelector
                 imageSrc={imageSrc}
                 corners={corners}
                 onCornersChange={setCorners}
-                width={Math.min(window.innerWidth - 32, 400)}
-                height={Math.min(window.innerHeight - 300, 500)}
+                width={Math.min(availableWidth, 360)}
+                height={Math.min(availableHeight, 400)}
               />
             </div>
-
-            <p className="text-gray-400 text-sm text-center mb-4">
-              모서리를 드래그하여 문서 영역을 조정하세요
+            <p className="text-gray-400 text-xs text-center mt-2">
+              모서리를 드래그하여 조정
             </p>
           </>
         ) : (
           <>
-            {/* 필터 미리보기 */}
+            {/* 필터 미리보기 - 화면에 맞게 */}
             {previewImage && (
-              <div className="mb-4 max-w-full overflow-hidden">
+              <div className="flex-shrink-0 max-w-full">
                 <img
                   src={previewImage}
                   alt="미리보기"
-                  className="max-h-[50vh] max-w-full object-contain rounded-lg shadow-lg"
+                  className="object-contain rounded-lg shadow-lg"
+                  style={{ maxHeight: availableHeight, maxWidth: availableWidth }}
                 />
               </div>
             )}
@@ -213,38 +222,45 @@ export function DocumentScanner({ imageSrc, onComplete, onCancel }: DocumentScan
         )}
       </div>
 
-      {/* 하단 컨트롤 */}
-      <div className="bg-gray-900 p-4 space-y-4">
+      {/* 하단 컨트롤 - 항상 보이도록 고정 */}
+      <div className="flex-shrink-0 bg-gray-900 p-3 space-y-2 safe-area-bottom">
         {step === 'corners' ? (
           <>
-            {/* 자동 감지 버튼 */}
-            <Button
-              variant="outline"
-              onClick={handleAutoDetect}
-              className="w-full bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
-            >
-              <Wand2 className="h-4 w-4 mr-2" />
-              자동 감지 다시 시도
-            </Button>
-
-            {/* 다음 단계 버튼 */}
-            <Button
-              onClick={handleApplyTransform}
-              disabled={processing}
-              className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700"
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  처리 중...
-                </>
-              ) : (
-                <>
-                  <Check className="h-5 w-5 mr-2" />
-                  영역 확정
-                </>
-              )}
-            </Button>
+            {/* 자동 감지 + 확정 버튼을 한 줄에 */}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleAutoDetect();
+                }}
+                className="flex-1 bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+              >
+                <Wand2 className="h-4 w-4 mr-1" />
+                자동감지
+              </Button>
+              <Button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleApplyTransform();
+                }}
+                disabled={processing}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                {processing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-1" />
+                    영역 확정
+                  </>
+                )}
+              </Button>
+            </div>
           </>
         ) : (
           <>
@@ -253,11 +269,15 @@ export function DocumentScanner({ imageSrc, onComplete, onCancel }: DocumentScan
               selectedFilter={selectedFilter}
               onFilterChange={setSelectedFilter}
             />
-
             {/* 완료 버튼 */}
             <Button
-              onClick={handleComplete}
-              className="w-full h-14 text-lg bg-green-600 hover:bg-green-700"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleComplete();
+              }}
+              className="w-full h-12 text-base bg-green-600 hover:bg-green-700"
             >
               <Check className="h-5 w-5 mr-2" />
               보정 완료

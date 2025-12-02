@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { LicenseUploadWithOCR } from "@/components/LicenseUploadWithOCR";
 import type { LicenseInfo } from "@/hooks/useLicenseOCR";
@@ -29,14 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter, ShieldCheck, CheckSquare, Bell, Camera, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter, ShieldCheck, CheckSquare, Bell } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { DocumentScanner } from "@/components/DocumentScanner";
-import { Capacitor } from "@capacitor/core";
 
 interface DocFile {
   docTypeId: string;
@@ -98,11 +97,6 @@ export default function Workers() {
   const [docScannerOpen, setDocScannerOpen] = useState(false);
   const [docImageToScan, setDocImageToScan] = useState<string | null>(null);
   const [pendingDocTypeId, setPendingDocTypeId] = useState<string | null>(null);
-  const docCameraInputRef = useRef<HTMLInputElement>(null);
-  const docFileInputRef = useRef<HTMLInputElement>(null);
-
-  // 모바일 감지
-  const isMobileDevice = Capacitor.isNativePlatform() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const utils = trpc.useUtils();
   const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
@@ -1180,67 +1174,19 @@ export default function Workers() {
                           <Label htmlFor={`file-${doc.docTypeId}`}>
                             파일 업로드 {doc.isMandatory && "*"}
                           </Label>
-                          {isMobileDevice ? (
-                            /* 모바일: 카메라/갤러리 버튼 */
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-10"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setPendingDocTypeId(doc.docTypeId);
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'image/*';
-                                  input.capture = 'environment';
-                                  input.onchange = (ev) => {
-                                    const file = (ev.target as HTMLInputElement).files?.[0];
-                                    if (file) handleDocImageSelect(doc.docTypeId, file);
-                                  };
-                                  input.click();
-                                }}
-                              >
-                                <Camera className="h-4 w-4 mr-1" />
-                                카메라
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-10"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = '.pdf,.jpg,.jpeg,.png';
-                                  input.onchange = (ev) => {
-                                    const file = (ev.target as HTMLInputElement).files?.[0];
-                                    if (file) handleDocImageSelect(doc.docTypeId, file);
-                                  };
-                                  input.click();
-                                }}
-                              >
-                                <Upload className="h-4 w-4 mr-1" />
-                                파일
-                              </Button>
-                            </div>
-                          ) : (
-                            /* 데스크톱: 기존 파일 input */
-                            <Input
-                              id={`file-${doc.docTypeId}`}
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleDocImageSelect(doc.docTypeId, file);
-                                e.target.value = '';
-                              }}
-                            />
-                          )}
+                          {/* 기존 파일 input - 이미지 선택 시 스캐너 열림 */}
+                          <Input
+                            id={`file-${doc.docTypeId}`}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleDocImageSelect(doc.docTypeId, file);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
                           {doc.file && (
                             <p className="text-xs text-muted-foreground">
                               ✓ {doc.file.name} ({(doc.file.size / 1024).toFixed(1)} KB)

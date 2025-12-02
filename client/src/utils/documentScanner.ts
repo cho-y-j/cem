@@ -204,9 +204,9 @@ function tryDetectCorners(
 }
 
 /**
- * 기본 모서리 반환 (이미지 가장자리에서 약간 안쪽)
+ * 기본 모서리 반환 (거의 전체 영역 - 2% 여백)
  */
-export function getDefaultCorners(width: number, height: number, padding = 0.1): Corners {
+export function getDefaultCorners(width: number, height: number, padding = 0.02): Corners {
   const padX = width * padding;
   const padY = height * padding;
 
