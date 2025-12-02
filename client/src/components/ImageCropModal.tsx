@@ -30,26 +30,16 @@ interface ImageCropModalProps {
 const LICENSE_ASPECT_RATIO = 85.6 / 54;
 
 /**
- * 이미지 중앙에 기본 크롭 영역 생성
+ * 전체 이미지 영역 크롭 생성 (기본값)
  */
-function centerAspectCrop(
-  mediaWidth: number,
-  mediaHeight: number,
-  aspect: number,
-): Crop {
-  return centerCrop(
-    makeAspectCrop(
-      {
-        unit: '%',
-        width: 90,
-      },
-      aspect,
-      mediaWidth,
-      mediaHeight,
-    ),
-    mediaWidth,
-    mediaHeight,
-  );
+function fullImageCrop(): Crop {
+  return {
+    unit: '%',
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+  };
 }
 
 /**
@@ -112,10 +102,10 @@ export function ImageCropModal({
     }
   }, [isOpen, imageSrc]);
 
-  // 이미지 로드 시 기본 크롭 영역 설정
+  // 이미지 로드 시 전체 영역 크롭 설정
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { width, height } = e.currentTarget;
-    setCrop(centerAspectCrop(width, height, LICENSE_ASPECT_RATIO));
+    // 전체 영역을 기본으로 선택
+    setCrop(fullImageCrop());
   }, []);
 
   // 90도 회전 - 실제 이미지를 회전
@@ -234,7 +224,7 @@ export function ImageCropModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>면허증 영역 선택</DialogTitle>
           <DialogDescription>
@@ -248,7 +238,11 @@ export function ImageCropModal({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => handleRotate('ccw')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleRotate('ccw');
+            }}
             disabled={isRotating}
           >
             <RotateCcw className="h-4 w-4 mr-1" />
@@ -258,7 +252,11 @@ export function ImageCropModal({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => handleRotate('cw')}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleRotate('cw');
+            }}
             disabled={isRotating}
           >
             <RotateCw className="h-4 w-4 mr-1" />
@@ -268,7 +266,11 @@ export function ImageCropModal({
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleSelectAll}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSelectAll();
+            }}
             disabled={isRotating}
           >
             <Maximize2 className="h-4 w-4 mr-1" />
@@ -285,7 +287,6 @@ export function ImageCropModal({
               crop={crop}
               onChange={(c) => setCrop(c)}
               onComplete={(c) => setCompletedCrop(c)}
-              aspect={LICENSE_ASPECT_RATIO}
               className="max-h-[400px]"
             >
               <img
@@ -316,7 +317,11 @@ export function ImageCropModal({
           <Button
             type="button"
             variant="outline"
-            onClick={onClose}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
             disabled={isProcessing || isRotating}
           >
             <X className="h-4 w-4 mr-1" />
@@ -324,7 +329,11 @@ export function ImageCropModal({
           </Button>
           <Button
             type="button"
-            onClick={handleConfirm}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleConfirm();
+            }}
             disabled={!completedCrop || isProcessing || isRotating}
           >
             {isProcessing ? (

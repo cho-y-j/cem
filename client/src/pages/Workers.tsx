@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { LicenseUploadWithOCR } from "@/components/LicenseUploadWithOCR";
 import type { LicenseInfo } from "@/hooks/useLicenseOCR";
@@ -29,12 +29,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter, ShieldCheck, CheckSquare, Bell } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, X, Filter, ShieldCheck, CheckSquare, Bell, Camera, Upload } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
+import { DocumentScanner } from "@/components/DocumentScanner";
+import { Capacitor } from "@capacitor/core";
 
 interface DocFile {
   docTypeId: string;
@@ -91,6 +93,16 @@ export default function Workers() {
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<Set<string>>(new Set()); // 선택된 인력
   const [isVerifying, setIsVerifying] = useState(false); // 검증 중 상태
+
+  // 첨부 서류 스캐너 상태
+  const [docScannerOpen, setDocScannerOpen] = useState(false);
+  const [docImageToScan, setDocImageToScan] = useState<string | null>(null);
+  const [pendingDocTypeId, setPendingDocTypeId] = useState<string | null>(null);
+  const docCameraInputRef = useRef<HTMLInputElement>(null);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 모바일 감지
+  const isMobileDevice = Capacitor.isNativePlatform() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const utils = trpc.useUtils();
   const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
@@ -389,6 +401,44 @@ export default function Workers() {
         doc.docTypeId === docTypeId ? { ...doc, file } : doc
       )
     );
+  };
+
+  // 첨부 서류 이미지 선택 시 스캐너 열기
+  const handleDocImageSelect = (docTypeId: string, file: File) => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocImageToScan(reader.result as string);
+        setPendingDocTypeId(docTypeId);
+        setDocScannerOpen(true);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // 이미지가 아닌 파일은 바로 추가
+      handleFileChange(docTypeId, file);
+    }
+  };
+
+  // 스캔 완료 후 파일 저장
+  const handleDocScanComplete = (resultDataUrl: string) => {
+    if (pendingDocTypeId) {
+      fetch(resultDataUrl)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], `scanned_${Date.now()}.jpg`, { type: 'image/jpeg' });
+          handleFileChange(pendingDocTypeId, file);
+        });
+    }
+    setDocScannerOpen(false);
+    setDocImageToScan(null);
+    setPendingDocTypeId(null);
+  };
+
+  // 스캔 취소
+  const handleDocScanCancel = () => {
+    setDocScannerOpen(false);
+    setDocImageToScan(null);
+    setPendingDocTypeId(null);
   };
 
   const handleDateChange = (
@@ -849,7 +899,7 @@ export default function Workers() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "인력 수정" : "인력 등록"}</DialogTitle>
             <DialogDescription>
@@ -1130,17 +1180,67 @@ export default function Workers() {
                           <Label htmlFor={`file-${doc.docTypeId}`}>
                             파일 업로드 {doc.isMandatory && "*"}
                           </Label>
-                          <Input
-                            id={`file-${doc.docTypeId}`}
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) =>
-                              handleFileChange(
-                                doc.docTypeId,
-                                e.target.files?.[0] || null
-                              )
-                            }
-                          />
+                          {isMobileDevice ? (
+                            /* 모바일: 카메라/갤러리 버튼 */
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-10"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setPendingDocTypeId(doc.docTypeId);
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = 'image/*';
+                                  input.capture = 'environment';
+                                  input.onchange = (ev) => {
+                                    const file = (ev.target as HTMLInputElement).files?.[0];
+                                    if (file) handleDocImageSelect(doc.docTypeId, file);
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <Camera className="h-4 w-4 mr-1" />
+                                카메라
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-10"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = '.pdf,.jpg,.jpeg,.png';
+                                  input.onchange = (ev) => {
+                                    const file = (ev.target as HTMLInputElement).files?.[0];
+                                    if (file) handleDocImageSelect(doc.docTypeId, file);
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <Upload className="h-4 w-4 mr-1" />
+                                파일
+                              </Button>
+                            </div>
+                          ) : (
+                            /* 데스크톱: 기존 파일 input */
+                            <Input
+                              id={`file-${doc.docTypeId}`}
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleDocImageSelect(doc.docTypeId, file);
+                                e.target.value = '';
+                              }}
+                            />
+                          )}
                           {doc.file && (
                             <p className="text-xs text-muted-foreground">
                               ✓ {doc.file.name} ({(doc.file.size / 1024).toFixed(1)} KB)
@@ -1228,6 +1328,15 @@ export default function Workers() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* 첨부 서류 스캐너 모달 */}
+      {docScannerOpen && docImageToScan && (
+        <DocumentScanner
+          imageSrc={docImageToScan}
+          onComplete={handleDocScanComplete}
+          onCancel={handleDocScanCancel}
+        />
+      )}
     </div>
   );
 }
