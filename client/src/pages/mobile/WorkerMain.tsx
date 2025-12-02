@@ -99,7 +99,6 @@ export default function WorkerMain() {
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const [checkInTimeDisplay, setCheckInTimeDisplay] = useState<string>("");
   const [isMounted, setIsMounted] = useState(false);
-  const [showPWAHint, setShowPWAHint] = useState(false);
 
   // 긴급 신고 Drawer 상태
   const [isEmergencyDrawerOpen, setIsEmergencyDrawerOpen] = useState(false);
@@ -156,21 +155,6 @@ export default function WorkerMain() {
     };
 
     checkBiometricAvailability();
-  }, []);
-
-  // PWA 안내 표시 여부 체크
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // 이미 설치되어 있으면 안내 표시 안 함
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) return;
-
-    // 한 번 본 적이 있으면 안내 표시 안 함
-    const hasSeenHint = localStorage.getItem('pwa-hint-seen');
-    if (hasSeenHint) return;
-
-    setShowPWAHint(true);
   }, []);
 
   // 배정된 장비 조회
@@ -998,42 +982,6 @@ export default function WorkerMain() {
                     </span>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* PWA 안내 */}
-        {showPWAHint && (
-          <div className="px-4 mb-4">
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <Settings className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-medium text-blue-900 mb-1">
-                      홈 화면에 추가
-                    </div>
-                    <div className="text-sm text-blue-800 mb-2">
-                      {/iPad|iPhone|iPod/.test(navigator.userAgent) ? (
-                        <>공유 버튼(□↑) → 홈 화면에 추가</>
-                      ) : (
-                        <>메뉴(⋮) → 홈 화면에 추가</>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-blue-700 h-8"
-                      onClick={() => {
-                        localStorage.setItem('pwa-hint-seen', 'true');
-                        setShowPWAHint(false);
-                      }}
-                    >
-                      닫기
-                    </Button>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>

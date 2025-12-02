@@ -12,41 +12,30 @@ export function isNativeApp(): boolean {
  */
 export async function isNfcAvailable(): Promise<boolean> {
   if (isNativeApp()) {
-    // 네이티브 앱: Capacitor NFC 플러그인 사용
+    // 네이티브 앱: @capgo/capacitor-nfc 플러그인 사용
     try {
       console.log('[NFC] Checking NFC availability in native app...');
-      // 동적 import를 사용하되, 웹 빌드에서는 패키지가 없을 수 있으므로 안전하게 처리
-      const nfcModule = await import('@exxili/capacitor-nfc').catch((error) => {
-        console.error('[NFC] Failed to import @exxili/capacitor-nfc:', error);
-        console.error('[NFC] Error details:', {
-          message: error?.message,
-          stack: error?.stack,
-          name: error?.name,
-        });
+      const nfcModule = await import('@capgo/capacitor-nfc').catch((error) => {
+        console.error('[NFC] Failed to import @capgo/capacitor-nfc:', error);
         return null;
       });
       if (!nfcModule) {
-        console.warn('[NFC] Native NFC plugin module is null - plugin may not be installed or accessible');
+        console.warn('[NFC] Native NFC plugin module is null');
         return false;
       }
       console.log('[NFC] NFC module loaded successfully:', Object.keys(nfcModule));
-      const { Nfc } = nfcModule;
-      if (!Nfc) {
-        console.error('[NFC] Nfc class not found in module');
+      const { CapacitorNfc } = nfcModule;
+      if (!CapacitorNfc) {
+        console.error('[NFC] CapacitorNfc class not found in module');
         return false;
       }
-      console.log('[NFC] Checking if NFC is enabled...');
-      const result = await Nfc.isEnabled();
-      console.log('[NFC] NFC enabled check result:', result);
-      return result.isEnabled;
+      console.log('[NFC] Checking NFC status...');
+      const result = await CapacitorNfc.getStatus();
+      console.log('[NFC] NFC status result:', result);
+      // NFC_OK means NFC is available and enabled
+      return result.status === 'NFC_OK';
     } catch (error: any) {
       console.error('[NFC] Native NFC check failed:', error);
-      console.error('[NFC] Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name,
-        code: error?.code,
-      });
       return false;
     }
   } else {
@@ -74,75 +63,72 @@ export async function startNativeNfcScan(
 
   try {
     console.log('[NFC] Starting native NFC scan...');
-    // 동적 import를 사용하되, 웹 빌드에서는 패키지가 없을 수 있으므로 안전하게 처리
-    const nfcModule = await import('@exxili/capacitor-nfc').catch((error) => {
-      console.error('[NFC] Failed to import @exxili/capacitor-nfc for scan:', error);
-      console.error('[NFC] Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name,
-      });
+    const nfcModule = await import('@capgo/capacitor-nfc').catch((error) => {
+      console.error('[NFC] Failed to import @capgo/capacitor-nfc for scan:', error);
       return null;
     });
     if (!nfcModule) {
-      const errorMsg = 'NFC 플러그인을 사용할 수 없습니다. 플러그인이 설치되어 있는지 확인해주세요.';
+      const errorMsg = 'NFC 플러그인을 사용할 수 없습니다.';
       console.error('[NFC]', errorMsg);
       onError?.(errorMsg);
       return () => {};
     }
     console.log('[NFC] NFC module loaded for scan:', Object.keys(nfcModule));
-    const { Nfc } = nfcModule;
-    if (!Nfc) {
-      const errorMsg = 'NFC 클래스를 찾을 수 없습니다.';
+    const { CapacitorNfc } = nfcModule;
+    if (!CapacitorNfc) {
+      const errorMsg = 'CapacitorNfc 클래스를 찾을 수 없습니다.';
       console.error('[NFC]', errorMsg);
       onError?.(errorMsg);
       return () => {};
     }
 
-    // 리스너 등록
-    const listener = await Nfc.addListener('nfcTag', (event: any) => {
-      console.log('[NFC] Tag read:', event);
+    // 리스너 등록 - @capgo/capacitor-nfc 이벤트 형식
+    const listener = await CapacitorNfc.addListener('nfcEvent', (event: any) => {
+      console.log('[NFC] Tag event received:', event);
 
-      // 태그 ID 추출
+      // 태그 ID 추출 - @capgo/capacitor-nfc 형식
       let tagId = '';
 
-      // ID 형식에 따라 처리
-      if (event.id) {
-        tagId = event.id;
-      } else if (event.tag?.id) {
-        tagId = event.tag.id;
-      } else if (event.serialNumber) {
-        tagId = event.serialNumber;
+      // tag.id는 number[] 배열이므로 hex 문자열로 변환 (웹과 동일한 형식: 콜론 구분, 소문자)
+      if (event.tag?.id && Array.isArray(event.tag.id)) {
+        tagId = event.tag.id.map((b: number) => b.toString(16).padStart(2, '0')).join(':');
+        console.log('[NFC] Tag ID from bytes:', tagId);
       }
 
       // NDEF 메시지에서 텍스트 추출 시도
-      if (!tagId && event.messages?.length > 0) {
-        for (const message of event.messages) {
-          for (const record of message.records || []) {
-            if (record.type === 'text' || record.type === 'T') {
-              tagId = record.payload || record.text || '';
+      if (!tagId && event.tag?.ndefMessage?.length > 0) {
+        for (const record of event.tag.ndefMessage) {
+          // TNF 1 = Well-known, type T = Text
+          if (record.tnf === 1 && record.type?.length > 0) {
+            const typeChar = String.fromCharCode(record.type[0]);
+            if (typeChar === 'T' && record.payload?.length > 0) {
+              // Text record: 첫 바이트는 상태 바이트 (언어 코드 길이 포함)
+              const langCodeLen = record.payload[0] & 0x3F;
+              const textBytes = record.payload.slice(1 + langCodeLen);
+              tagId = String.fromCharCode(...textBytes);
+              console.log('[NFC] Tag ID from NDEF text:', tagId);
               if (tagId) break;
             }
           }
-          if (tagId) break;
         }
       }
 
       if (tagId) {
         onTagRead(tagId);
       } else {
+        console.warn('[NFC] Could not extract tag ID from event:', event);
         onError?.('태그 ID를 읽을 수 없습니다.');
       }
     });
 
     // 스캔 시작
-    await Nfc.startScanSession();
+    await CapacitorNfc.startScanning();
     console.log('[NFC] Native scan started');
 
     // 중지 함수 반환
     return async () => {
       try {
-        await Nfc.stopScanSession();
+        await CapacitorNfc.stopScanning();
         await listener.remove();
         console.log('[NFC] Native scan stopped');
       } catch (error) {
@@ -151,12 +137,6 @@ export async function startNativeNfcScan(
     };
   } catch (error: any) {
     console.error('[NFC] Native NFC scan error:', error);
-    console.error('[NFC] Error details:', {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-      code: error?.code,
-    });
     onError?.(error?.message || 'NFC 스캔 시작 실패');
     return () => {};
   }
@@ -183,9 +163,10 @@ export async function startWebNfcScan(
     reader.addEventListener('reading', (event: any) => {
       let tagId = '';
 
-      // serialNumber 사용
+      // serialNumber 사용 - 앱과 동일한 형식으로 정규화 (콜론 구분, 소문자)
       if (event.serialNumber) {
-        tagId = event.serialNumber.trim();
+        // Web NFC serialNumber는 "04:a3:b2:c1" 또는 "04-a3-b2-c1" 형식일 수 있음
+        tagId = event.serialNumber.trim().toLowerCase().replace(/-/g, ':');
       }
 
       // NDEF 메시지에서 텍스트 추출
