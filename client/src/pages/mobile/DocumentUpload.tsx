@@ -37,36 +37,36 @@ export default function DocumentUpload() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean = false) => {
     const files = Array.from(event.target.files || []);
     console.log('[DocumentUpload] handleFileSelect:', { filesCount: files.length, fromCamera });
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      console.log('[DocumentUpload] No files selected');
+      return;
+    }
 
     // 첫 번째 이미지 파일만 스캔 (카메라는 한 장씩)
     const file = files[0];
-    console.log('[DocumentUpload] Processing file:', { name: file.name, type: file.type, fromCamera });
+    console.log('[DocumentUpload] Processing file:', { name: file.name, type: file.type, size: file.size, fromCamera });
 
-    if (file.type.startsWith('image/') && fromCamera) {
-      // 카메라로 촬영한 경우 스캔 화면 열기
-      console.log('[DocumentUpload] Opening scanner for camera image...');
+    // 이미지 파일인 경우 무조건 스캐너 열기
+    if (file.type.startsWith('image/')) {
+      console.log('[DocumentUpload] Opening scanner for image (camera:', fromCamera, ')');
       const reader = new FileReader();
       reader.onloadend = () => {
-        console.log('[DocumentUpload] Image loaded, opening scanner');
-        setImageToScan(reader.result as string);
+        const result = reader.result as string;
+        console.log('[DocumentUpload] Image loaded, data length:', result?.length, 'opening scanner...');
+        console.log('[DocumentUpload] Setting states: imageToScan, pendingFileIndex, scannerOpen');
+        setImageToScan(result);
         setPendingFileIndex(selectedFiles.length);
         setScannerOpen(true);
+        console.log('[DocumentUpload] Scanner should be open now');
       };
-      reader.readAsDataURL(file);
-    } else if (file.type.startsWith('image/')) {
-      // 갤러리에서 선택한 이미지도 스캔 화면 열기 (선택 사항)
-      console.log('[DocumentUpload] Opening scanner for gallery image...');
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageToScan(reader.result as string);
-        setPendingFileIndex(selectedFiles.length);
-        setScannerOpen(true);
+      reader.onerror = (error) => {
+        console.error('[DocumentUpload] FileReader error:', error);
+        alert('이미지를 읽는 중 오류가 발생했습니다.');
       };
       reader.readAsDataURL(file);
     } else {
       // PDF 등 다른 파일은 바로 추가
-      console.log('[DocumentUpload] Adding non-image file directly');
+      console.log('[DocumentUpload] Adding non-image file directly:', file.type);
       addFileToList(file);
     }
 
@@ -191,6 +191,9 @@ export default function DocumentUpload() {
       setUploading(false);
     }
   };
+
+  // 디버그 로그
+  console.log('[DocumentUpload] Render state:', { scannerOpen, hasImageToScan: !!imageToScan, pendingFileIndex });
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -4,12 +4,13 @@
  * Admin/Owner 및 Worker 모두 사용 가능한 공통 컴포넌트
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Camera, Upload, Loader2, CheckCircle2, XCircle, AlertCircle, Crop, ScanLine } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useLicenseOCR, LicenseInfo, LICENSE_TYPES } from '@/hooks/useLicenseOCR';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
@@ -69,16 +70,24 @@ export function LicenseUploadWithOCR({
   const [showScanner, setShowScanner] = useState(false);
   const [scannerImageSrc, setScannerImageSrc] = useState<string | null>(null);
 
+  // 파일 input refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // 모바일/네이티브 앱 감지
+  const isNative = Capacitor.isNativePlatform();
+  const isMobileDevice = isMobile || isNative || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   const { isProcessing, extractedInfo, error: ocrError, processImage, reset: resetOCR } = useLicenseOCR();
   
   const verifyLicenseMutation = trpc.workers.verifyLicense.useMutation();
 
   // 이미지 업로드 핸들러 - 모바일이면 스캐너, 아니면 크롭 모달
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('[LicenseUpload] File selected:', { name: file.name, type: file.type, isMobile });
+    console.log('[LicenseUpload] File selected:', { name: file.name, type: file.type, isMobileDevice, fromCamera });
     setVerificationStatus('idle');
 
     // 파일을 base64로 변환
@@ -86,9 +95,10 @@ export function LicenseUploadWithOCR({
     reader.onload = (event) => {
       const imageSrc = event.target?.result as string;
 
-      if (isMobile) {
+      // 모바일에서 카메라로 찍었거나 모바일 기기인 경우 스캐너 열기
+      if (isMobileDevice || fromCamera) {
         // 모바일: 문서 스캐너 먼저 열기
-        console.log('[LicenseUpload] Opening scanner for mobile');
+        console.log('[LicenseUpload] Opening scanner for mobile/camera');
         setScannerImageSrc(imageSrc);
         setShowScanner(true);
       } else {
@@ -102,6 +112,11 @@ export function LicenseUploadWithOCR({
 
     // input 초기화
     e.target.value = '';
+  };
+
+  // 카메라 촬영 핸들러
+  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleImageUpload(e, true);
   };
 
   // 스캔 완료 후 크롭 모달로 이동
@@ -264,8 +279,8 @@ export function LicenseUploadWithOCR({
           <div>
             <Label className="text-base font-semibold">📸 운전면허증 자동 인식</Label>
             <p className="text-sm text-muted-foreground mt-1">
-              {isMobile
-                ? '면허증 사진을 촬영하거나 업로드 후 영역을 선택하세요'
+              {isMobileDevice
+                ? '면허증 사진을 촬영하거나 갤러리에서 선택하세요'
                 : '면허증 사진을 업로드 후 영역을 선택하면 자동으로 정보를 추출합니다'}
             </p>
             <p className="text-xs text-blue-600 mt-1">
@@ -281,19 +296,61 @@ export function LicenseUploadWithOCR({
         </div>
 
         {/* 이미지 업로드 버튼 */}
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <Input
+        {isMobileDevice ? (
+          /* 모바일: 카메라와 갤러리 버튼 분리 */
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={isProcessing}
+              className="h-16 flex-col gap-1 bg-blue-600 hover:bg-blue-700"
+            >
+              <Camera className="h-5 w-5" />
+              <span className="text-sm">카메라 촬영</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+              className="h-16 flex-col gap-1"
+            >
+              <Upload className="h-5 w-5" />
+              <span className="text-sm">갤러리 선택</span>
+            </Button>
+            {/* 숨겨진 카메라 input */}
+            <input
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
-              capture={isMobile ? 'environment' : undefined} // 모바일: 카메라 열기
-              onChange={handleImageUpload}
-              disabled={isProcessing}
-              className="cursor-pointer"
-              id="license-upload"
+              capture="environment"
+              className="hidden"
+              onChange={handleCameraCapture}
+            />
+            {/* 숨겨진 갤러리 input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleImageUpload(e, false)}
             />
           </div>
-        </div>
+        ) : (
+          /* 데스크톱: 기존 파일 선택 input */
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, false)}
+                disabled={isProcessing}
+                className="cursor-pointer"
+                id="license-upload"
+              />
+            </div>
+          </div>
+        )}
 
         {/* 이미지 미리보기 */}
         {imagePreview && (
