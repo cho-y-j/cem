@@ -893,7 +893,7 @@ export default function Workers() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="!w-[95vw] !max-w-2xl max-h-[85vh] overflow-y-auto p-3 sm:p-6 mx-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? "인력 수정" : "인력 등록"}</DialogTitle>
             <DialogDescription>
@@ -903,9 +903,9 @@ export default function Workers() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
-            <div className="space-y-6 py-4">
+            <div className="space-y-4 py-2">
               {/* 기본 정보 */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <h3 className="text-sm font-semibold">기본 정보</h3>
                 <div className="space-y-2">
                   <Label htmlFor="workerTypeId">인력 유형 *</Label>
