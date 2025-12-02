@@ -41,14 +41,19 @@ export function ImageFilters({ selectedFilter, onFilterChange, disabled = false 
       {filters.map((filter) => (
         <button
           key={filter.type}
-          onClick={() => onFilterChange(filter.type)}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onFilterChange(filter.type);
+          }}
           disabled={disabled}
           className={cn(
-            'flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all',
-            'min-w-[70px]',
+            'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all',
+            'min-w-[60px]',
             selectedFilter === filter.type
-              ? 'bg-blue-600 text-white shadow-lg scale-105'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-700 text-gray-200 hover:bg-gray-600',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
         >

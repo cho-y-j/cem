@@ -893,7 +893,7 @@ export default function Workers() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-[92vw] max-w-[92vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-2 sm:p-6">
+        <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-2xl max-h-[88vh] overflow-y-auto p-2 sm:p-4">
           <DialogHeader>
             <DialogTitle>{editingId ? "인력 수정" : "인력 등록"}</DialogTitle>
             <DialogDescription>
