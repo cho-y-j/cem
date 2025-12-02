@@ -414,18 +414,24 @@ export default function Workers() {
   };
 
   // 스캔 완료 후 파일 저장
-  const handleDocScanComplete = (resultDataUrl: string) => {
-    if (pendingDocTypeId) {
-      fetch(resultDataUrl)
-        .then(res => res.blob())
-        .then(blob => {
-          const file = new File([blob], `scanned_${Date.now()}.jpg`, { type: 'image/jpeg' });
-          handleFileChange(pendingDocTypeId, file);
-        });
+  const handleDocScanComplete = async (resultDataUrl: string) => {
+    try {
+      if (pendingDocTypeId && resultDataUrl) {
+        // base64 데이터 URL을 File로 변환
+        const response = await fetch(resultDataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `scanned_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        handleFileChange(pendingDocTypeId, file);
+        toast.success('문서가 저장되었습니다.');
+      }
+    } catch (error) {
+      console.error('[Workers] 스캔 완료 처리 오류:', error);
+      toast.error('문서 저장에 실패했습니다.');
+    } finally {
+      setDocScannerOpen(false);
+      setDocImageToScan(null);
+      setPendingDocTypeId(null);
     }
-    setDocScannerOpen(false);
-    setDocImageToScan(null);
-    setPendingDocTypeId(null);
   };
 
   // 스캔 취소

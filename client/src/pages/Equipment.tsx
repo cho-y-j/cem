@@ -35,6 +35,7 @@ import { ko } from "date-fns/locale";
 import { toast } from "sonner";
 import AssignDriverDialog from "@/components/AssignDriverDialog";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { DocumentScanner } from "@/components/DocumentScanner";
 
 interface DocFile {
   docTypeId: string;
@@ -74,6 +75,12 @@ export default function Equipment() {
     nfcTagId: "",
   });
   const [docFiles, setDocFiles] = useState<DocFile[]>([]);
+
+  // 첨부 서류 스캐너 상태
+  const [docScannerOpen, setDocScannerOpen] = useState(false);
+  const [docImageToScan, setDocImageToScan] = useState<string | null>(null);
+  const [pendingDocTypeId, setPendingDocTypeId] = useState<string | null>(null);
+
   const [assignDriverDialogOpen, setAssignDriverDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<any>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -315,6 +322,49 @@ export default function Equipment() {
         doc.docTypeId === docTypeId ? { ...doc, file } : doc
       )
     );
+  };
+
+  // 첨부 서류 이미지 선택 시 스캐너 열기
+  const handleDocImageSelect = (docTypeId: string, file: File) => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocImageToScan(reader.result as string);
+        setPendingDocTypeId(docTypeId);
+        setDocScannerOpen(true);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // 이미지가 아닌 파일은 바로 추가
+      handleFileChange(docTypeId, file);
+    }
+  };
+
+  // 스캔 완료 후 파일 저장
+  const handleDocScanComplete = async (resultDataUrl: string) => {
+    try {
+      if (pendingDocTypeId && resultDataUrl) {
+        const response = await fetch(resultDataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `scanned_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        handleFileChange(pendingDocTypeId, file);
+        toast.success('문서가 저장되었습니다.');
+      }
+    } catch (error) {
+      console.error('[Equipment] 스캔 완료 처리 오류:', error);
+      toast.error('문서 저장에 실패했습니다.');
+    } finally {
+      setDocScannerOpen(false);
+      setDocImageToScan(null);
+      setPendingDocTypeId(null);
+    }
+  };
+
+  // 스캔 취소
+  const handleDocScanCancel = () => {
+    setDocScannerOpen(false);
+    setDocImageToScan(null);
+    setPendingDocTypeId(null);
   };
 
   const handleDateChange = (
@@ -709,12 +759,13 @@ export default function Equipment() {
                             id={`file-${doc.docTypeId}`}
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) =>
-                              handleFileChange(
-                                doc.docTypeId,
-                                e.target.files?.[0] || null
-                              )
-                            }
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleDocImageSelect(doc.docTypeId, file);
+                              }
+                              e.target.value = '';
+                            }}
                           />
                           {doc.file && (
                             <p className="text-xs text-muted-foreground">
@@ -813,6 +864,15 @@ export default function Equipment() {
         onOpenChange={setDetailDialogOpen}
         equipmentId={viewingEquipmentId}
       />
+
+      {/* 첨부 서류 스캐너 모달 */}
+      {docScannerOpen && docImageToScan && (
+        <DocumentScanner
+          imageSrc={docImageToScan}
+          onComplete={handleDocScanComplete}
+          onCancel={handleDocScanCancel}
+        />
+      )}
     </div>
   );
 }
