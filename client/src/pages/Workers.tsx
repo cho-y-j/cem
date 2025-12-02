@@ -708,60 +708,54 @@ export default function Workers() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="pb-3">
+          <div className="space-y-3">
             <div>
-              <CardTitle>인력 목록</CardTitle>
-              <CardDescription>
-                총 {workersList?.length || 0}명 중 {filteredWorkersList?.length || 0}명 표시
-                {licenseStatusFilter && (
-                  <span className="ml-1 text-xs">
-                    ({licenseStatusFilter === "invalid" ? "부적격자" : licenseStatusFilter === "valid" ? "유효" : "미검증"} 필터)
-                  </span>
-                )}
+              <CardTitle className="text-base sm:text-lg">인력 목록</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                총 {workersList?.length || 0}명 중 {filteredWorkersList?.length || 0}명
                 {selectedWorkerIds.size > 0 && (
-                  <span className="ml-2 text-blue-600 font-medium">
-                    ({selectedWorkerIds.size}명 선택됨)
+                  <span className="ml-1 text-blue-600 font-medium">
+                    ({selectedWorkerIds.size}명 선택)
                   </span>
                 )}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleSelectWithLicense}
                 disabled={!workersList || workersList.length === 0}
+                className="text-xs h-8"
               >
-                <CheckSquare className="mr-1 h-4 w-4" />
-                면허보유자 선택
+                <CheckSquare className="mr-1 h-3 w-3" />
+                면허보유자
               </Button>
               <Button
                 variant="default"
                 size="sm"
                 onClick={handleVerifyBatch}
                 disabled={selectedWorkerIds.size === 0 || verifyBatchMutation.isPending}
+                className="text-xs h-8"
               >
                 {verifyBatchMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                    검증 중...
-                  </>
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
                   <>
-                    <ShieldCheck className="mr-1 h-4 w-4" />
-                    서류 검증
+                    <ShieldCheck className="mr-1 h-3 w-3" />
+                    검증
                   </>
                 )}
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
+                className="text-xs h-8"
                 onClick={() => {
                   if (selectedWorkerIds.size === 0) {
                     setLocation("/notifications/send");
                   } else {
-                    // 선택된 인력의 userId와 이름을 쿼리 파라미터로 전달
                     const selectedWorkers = filteredWorkersList
                       ?.filter((w) => selectedWorkerIds.has(w.id))
                       .map((w) => ({ userId: w.userId, name: w.name, workerId: w.id }))
@@ -779,8 +773,8 @@ export default function Workers() {
                   }
                 }}
               >
-                <Bell className="mr-1 h-4 w-4" />
-                알림 보내기
+                <Bell className="mr-1 h-3 w-3" />
+                알림
               </Button>
             </div>
           </div>
