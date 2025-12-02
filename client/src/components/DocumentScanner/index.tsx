@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, RotateCcw, Check, X, Wand2 } from 'lucide-react';
@@ -124,22 +123,21 @@ export function DocumentScanner({ imageSrc, onComplete, onCancel }: DocumentScan
 
   // 로딩 중
   if (loading) {
-    return createPortal(
-      <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
         <div className="text-center text-white">
           <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
           <p className="text-lg">이미지 처리 엔진 로딩 중...</p>
           <p className="text-sm text-gray-400 mt-2">처음 로드 시 시간이 소요될 수 있습니다.</p>
         </div>
-      </div>,
-      document.body
+      </div>
     );
   }
 
   // 에러
   if (error) {
-    return createPortal(
-      <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center p-4">
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4">
         <Card className="max-w-md">
           <CardContent className="pt-6 text-center">
             <X className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -148,18 +146,16 @@ export function DocumentScanner({ imageSrc, onComplete, onCancel }: DocumentScan
             <Button onClick={onCancel}>닫기</Button>
           </CardContent>
         </Card>
-      </div>,
-      document.body
+      </div>
     );
   }
 
   // OpenCV 준비 안됨
   if (!ready || !corners) {
-    return createPortal(
-      <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-white" />
-      </div>,
-      document.body
+      </div>
     );
   }
 
@@ -167,8 +163,8 @@ export function DocumentScanner({ imageSrc, onComplete, onCancel }: DocumentScan
   const availableHeight = typeof window !== 'undefined' ? window.innerHeight - 240 : 400;
   const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 32 : 360;
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
+  return (
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* 헤더 - 높이 고정 */}
       <div className="flex-shrink-0 bg-gray-900 text-white p-3 flex items-center justify-between">
         <Button
@@ -289,8 +285,7 @@ export function DocumentScanner({ imageSrc, onComplete, onCancel }: DocumentScan
           </>
         )}
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }
 

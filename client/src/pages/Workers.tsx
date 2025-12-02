@@ -404,7 +404,11 @@ export default function Workers() {
       reader.onloadend = () => {
         setDocImageToScan(reader.result as string);
         setPendingDocTypeId(docTypeId);
-        setDocScannerOpen(true);
+        // Dialog를 닫고 스캐너 열기 (Dialog focus trap 회피)
+        setIsDialogOpen(false);
+        setTimeout(() => {
+          setDocScannerOpen(true);
+        }, 100);
       };
       reader.readAsDataURL(file);
     } else {
@@ -431,6 +435,10 @@ export default function Workers() {
       setDocScannerOpen(false);
       setDocImageToScan(null);
       setPendingDocTypeId(null);
+      // 스캔 완료 후 Dialog 다시 열기
+      setTimeout(() => {
+        setIsDialogOpen(true);
+      }, 100);
     }
   };
 
@@ -439,6 +447,10 @@ export default function Workers() {
     setDocScannerOpen(false);
     setDocImageToScan(null);
     setPendingDocTypeId(null);
+    // 취소 시에도 Dialog 다시 열기
+    setTimeout(() => {
+      setIsDialogOpen(true);
+    }, 100);
   };
 
   const handleDateChange = (
