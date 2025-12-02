@@ -893,7 +893,7 @@ export default function Workers() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="!w-[95vw] !max-w-2xl max-h-[85vh] overflow-y-auto p-3 sm:p-6 mx-auto">
+        <DialogContent className="w-[92vw] max-w-[92vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-2 sm:p-6">
           <DialogHeader>
             <DialogTitle>{editingId ? "인력 수정" : "인력 등록"}</DialogTitle>
             <DialogDescription>
@@ -1195,7 +1195,7 @@ export default function Workers() {
                         </div>
 
                         {doc.hasExpiry && (
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                             <div className="space-y-2">
                               <Label htmlFor={`issue-${doc.docTypeId}`}>
                                 발급일
