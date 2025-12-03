@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Download, Eye, Search, Loader2, Truck, HardHat, Trash2, Pencil, AlertTriangle } from "lucide-react";
+import { Plus, FileText, Download, Eye, Search, Loader2, Truck, HardHat, Trash2, Pencil, AlertTriangle, Filter, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { DocumentUpload } from "@/components/DocumentUpload";
@@ -47,6 +47,10 @@ export default function Documents() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTarget, setSelectedTarget] = useState<any>(null);
   const [editingDoc, setEditingDoc] = useState<any>(null);
+  // 필터 상태
+  const [docTypeFilter, setDocTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all"); // all, valid, expiring, expired
+  const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("all");
   const [newFile, setNewFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     targetType: "equipment" as "equipment" | "worker",
@@ -136,6 +140,18 @@ export default function Documents() {
   
   const { data: equipment } = trpc.equipment.list.useQuery(equipmentFilters);
   const { data: workers } = trpc.workers.list.useQuery(equipmentFilters);
+
+  // 회사 목록 조회 (필터용)
+  const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "owner" },
+    { enabled: role === "admin" || role === "bp" || role === "ep" }
+  );
+
+  // 서류 유형 목록 (중복 제거)
+  const docTypes = useMemo(() => {
+    if (!documents) return [];
+    return [...new Set(documents.map((d: any) => d.docType).filter(Boolean))] as string[];
+  }, [documents]);
 
   const createMutation = trpc.docsCompliance.create.useMutation({
     onSuccess: () => {
@@ -313,22 +329,69 @@ export default function Documents() {
     }
   };
 
-  // 장비별로 서류 그룹화
-  const equipmentGroups = equipment?.map((eq) => ({
-    ...eq,
-    docs: documents?.filter((doc) => doc.targetType === "equipment" && doc.targetId === eq.id) || [],
-  })) || [];
-  
+  // 서류 상태 계산 함수
+  const getDocStatus = (expiryDate: Date | null) => {
+    if (!expiryDate) return "valid";
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntilExpiry < 0) return "expired";
+    if (daysUntilExpiry <= 30) return "expiring";
+    return "valid";
+  };
+
+  // 서류 필터링 함수
+  const filterDocs = (docs: any[]) => {
+    return docs.filter((doc) => {
+      // 서류 유형 필터
+      if (docTypeFilter !== "all" && doc.docType !== docTypeFilter) return false;
+      // 상태 필터
+      if (statusFilter !== "all") {
+        const status = getDocStatus(doc.expiryDate);
+        if (statusFilter !== status) return false;
+      }
+      return true;
+    });
+  };
+
+  // 장비별로 서류 그룹화 (필터 적용)
+  const equipmentGroups = useMemo(() => {
+    if (!equipment) return [];
+    return equipment.map((eq) => {
+      const eqDocs = documents?.filter((doc) => doc.targetType === "equipment" && doc.targetId === eq.id) || [];
+      return {
+        ...eq,
+        docs: filterDocs(eqDocs),
+        totalDocs: eqDocs.length,
+      };
+    }).filter(eq => {
+      // Owner 회사 필터
+      if (ownerCompanyFilter !== "all" && eq.ownerId !== ownerCompanyFilter) return false;
+      return true;
+    });
+  }, [equipment, documents, docTypeFilter, statusFilter, ownerCompanyFilter]);
+
   // 디버깅 로그
   console.log('[Documents] Total documents:', documents?.length);
   console.log('[Documents] Total equipment:', equipment?.length);
   console.log('[Documents] Equipment groups:', equipmentGroups.map(eq => ({ id: eq.id, regNum: eq.regNum, docsCount: eq.docs.length })));
 
-  // 인력별로 서류 그룹화
-  const workerGroups = workers?.map((w) => ({
-    ...w,
-    docs: documents?.filter((doc) => doc.targetType === "worker" && doc.targetId === w.id) || [],
-  })) || [];
+  // 인력별로 서류 그룹화 (필터 적용)
+  const workerGroups = useMemo(() => {
+    if (!workers) return [];
+    return workers.map((w) => {
+      const wDocs = documents?.filter((doc) => doc.targetType === "worker" && doc.targetId === w.id) || [];
+      return {
+        ...w,
+        docs: filterDocs(wDocs),
+        totalDocs: wDocs.length,
+      };
+    }).filter(w => {
+      // Owner 회사 필터
+      if (ownerCompanyFilter !== "all" && w.ownerId !== ownerCompanyFilter) return false;
+      return true;
+    });
+  }, [workers, documents, docTypeFilter, statusFilter, ownerCompanyFilter]);
 
   // 검색 필터링
   const filteredEquipment = equipmentGroups.filter((eq) =>
@@ -338,6 +401,14 @@ export default function Documents() {
   const filteredWorkers = workerGroups.filter((w) =>
     w.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // 필터 초기화
+  const resetFilters = () => {
+    setSearchQuery("");
+    setDocTypeFilter("all");
+    setStatusFilter("all");
+    setOwnerCompanyFilter("all");
+  };
 
   const canUpload = user?.role === "bp" || user?.role === "owner" || user?.role === "admin";
 
@@ -364,17 +435,95 @@ export default function Documents() {
         </div>
       </div>
 
-      {/* 검색 */}
+      {/* 검색 및 필터 */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="장비 번호 또는 인력 이름으로 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            검색 및 필터
+          </CardTitle>
+          <CardDescription className="text-xs">조건을 선택하여 서류를 검색하세요</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
+            {/* 검색 */}
+            <div className="w-full md:flex-1 md:min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">검색</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="장비 번호 또는 인력 이름..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-9"
+                />
+              </div>
+            </div>
+
+            {/* 서류 유형 필터 */}
+            <div className="w-full md:flex-1 md:min-w-[150px]">
+              <Label className="text-sm font-medium mb-1.5 block">서류 유형</Label>
+              <Select value={docTypeFilter} onValueChange={setDocTypeFilter}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {docTypes.map((docType) => (
+                    <SelectItem key={docType} value={docType}>
+                      {docType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 상태 필터 */}
+            <div className="w-full md:flex-1 md:min-w-[150px]">
+              <Label className="text-sm font-medium mb-1.5 block">상태</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="valid">유효</SelectItem>
+                  <SelectItem value="expiring">만료 임박 (30일 이내)</SelectItem>
+                  <SelectItem value="expired">만료됨</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Owner 회사 필터 (admin/bp/ep만) */}
+            {(role === "admin" || role === "bp" || role === "ep") && (
+              <div className="w-full md:flex-1 md:min-w-[150px]">
+                <Label className="text-sm font-medium mb-1.5 block">Owner 회사</Label>
+                <Select value={ownerCompanyFilter} onValueChange={setOwnerCompanyFilter}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {ownerCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* 초기화 버튼 */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={resetFilters}
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              초기화
+            </Button>
           </div>
         </CardContent>
       </Card>

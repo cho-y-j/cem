@@ -91,7 +91,20 @@ function DeploymentDocuments({
 
   const handleViewDoc = (doc: any) => {
     if (doc.fileUrl) {
-      window.open(doc.fileUrl, "_blank");
+      // EnhancedPdfViewer로 보기 (Inspector와 동일)
+      const currentDocs = getCurrentDocs();
+      const docIndex = currentDocs.findIndex((d: any) => d.id === doc.id);
+      const docsToView = currentDocs
+        .filter((d: any) => d.fileUrl)
+        .map((d: any) => ({
+          id: d.id,
+          name: d.docType || d.fileName || '서류',
+          url: d.fileUrl,
+          type: d.fileName?.endsWith('.pdf') ? 'pdf' : 'image'
+        }));
+      if (docsToView.length > 0) {
+        onViewDocuments(docsToView);
+      }
     }
   };
 
