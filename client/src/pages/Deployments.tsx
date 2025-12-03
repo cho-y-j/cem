@@ -47,7 +47,7 @@ function DeploymentDocuments({
 }) {
   const [docTab, setDocTab] = useState<"equipment" | "worker" | "guideWorker">("equipment");
 
-  const { data: docsData, isLoading, error } = trpc.deployment.getDocuments.useQuery(
+  const { data: docsData, isLoading, error } = trpc.deployments.getDocuments.useQuery(
     { deploymentId },
     { enabled: !!deploymentId }
   );
