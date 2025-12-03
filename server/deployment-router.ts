@@ -687,4 +687,86 @@ export const deploymentRouter = router({
       console.log(`[Deployment] Deployment rejected: ${input.deploymentId} by BP ${ctx.user.id}${input.reason ? `, reason: ${input.reason}` : ''}`);
       return { success: true };
     }),
+
+  /**
+   * 투입의 장비/인력 서류 조회
+   */
+  getDocuments: protectedProcedure
+    .input(
+      z.object({
+        deploymentId: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      const supabase = db.getSupabase();
+      if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // 투입 정보 조회
+      const { data: deployment } = await supabase
+        .from('deployments')
+        .select('equipment_id, worker_id, guide_worker_id')
+        .eq('id', input.deploymentId)
+        .single();
+
+      if (!deployment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "투입 정보를 찾을 수 없습니다." });
+      }
+
+      const equipmentId = deployment.equipment_id;
+      const workerId = deployment.worker_id;
+      const guideWorkerId = deployment.guide_worker_id;
+
+      // 서류 조회
+      const documents: any[] = [];
+
+      // 장비 서류
+      if (equipmentId) {
+        const { data: equipDocs } = await supabase
+          .from('docs_compliance')
+          .select('*')
+          .eq('target_type', 'equipment')
+          .eq('target_id', equipmentId);
+
+        if (equipDocs) {
+          documents.push(...equipDocs.map((doc: any) => ({
+            ...doc,
+            category: '장비 서류',
+          })));
+        }
+      }
+
+      // 운전자 서류
+      if (workerId) {
+        const { data: workerDocs } = await supabase
+          .from('docs_compliance')
+          .select('*')
+          .eq('target_type', 'worker')
+          .eq('target_id', workerId);
+
+        if (workerDocs) {
+          documents.push(...workerDocs.map((doc: any) => ({
+            ...doc,
+            category: '운전자 서류',
+          })));
+        }
+      }
+
+      // 유도원 서류
+      if (guideWorkerId) {
+        const { data: guideDocs } = await supabase
+          .from('docs_compliance')
+          .select('*')
+          .eq('target_type', 'worker')
+          .eq('target_id', guideWorkerId);
+
+        if (guideDocs) {
+          documents.push(...guideDocs.map((doc: any) => ({
+            ...doc,
+            category: '유도원 서류',
+          })));
+        }
+      }
+
+      return documents;
+    }),
 });

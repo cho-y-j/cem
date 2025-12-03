@@ -31,10 +31,124 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Clock, UserCheck, CheckCircle, Loader2, Calendar } from "lucide-react";
+import { Plus, Clock, UserCheck, CheckCircle, Loader2, Calendar, FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
+import { EnhancedPdfViewer } from "@/components/EnhancedPdfViewer";
+
+// 투입 서류 컴포넌트
+function DeploymentDocuments({
+  deploymentId,
+  onViewDocuments
+}: {
+  deploymentId: string;
+  onViewDocuments: (docs: any[]) => void;
+}) {
+  const { data: documents, isLoading } = trpc.deployment.getDocuments.useQuery(
+    { deploymentId },
+    { enabled: !!deploymentId }
+  );
+
+  if (isLoading) {
+    return (
+      <div className="border rounded-lg p-4">
+        <h3 className="font-semibold text-lg mb-3">서류 목록</h3>
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          <span className="text-muted-foreground">서류 로딩 중...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!documents || documents.length === 0) {
+    return (
+      <div className="border rounded-lg p-4">
+        <h3 className="font-semibold text-lg mb-3">서류 목록</h3>
+        <p className="text-muted-foreground text-sm">등록된 서류가 없습니다.</p>
+      </div>
+    );
+  }
+
+  // 카테고리별로 그룹화
+  const groupedDocs = documents.reduce((acc: any, doc: any) => {
+    const category = doc.category || '기타';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(doc);
+    return acc;
+  }, {});
+
+  const handleViewDoc = (doc: any) => {
+    if (doc.file_url) {
+      onViewDocuments([{
+        id: doc.id,
+        name: doc.doc_type || doc.file_name || '서류',
+        url: doc.file_url,
+        type: doc.file_name?.endsWith('.pdf') ? 'pdf' : 'image'
+      }]);
+    }
+  };
+
+  const handleViewAll = () => {
+    const viewableDocs = documents
+      .filter((doc: any) => doc.file_url)
+      .map((doc: any) => ({
+        id: doc.id,
+        name: `${doc.category} - ${doc.doc_type || doc.file_name || '서류'}`,
+        url: doc.file_url,
+        type: doc.file_name?.endsWith('.pdf') ? 'pdf' : 'image'
+      }));
+    if (viewableDocs.length > 0) {
+      onViewDocuments(viewableDocs);
+    }
+  };
+
+  return (
+    <div className="border rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-lg">서류 목록</h3>
+        <Button variant="outline" size="sm" onClick={handleViewAll}>
+          <Eye className="h-4 w-4 mr-1" />
+          전체 보기
+        </Button>
+      </div>
+      <div className="space-y-4">
+        {Object.entries(groupedDocs).map(([category, docs]: [string, any]) => (
+          <div key={category}>
+            <h4 className="font-medium text-sm text-muted-foreground mb-2">{category}</h4>
+            <div className="space-y-2">
+              {docs.map((doc: any) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between p-2 bg-muted/50 rounded"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{doc.doc_type || doc.file_name || '서류'}</span>
+                    {doc.expiry_date && (
+                      <Badge
+                        variant={new Date(doc.expiry_date) < new Date() ? "destructive" : "secondary"}
+                        className="text-xs"
+                      >
+                        {format(new Date(doc.expiry_date), "yyyy-MM-dd")}
+                      </Badge>
+                    )}
+                  </div>
+                  {doc.file_url && (
+                    <Button variant="ghost" size="sm" onClick={() => handleViewDoc(doc)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * 투입 관리 페이지 (Owner)
@@ -56,6 +170,8 @@ export default function Deployments() {
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<any>(null);
+  const [isDocViewerOpen, setIsDocViewerOpen] = useState(false);
+  const [viewingDocuments, setViewingDocuments] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("");
   const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("");
@@ -503,10 +619,10 @@ export default function Deployments() {
           <CardTitle>필터</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* 필터 UI - 한 줄 통일 디자인 */}
-          <div className="flex flex-wrap items-end gap-3">
+          {/* 필터 UI - 모바일 최적화 */}
+          <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
             {(role === "admin" || role === "bp" || role === "ep") && (
-              <div className="flex-1 min-w-[200px]">
+              <div className="w-full md:flex-1 md:min-w-[200px]">
                 <Label className="text-sm font-medium mb-1.5 block">Owner 회사</Label>
                 <Select
                   value={ownerCompanyFilter || "all"}
@@ -529,7 +645,7 @@ export default function Deployments() {
             )}
 
             {(role === "admin" || role === "ep" || role === "owner") && (
-              <div className="flex-1 min-w-[200px]">
+              <div className="w-full md:flex-1 md:min-w-[200px]">
                 <Label className="text-sm font-medium mb-1.5 block">BP 회사</Label>
                 <Select
                   value={bpCompanyFilter || "all"}
@@ -552,7 +668,7 @@ export default function Deployments() {
             )}
 
             {role === "admin" && (
-              <div className="flex-1 min-w-[200px]">
+              <div className="w-full md:flex-1 md:min-w-[200px]">
                 <Label className="text-sm font-medium mb-1.5 block">EP 회사</Label>
                 <Select
                   value={epCompanyFilter || "all"}
@@ -574,7 +690,7 @@ export default function Deployments() {
               </div>
             )}
 
-            <div className="flex-1 min-w-[200px]">
+            <div className="w-full md:flex-1 md:min-w-[200px]">
               <Label className="text-sm font-medium mb-1.5 block">장비</Label>
               <Select
                 value={equipmentFilter || "all"}
@@ -594,7 +710,7 @@ export default function Deployments() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[200px]">
+            <div className="w-full md:flex-1 md:min-w-[200px]">
               <Label className="text-sm font-medium mb-1.5 block">운전자</Label>
               <Select
                 value={workerFilter || "all"}
@@ -614,7 +730,7 @@ export default function Deployments() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[200px]">
+            <div className="w-full md:flex-1 md:min-w-[200px]">
               <Label className="text-sm font-medium mb-1.5 block">상태</Label>
               <Select
                 value={statusFilter}
@@ -1429,6 +1545,15 @@ export default function Deployments() {
                 </div>
               </div>
 
+              {/* 서류 보기 */}
+              <DeploymentDocuments
+                deploymentId={selectedDeployment.id}
+                onViewDocuments={(docs) => {
+                  setViewingDocuments(docs);
+                  setIsDocViewerOpen(true);
+                }}
+              />
+
               {/* 빠른 액션 */}
               {(selectedDeployment.status === "active" ||
                 selectedDeployment.status === "extended") && (
@@ -1805,6 +1930,14 @@ export default function Deployments() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 서류 미리보기 */}
+      <EnhancedPdfViewer
+        open={isDocViewerOpen}
+        onClose={() => setIsDocViewerOpen(false)}
+        documents={viewingDocuments}
+        title="투입 서류 미리보기"
+      />
     </div>
   );
 }
