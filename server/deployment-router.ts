@@ -701,12 +701,17 @@ export const deploymentRouter = router({
       const supabase = db.getSupabase();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+      console.log('[getDocuments] deploymentId:', input.deploymentId);
+
       // 투입 정보 조회
-      const { data: deployment } = await supabase
+      const { data: deployment, error: depError } = await supabase
         .from('deployments')
         .select('equipment_id, worker_id, guide_worker_id')
         .eq('id', input.deploymentId)
         .single();
+
+      console.log('[getDocuments] deployment:', deployment);
+      console.log('[getDocuments] depError:', depError);
 
       if (!deployment) {
         throw new TRPCError({ code: "NOT_FOUND", message: "투입 정보를 찾을 수 없습니다." });
@@ -715,6 +720,8 @@ export const deploymentRouter = router({
       const equipmentId = deployment.equipment_id;
       const workerId = deployment.worker_id;
       const guideWorkerId = deployment.guide_worker_id;
+
+      console.log('[getDocuments] equipmentId:', equipmentId, 'workerId:', workerId, 'guideWorkerId:', guideWorkerId);
 
       // getDocsComplianceByTarget 사용 (Inspector와 동일)
       const equipmentDocs = equipmentId
@@ -726,6 +733,8 @@ export const deploymentRouter = router({
       const guideWorkerDocs = guideWorkerId
         ? await db.getDocsComplianceByTarget("worker", guideWorkerId)
         : [];
+
+      console.log('[getDocuments] equipmentDocs:', equipmentDocs?.length, 'workerDocs:', workerDocs?.length, 'guideWorkerDocs:', guideWorkerDocs?.length);
 
       return {
         equipment: equipmentDocs,

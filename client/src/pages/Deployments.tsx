@@ -47,16 +47,22 @@ function DeploymentDocuments({
 }) {
   const [docTab, setDocTab] = useState<"equipment" | "worker" | "guideWorker">("equipment");
 
-  const { data: docsData, isLoading } = trpc.deployment.getDocuments.useQuery(
+  const { data: docsData, isLoading, error } = trpc.deployment.getDocuments.useQuery(
     { deploymentId },
     { enabled: !!deploymentId }
   );
+
+  // 디버그 로그
+  console.log('[DeploymentDocuments] deploymentId:', deploymentId);
+  console.log('[DeploymentDocuments] docsData:', docsData);
+  console.log('[DeploymentDocuments] error:', error);
 
   const equipmentDocs = docsData?.equipment || [];
   const workerDocs = docsData?.worker || [];
   const guideWorkerDocs = docsData?.guideWorker || [];
 
   const totalDocs = equipmentDocs.length + workerDocs.length + guideWorkerDocs.length;
+  console.log('[DeploymentDocuments] totalDocs:', totalDocs, '(equipment:', equipmentDocs.length, 'worker:', workerDocs.length, 'guideWorker:', guideWorkerDocs.length, ')');
 
   if (isLoading) {
     return (
