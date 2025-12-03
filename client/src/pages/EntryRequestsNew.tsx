@@ -506,16 +506,25 @@ export default function EntryRequestsNew() {
         </Button>
       </div>
 
-      {/* 반입 요청 목록 */}
+      {/* 필터 */}
       <Card>
-        <CardHeader>
-          <CardTitle>반입,출입 요청 목록 ({sortedRequests.length}건)</CardTitle>
-          <CardDescription>등록된 반입,출입 요청을 확인하고 관리합니다.</CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">검색 및 필터</CardTitle>
+          <CardDescription className="text-xs">조건을 선택하여 요청을 검색하세요</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* 필터 UI - 모바일 최적화 */}
+        <CardContent>
           <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
             <div className="w-full md:flex-1 md:min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">검색</Label>
+              <Input
+                placeholder="요청번호, 업체명, 요청자..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="h-9"
+              />
+            </div>
+
+            <div className="w-full md:flex-1 md:min-w-[150px]">
               <Label className="text-sm font-medium mb-1.5 block">상태</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-9">
@@ -532,7 +541,7 @@ export default function EntryRequestsNew() {
               </Select>
             </div>
 
-            <div className="w-full md:flex-1 md:min-w-[200px]">
+            <div className="w-full md:flex-1 md:min-w-[150px]">
               <Label className="text-sm font-medium mb-1.5 block">협력업체</Label>
               <Select value={bpCompanyFilter} onValueChange={setBpCompanyFilter}>
                 <SelectTrigger className="h-9">
@@ -549,17 +558,29 @@ export default function EntryRequestsNew() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[250px]">
-              <Label className="text-sm font-medium mb-1.5 block">검색</Label>
-              <Input
-                placeholder="요청번호, 업체명, 요청자..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="h-9"
-              />
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => {
+                setSearchText("");
+                setStatusFilter("all");
+                setBpCompanyFilter("all");
+              }}
+            >
+              초기화
+            </Button>
           </div>
+        </CardContent>
+      </Card>
 
+      {/* 반입 요청 목록 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>반입,출입 요청 목록 ({sortedRequests.length}건)</CardTitle>
+          <CardDescription>등록된 반입,출입 요청을 확인하고 관리합니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
           <Table>
             <TableHeader>
               <TableRow>

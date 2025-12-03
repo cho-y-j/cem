@@ -89,6 +89,8 @@ export default function Equipment() {
   const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("");
   const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("");
   const [epCompanyFilter, setEpCompanyFilter] = useState<string>("");
+  const [equipTypeFilter, setEquipTypeFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [filtersInitialized, setFiltersInitialized] = useState(false);
 
   const utils = trpc.useUtils();
@@ -149,6 +151,16 @@ export default function Equipment() {
     { equipTypeId: formData.equipTypeId },
     { enabled: !!formData.equipTypeId }
   );
+
+  // 클라이언트 필터링 (장비종류, 상태)
+  const filteredEquipmentList = useMemo(() => {
+    if (!equipmentList) return [];
+    return equipmentList.filter((eq: any) => {
+      if (equipTypeFilter && eq.equipTypeId !== equipTypeFilter) return false;
+      if (statusFilter && eq.status !== statusFilter) return false;
+      return true;
+    });
+  }, [equipmentList, equipTypeFilter, statusFilter]);
 
   // 장비 종류 변경 시 필수 서류 목록 초기화
   useEffect(() => {
@@ -520,6 +532,60 @@ export default function Equipment() {
                 </Select>
               </div>
             )}
+
+            <div className="w-full md:flex-1 md:min-w-[150px]">
+              <Label className="text-sm font-medium mb-1.5 block">장비 종류</Label>
+              <Select
+                value={equipTypeFilter || "all"}
+                onValueChange={(value) => setEquipTypeFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {equipTypes?.map((type: any) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full md:flex-1 md:min-w-[120px]">
+              <Label className="text-sm font-medium mb-1.5 block">상태</Label>
+              <Select
+                value={statusFilter || "all"}
+                onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="idle">유휴</SelectItem>
+                  <SelectItem value="operating">운영중</SelectItem>
+                  <SelectItem value="maintenance">점검중</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 mt-auto"
+              onClick={() => {
+                setSearchTerm("");
+                setOwnerCompanyFilter("");
+                setBpCompanyFilter("");
+                setEpCompanyFilter("");
+                setEquipTypeFilter("");
+                setStatusFilter("");
+              }}
+            >
+              초기화
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -528,7 +594,7 @@ export default function Equipment() {
         <CardHeader>
           <CardTitle>장비 목록</CardTitle>
           <CardDescription>
-            총 {equipmentList?.length || 0}개의 장비가 등록되어 있습니다.
+            총 {filteredEquipmentList?.length || 0}개의 장비
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -537,7 +603,7 @@ export default function Equipment() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               로딩 중...
             </div>
-          ) : equipmentList && equipmentList.length > 0 ? (
+          ) : filteredEquipmentList && filteredEquipmentList.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -551,7 +617,7 @@ export default function Equipment() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {equipmentList.map((equipment) => (
+                {filteredEquipmentList.map((equipment: any) => (
                   <TableRow key={equipment.id}>
                     <TableCell className="font-medium">{equipment.regNum}</TableCell>
                     <TableCell>

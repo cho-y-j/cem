@@ -45,10 +45,16 @@ function DeploymentDocuments({
   deploymentId: string;
   onViewDocuments: (docs: any[]) => void;
 }) {
-  const { data: documents, isLoading } = trpc.deployment.getDocuments.useQuery(
+  const { data: documents, isLoading, error } = trpc.deployment.getDocuments.useQuery(
     { deploymentId },
     { enabled: !!deploymentId }
   );
+
+  // 디버깅
+  console.log('[DeploymentDocuments] deploymentId:', deploymentId);
+  console.log('[DeploymentDocuments] documents:', documents);
+  console.log('[DeploymentDocuments] isLoading:', isLoading);
+  console.log('[DeploymentDocuments] error:', error);
 
   if (isLoading) {
     return (

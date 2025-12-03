@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -73,13 +75,32 @@ const URGENCY_STYLES = {
 };
 
 export default function ExpiringDocuments() {
+  const { user } = useAuth();
+  const role = user?.role?.toLowerCase();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTargetType, setFilterTargetType] = useState<string>("all");
   const [filterUrgency, setFilterUrgency] = useState<string>("all");
+  const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("all");
+  const [bpCompanyFilter, setBpCompanyFilter] = useState<string>("all");
+  const [docTypeFilter, setDocTypeFilter] = useState<string>("all");
 
   const { data: documents, isLoading, refetch } = trpc.notifications.getExpiringDocuments.useQuery(
     { daysAhead: 30, includeExpired: true }
   );
+
+  // 회사 목록 조회
+  const { data: ownerCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "owner" },
+    { enabled: role === "admin" || role === "bp" || role === "ep" }
+  );
+  const { data: bpCompanies = [] } = trpc.companies.listByType.useQuery(
+    { companyType: "bp" },
+    { enabled: role === "admin" || role === "ep" }
+  );
+
+  // 서류 유형 목록 (중복 제거)
+  const docTypes = [...new Set(documents?.map((d: any) => d.docType).filter(Boolean))] as string[];
 
   const sendNotificationMutation = trpc.notifications.triggerDocumentExpiryNotifications.useMutation({
     onSuccess: (result) => {
@@ -109,6 +130,14 @@ export default function ExpiringDocuments() {
     }
     // 긴급도 필터
     if (filterUrgency !== "all" && doc.urgencyLevel !== filterUrgency) {
+      return false;
+    }
+    // Owner 회사 필터
+    if (ownerCompanyFilter !== "all" && doc.ownerId !== ownerCompanyFilter) {
+      return false;
+    }
+    // 서류 유형 필터
+    if (docTypeFilter !== "all" && doc.docType !== docTypeFilter) {
       return false;
     }
     return true;
@@ -207,43 +236,105 @@ export default function ExpiringDocuments() {
 
       {/* 필터 */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row md:flex-wrap gap-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">검색 및 필터</CardTitle>
+          <CardDescription className="text-xs">조건을 선택하여 서류를 검색하세요</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
             <div className="w-full md:flex-1 md:min-w-[200px]">
+              <Label className="text-sm font-medium mb-1.5 block">검색</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="이름 또는 서류 유형 검색..."
+                  placeholder="이름 또는 서류 유형..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-9"
                 />
               </div>
             </div>
-            <Select value={filterTargetType} onValueChange={setFilterTargetType}>
-              <SelectTrigger className="w-[150px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="대상 유형" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                <SelectItem value="worker">인력</SelectItem>
-                <SelectItem value="equipment">장비</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterUrgency} onValueChange={setFilterUrgency}>
-              <SelectTrigger className="w-[150px]">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="긴급도" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">전체</SelectItem>
-                <SelectItem value="expired">만료됨</SelectItem>
-                <SelectItem value="urgent">긴급 (3일)</SelectItem>
-                <SelectItem value="warning">주의 (7일)</SelectItem>
-                <SelectItem value="normal">정상</SelectItem>
-              </SelectContent>
-            </Select>
+
+            <div className="w-full md:flex-1 md:min-w-[150px]">
+              <Label className="text-sm font-medium mb-1.5 block">대상 유형</Label>
+              <Select value={filterTargetType} onValueChange={setFilterTargetType}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="worker">인력</SelectItem>
+                  <SelectItem value="equipment">장비</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full md:flex-1 md:min-w-[150px]">
+              <Label className="text-sm font-medium mb-1.5 block">긴급도</Label>
+              <Select value={filterUrgency} onValueChange={setFilterUrgency}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  <SelectItem value="expired">만료됨</SelectItem>
+                  <SelectItem value="urgent">긴급 (3일)</SelectItem>
+                  <SelectItem value="warning">주의 (7일)</SelectItem>
+                  <SelectItem value="normal">정상</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(role === "admin" || role === "bp" || role === "ep") && (
+              <div className="w-full md:flex-1 md:min-w-[150px]">
+                <Label className="text-sm font-medium mb-1.5 block">Owner 회사</Label>
+                <Select value={ownerCompanyFilter} onValueChange={setOwnerCompanyFilter}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">전체</SelectItem>
+                    {ownerCompanies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="w-full md:flex-1 md:min-w-[150px]">
+              <Label className="text-sm font-medium mb-1.5 block">서류 유형</Label>
+              <Select value={docTypeFilter} onValueChange={setDocTypeFilter}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체</SelectItem>
+                  {docTypes.map((docType) => (
+                    <SelectItem key={docType} value={docType}>
+                      {docType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => {
+                setSearchTerm("");
+                setFilterTargetType("all");
+                setFilterUrgency("all");
+                setOwnerCompanyFilter("all");
+                setDocTypeFilter("all");
+              }}
+            >
+              초기화
+            </Button>
           </div>
         </CardContent>
       </Card>
