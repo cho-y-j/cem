@@ -37,7 +37,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { EnhancedPdfViewer } from "@/components/EnhancedPdfViewer";
 
-// 투입 서류 컴포넌트
+// 투입 서류 컴포넌트 (Inspector와 동일한 방식)
 function DeploymentDocuments({
   deploymentId,
   onViewDocuments
@@ -45,16 +45,18 @@ function DeploymentDocuments({
   deploymentId: string;
   onViewDocuments: (docs: any[]) => void;
 }) {
-  const { data: documents, isLoading, error } = trpc.deployment.getDocuments.useQuery(
+  const [docTab, setDocTab] = useState<"equipment" | "worker" | "guideWorker">("equipment");
+
+  const { data: docsData, isLoading } = trpc.deployment.getDocuments.useQuery(
     { deploymentId },
     { enabled: !!deploymentId }
   );
 
-  // 디버깅
-  console.log('[DeploymentDocuments] deploymentId:', deploymentId);
-  console.log('[DeploymentDocuments] documents:', documents);
-  console.log('[DeploymentDocuments] isLoading:', isLoading);
-  console.log('[DeploymentDocuments] error:', error);
+  const equipmentDocs = docsData?.equipment || [];
+  const workerDocs = docsData?.worker || [];
+  const guideWorkerDocs = docsData?.guideWorker || [];
+
+  const totalDocs = equipmentDocs.length + workerDocs.length + guideWorkerDocs.length;
 
   if (isLoading) {
     return (
@@ -68,7 +70,7 @@ function DeploymentDocuments({
     );
   }
 
-  if (!documents || documents.length === 0) {
+  if (totalDocs === 0) {
     return (
       <div className="border rounded-lg p-4">
         <h3 className="font-semibold text-lg mb-3">서류 목록</h3>
@@ -77,80 +79,118 @@ function DeploymentDocuments({
     );
   }
 
-  // 카테고리별로 그룹화
-  const groupedDocs = documents.reduce((acc: any, doc: any) => {
-    const category = doc.category || '기타';
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(doc);
-    return acc;
-  }, {});
+  // 현재 탭의 서류 가져오기
+  const getCurrentDocs = () => {
+    switch (docTab) {
+      case "equipment": return equipmentDocs;
+      case "worker": return workerDocs;
+      case "guideWorker": return guideWorkerDocs;
+      default: return [];
+    }
+  };
 
   const handleViewDoc = (doc: any) => {
-    if (doc.file_url) {
-      onViewDocuments([{
-        id: doc.id,
-        name: doc.doc_type || doc.file_name || '서류',
-        url: doc.file_url,
-        type: doc.file_name?.endsWith('.pdf') ? 'pdf' : 'image'
-      }]);
+    if (doc.fileUrl) {
+      window.open(doc.fileUrl, "_blank");
     }
   };
 
   const handleViewAll = () => {
-    const viewableDocs = documents
-      .filter((doc: any) => doc.file_url)
+    const allDocs = [...equipmentDocs, ...workerDocs, ...guideWorkerDocs]
+      .filter((doc: any) => doc.fileUrl)
       .map((doc: any) => ({
         id: doc.id,
-        name: `${doc.category} - ${doc.doc_type || doc.file_name || '서류'}`,
-        url: doc.file_url,
-        type: doc.file_name?.endsWith('.pdf') ? 'pdf' : 'image'
+        name: doc.docType || doc.fileName || '서류',
+        url: doc.fileUrl,
+        type: doc.fileName?.endsWith('.pdf') ? 'pdf' : 'image'
       }));
-    if (viewableDocs.length > 0) {
-      onViewDocuments(viewableDocs);
+    if (allDocs.length > 0) {
+      onViewDocuments(allDocs);
     }
   };
 
   return (
     <div className="border rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-lg">서류 목록</h3>
+        <h3 className="font-semibold text-lg">서류 목록 ({totalDocs})</h3>
         <Button variant="outline" size="sm" onClick={handleViewAll}>
           <Eye className="h-4 w-4 mr-1" />
           전체 보기
         </Button>
       </div>
-      <div className="space-y-4">
-        {Object.entries(groupedDocs).map(([category, docs]: [string, any]) => (
-          <div key={category}>
-            <h4 className="font-medium text-sm text-muted-foreground mb-2">{category}</h4>
-            <div className="space-y-2">
-              {docs.map((doc: any) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between p-2 bg-muted/50 rounded"
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{doc.doc_type || doc.file_name || '서류'}</span>
-                    {doc.expiry_date && (
-                      <Badge
-                        variant={new Date(doc.expiry_date) < new Date() ? "destructive" : "secondary"}
-                        className="text-xs"
-                      >
-                        {format(new Date(doc.expiry_date), "yyyy-MM-dd")}
-                      </Badge>
-                    )}
-                  </div>
-                  {doc.file_url && (
-                    <Button variant="ghost" size="sm" onClick={() => handleViewDoc(doc)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  )}
+
+      {/* 탭 버튼 (Inspector와 동일) */}
+      <div className="mb-4 flex gap-2 flex-wrap">
+        <Button
+          variant={docTab === "equipment" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setDocTab("equipment")}
+          disabled={equipmentDocs.length === 0}
+        >
+          장비 서류 ({equipmentDocs.length})
+        </Button>
+        <Button
+          variant={docTab === "worker" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setDocTab("worker")}
+          disabled={workerDocs.length === 0}
+        >
+          운전자 서류 ({workerDocs.length})
+        </Button>
+        {guideWorkerDocs.length > 0 && (
+          <Button
+            variant={docTab === "guideWorker" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setDocTab("guideWorker")}
+          >
+            유도원 서류 ({guideWorkerDocs.length})
+          </Button>
+        )}
+      </div>
+
+      {/* 서류 목록 */}
+      <div className="space-y-2">
+        {getCurrentDocs().length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-4">서류가 없습니다.</p>
+        ) : (
+          getCurrentDocs().map((doc: any) => (
+            <div
+              key={doc.id}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+            >
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">{doc.docType || '서류'}</span>
+                  <Badge
+                    variant={
+                      doc.status === "approved" || doc.status === "valid"
+                        ? "outline"
+                        : doc.status === "expired"
+                        ? "destructive"
+                        : "secondary"
+                    }
+                    className="text-xs"
+                  >
+                    {doc.status === "approved" || doc.status === "valid" ? "유효" :
+                     doc.status === "expired" ? "만료" : doc.status || "미정"}
+                  </Badge>
                 </div>
-              ))}
+                {doc.expiryDate && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    만료일: {format(new Date(doc.expiryDate), "yyyy-MM-dd")}
+                  </p>
+                )}
+              </div>
+              {doc.fileUrl && (
+                <Button variant="outline" size="sm" onClick={() => handleViewDoc(doc)}>
+                  <Eye className="h-4 w-4 mr-1" />
+                  보기
+                </Button>
+              )}
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

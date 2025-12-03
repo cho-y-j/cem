@@ -689,7 +689,7 @@ export const deploymentRouter = router({
     }),
 
   /**
-   * 투입의 장비/인력 서류 조회
+   * 투입의 장비/인력 서류 조회 (Inspector와 동일한 방식)
    */
   getDocuments: protectedProcedure
     .input(
@@ -716,57 +716,21 @@ export const deploymentRouter = router({
       const workerId = deployment.worker_id;
       const guideWorkerId = deployment.guide_worker_id;
 
-      // 서류 조회
-      const documents: any[] = [];
+      // getDocsComplianceByTarget 사용 (Inspector와 동일)
+      const equipmentDocs = equipmentId
+        ? await db.getDocsComplianceByTarget("equipment", equipmentId)
+        : [];
+      const workerDocs = workerId
+        ? await db.getDocsComplianceByTarget("worker", workerId)
+        : [];
+      const guideWorkerDocs = guideWorkerId
+        ? await db.getDocsComplianceByTarget("worker", guideWorkerId)
+        : [];
 
-      // 장비 서류
-      if (equipmentId) {
-        const { data: equipDocs } = await supabase
-          .from('docs_compliance')
-          .select('*')
-          .eq('target_type', 'equipment')
-          .eq('target_id', equipmentId);
-
-        if (equipDocs) {
-          documents.push(...equipDocs.map((doc: any) => ({
-            ...doc,
-            category: '장비 서류',
-          })));
-        }
-      }
-
-      // 운전자 서류
-      if (workerId) {
-        const { data: workerDocs } = await supabase
-          .from('docs_compliance')
-          .select('*')
-          .eq('target_type', 'worker')
-          .eq('target_id', workerId);
-
-        if (workerDocs) {
-          documents.push(...workerDocs.map((doc: any) => ({
-            ...doc,
-            category: '운전자 서류',
-          })));
-        }
-      }
-
-      // 유도원 서류
-      if (guideWorkerId) {
-        const { data: guideDocs } = await supabase
-          .from('docs_compliance')
-          .select('*')
-          .eq('target_type', 'worker')
-          .eq('target_id', guideWorkerId);
-
-        if (guideDocs) {
-          documents.push(...guideDocs.map((doc: any) => ({
-            ...doc,
-            category: '유도원 서류',
-          })));
-        }
-      }
-
-      return documents;
+      return {
+        equipment: equipmentDocs,
+        worker: workerDocs,
+        guideWorker: guideWorkerDocs,
+      };
     }),
 });
