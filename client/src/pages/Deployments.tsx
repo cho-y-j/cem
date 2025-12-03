@@ -76,11 +76,24 @@ function DeploymentDocuments({
     );
   }
 
+  // 에러가 있을 경우
+  if (error) {
+    return (
+      <div className="border rounded-lg p-4 border-red-300 bg-red-50">
+        <h3 className="font-semibold text-lg mb-3 text-red-700">서류 목록 - 오류</h3>
+        <p className="text-red-600 text-sm">서류를 불러오는 중 오류가 발생했습니다: {error.message}</p>
+      </div>
+    );
+  }
+
   if (totalDocs === 0) {
     return (
       <div className="border rounded-lg p-4">
         <h3 className="font-semibold text-lg mb-3">서류 목록</h3>
         <p className="text-muted-foreground text-sm">등록된 서류가 없습니다.</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          (장비ID: {deploymentId ? '있음' : '없음'}, API 응답: {docsData ? '받음' : '미수신'})
+        </p>
       </div>
     );
   }
