@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { Search, Truck, AlertCircle, FileText, Settings, Lock, User, Nfc } from "lucide-react";
+import { Search, Truck, AlertCircle, FileText, Settings, Lock, User, Nfc, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -368,16 +368,26 @@ export default function InspectorMain() {
     <MobileLayout title="안전점검" showBottomNav={true} navItems={inspectorNavItems}>
       <div className="p-4 space-y-5 pb-32">
         <div className="space-y-1.5">
-          <p className="text-sm font-semibold text-slate-700">장비 검색</p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-base font-bold text-slate-800 flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-blue-100">
+              <Search className="h-4 w-4 text-blue-600" />
+            </div>
+            장비 검색
+          </p>
+          <p className="text-xs text-muted-foreground leading-relaxed pl-8">
             차량번호를 입력하거나 NFC 태그를 스캔하면 배정된 장비를 바로 확인할 수 있습니다.
           </p>
         </div>
 
         {/* 검색 입력 */}
-        <Card className="shadow-sm">
+        <Card className="shadow-lg border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-white">
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-slate-800">차량번호로 검색</CardTitle>
+            <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-blue-600">
+                <Truck className="h-4 w-4 text-white" />
+              </div>
+              차량번호로 검색
+            </CardTitle>
             <CardDescription className="text-xs text-muted-foreground leading-relaxed">
               1234, 12가3456 등 일부 번호만 입력해도 검색됩니다.
             </CardDescription>
@@ -397,15 +407,17 @@ export default function InspectorMain() {
                 size="lg"
                 onClick={handleSearch}
                 disabled={!searchInput.trim() || isLoading}
-                className="h-14 px-6 text-base font-semibold"
+                className="h-14 px-6 text-base font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30 rounded-xl"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
-                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
                   </div>
                 ) : (
                   <>
-                    <Search className="h-5 w-5 mr-2" />
+                    <div className="mr-2 p-1 rounded-md bg-white/20">
+                      <Search className="h-5 w-5" />
+                    </div>
                     검색
                   </>
                 )}
@@ -427,16 +439,18 @@ export default function InspectorMain() {
                 variant="outline"
                 onClick={handleNfcScan}
                 disabled={!isNfcSupported || isNfcScanning}
-                className="w-full h-12 text-base"
+                className="w-full h-12 text-base border-2 border-purple-300 hover:border-purple-500 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 rounded-xl font-semibold"
               >
                 {isNfcScanning ? (
                   <>
-                    <div className="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    <div className="animate-spin h-5 w-5 border-2 border-purple-600 border-t-transparent rounded-full mr-2" />
                     NFC 태그 인식 중...
                   </>
                 ) : (
                   <>
-                    <Nfc className="h-5 w-5 mr-2" />
+                    <div className="mr-2 p-1 rounded-md bg-purple-100">
+                      <Nfc className="h-5 w-5 text-purple-600" />
+                    </div>
                     태그 인식 다시 시도
                   </>
                 )}
@@ -465,32 +479,35 @@ export default function InspectorMain() {
 
         {/* 검색 결과 */}
         {searchResults.length > 0 && (
-          <Card>
+          <Card className="shadow-lg border-2 border-blue-100">
             <CardHeader>
-              <CardTitle className="text-lg">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-600">
+                  <FileText className="h-4 w-4 text-white" />
+                </div>
                 검색 결과 ({searchResults.length}개)
               </CardTitle>
             </CardHeader>
             <CardContent>
               {lastNfcTag && (
-                <div className="mb-3">
-                  <Badge variant="outline" className="text-xs">
+                <div className="mb-3 p-3 rounded-lg bg-purple-50 border border-purple-200">
+                  <Badge variant="outline" className="text-xs bg-purple-100 border-purple-300">
                     NFC 태그 인식: {lastNfcTag}
                   </Badge>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-purple-700 mt-1 font-medium">
                     태그와 연결된 장비를 확인 후 선택해 주세요.
                   </p>
                 </div>
               )}
               {pendingNfcTag && (
-                <div className="mb-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                <div className="mb-3 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 p-3">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs bg-orange-100 border-orange-300">
                       등록되지 않은 태그
                     </Badge>
-                    <span className="text-xs font-medium text-slate-700">{pendingNfcTag}</span>
+                    <span className="text-xs font-bold text-orange-700">{pendingNfcTag}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-orange-700 mt-1 font-medium">
                     장비를 검색한 뒤 카드의 <strong>태그 등록</strong> 버튼을 눌러 연결해 주세요.
                   </p>
                 </div>
@@ -499,11 +516,11 @@ export default function InspectorMain() {
                 {searchResults.map((equipment) => (
                   <div
                     key={equipment.id}
-                    className="w-full text-left p-5 border-2 rounded-xl hover:bg-blue-50 hover:border-blue-300 transition-all cursor-pointer"
+                    className="w-full text-left p-5 border-2 border-blue-200 rounded-xl hover:bg-gradient-to-br hover:from-blue-50 hover:to-blue-100 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Truck className="h-6 w-6 text-blue-600" />
+                      <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
+                        <Truck className="h-7 w-7 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-lg text-gray-900">
@@ -576,9 +593,9 @@ export default function InspectorMain() {
                         </div>
                       </div>
                       <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
                           <svg
-                            className="w-4 h-4 text-white"
+                            className="w-5 h-5 text-white"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -601,38 +618,43 @@ export default function InspectorMain() {
         )}
 
         {/* 사용 안내 */}
-        <Card className="shadow-sm">
+        <Card className="shadow-lg border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-white">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-slate-800">점검 진행 순서</CardTitle>
+            <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-blue-600">
+                <ClipboardCheck className="h-4 w-4 text-white" />
+              </div>
+              점검 진행 순서
+            </CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
               NFC 태그를 인식하면 1~3 단계가 자동으로 연결됩니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-sm font-bold text-white shadow-md">
                 1
               </div>
               <div>
-                <div className="text-sm font-medium text-slate-800">장비 검색 또는 태그 인식</div>
+                <div className="text-sm font-bold text-slate-800">장비 검색 또는 태그 인식</div>
                 <div className="text-xs text-muted-foreground">차량번호·태그로 장비 정보를 확인합니다.</div>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-sm font-bold text-white shadow-md">
                 2
               </div>
               <div>
-                <div className="text-sm font-medium text-slate-800">점검표 작성</div>
+                <div className="text-sm font-bold text-slate-800">점검표 작성</div>
                 <div className="text-xs text-muted-foreground">차종별 템플릿으로 체크리스트를 진행합니다.</div>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-sm font-bold text-white shadow-md">
                 3
               </div>
               <div>
-                <div className="text-sm font-medium text-slate-800">제출 및 공유</div>
+                <div className="text-sm font-bold text-slate-800">제출 및 공유</div>
                 <div className="text-xs text-muted-foreground">
                   점검 결과와 사진을 저장하고 관리자에게 공유합니다.
                 </div>
@@ -642,25 +664,27 @@ export default function InspectorMain() {
         </Card>
 
         {/* 주의사항 */}
-        <Card className="shadow-sm border border-amber-100 bg-amber-50">
-          <CardContent className="py-4 space-y-3">
+        <Card className="shadow-lg border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50">
+          <CardContent className="py-5 space-y-3">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="p-2 rounded-lg bg-amber-500 shadow-md">
+                <AlertCircle className="h-5 w-5 text-white flex-shrink-0" />
+              </div>
               <div>
-                <div className="text-sm font-semibold text-amber-900">주의사항</div>
-                <p className="text-xs text-amber-700 leading-relaxed">
+                <div className="text-sm font-bold text-amber-900">주의사항</div>
+                <p className="text-xs text-amber-700 leading-relaxed font-medium">
                   안전과 기록 정확도를 위해 다음 사항을 지켜주세요.
                 </p>
               </div>
             </div>
-            <div className="grid gap-2">
+            <div className="grid gap-2.5 pl-11">
               {[
                 "이상 항목 발견 시 반드시 사진을 첨부합니다.",
                 "점검이 끝나면 즉시 제출하고 관리자와 공유합니다.",
                 "위험 요소 발견 시 현장 관리자에게 우선 보고합니다.",
               ].map((item) => (
-                <div key={item} className="flex items-start gap-2 text-xs text-amber-800">
-                  <div className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <div key={item} className="flex items-start gap-2 text-xs text-amber-800 font-medium">
+                  <div className="mt-1.5 h-2 w-2 rounded-full bg-amber-500 flex-shrink-0" />
                   <span>{item}</span>
                 </div>
               ))}

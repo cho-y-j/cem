@@ -877,18 +877,18 @@ export default function WorkerMain() {
               <p className="text-gray-500 mt-1">오늘도 안전한 하루 되세요</p>
             </div>
 
-            <Card className="border-0 shadow-lg bg-white overflow-hidden">
-              <div className="h-2 bg-blue-600 w-full" />
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-50 to-white overflow-hidden">
+              <div className="h-3 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 w-full" />
               <CardContent className="p-6 space-y-4">
                 <div className="text-center space-y-1 mb-2">
-                  <div className="text-lg font-semibold text-gray-900">출근 전입니다</div>
+                  <div className="text-lg font-bold text-gray-900">출근 전입니다</div>
                   <div className="text-sm text-gray-500">작업 시작 전 출근 체크를 해주세요</div>
                 </div>
 
                 {/* PIN 출근 버튼 */}
                 <Button
                   size="lg"
-                  className="w-full h-14 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-md active:scale-95 transition-all rounded-xl"
+                  className="w-full h-14 text-base font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30 active:scale-95 transition-all rounded-xl"
                   onClick={handleCheckIn}
                   disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
                 >
@@ -899,7 +899,9 @@ export default function WorkerMain() {
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="mr-2 h-5 w-5" />
+                      <div className="mr-2 p-1 rounded-md bg-white/20">
+                        <CheckCircle className="h-5 w-5" />
+                      </div>
                       출근하기
                     </>
                   )}
@@ -909,7 +911,7 @@ export default function WorkerMain() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="w-full h-14 text-base font-semibold border-gray-200 hover:bg-gray-50 active:scale-95 transition-all rounded-xl"
+                  className="w-full h-14 text-base font-semibold border-2 border-purple-200 hover:border-purple-400 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 active:scale-95 transition-all rounded-xl"
                   onClick={() => {
                     if (!isBiometricAvailable) {
                       if (Capacitor.isNativePlatform()) {
@@ -930,7 +932,9 @@ export default function WorkerMain() {
                   }}
                   disabled={checkInMutation.isPending || !!todayCheckInStatus?.checkIn}
                 >
-                  <Fingerprint className="mr-2 h-5 w-5 text-purple-600" />
+                  <div className="mr-2 p-1.5 rounded-md bg-purple-100">
+                    <Fingerprint className="h-5 w-5 text-purple-600" />
+                  </div>
                   생체 인증으로 출근
                 </Button>
 
@@ -943,17 +947,17 @@ export default function WorkerMain() {
           </div>
         ) : (
           <div className="px-4 mb-6 mt-2">
-            <Card className="border-0 shadow-md bg-white overflow-hidden">
-              <div className="h-2 bg-green-500 w-full" />
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-green-50 to-white overflow-hidden">
+              <div className="h-3 bg-gradient-to-r from-green-500 via-green-400 to-green-500 w-full" />
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="h-14 w-14 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shrink-0 shadow-lg shadow-green-500/30">
+                      <CheckCircle className="h-7 w-7 text-white" />
                     </div>
                     <div>
                       <div className="font-bold text-gray-900 text-lg">출근 완료</div>
-                      <div className="text-sm text-gray-500 font-medium">
+                      <div className="text-sm text-gray-600 font-semibold">
                         {checkInTimeDisplay}
                       </div>
                     </div>
@@ -989,13 +993,13 @@ export default function WorkerMain() {
 
         {/* 작업 상태 카드 - 큰 화면 상단 */}
         {currentSession && (
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 mb-4">
+          <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 text-white p-6 mb-4 shadow-xl shadow-blue-500/30 rounded-2xl mx-4">
             <div className="text-center space-y-3">
               {getStatusBadge()}
-              <div className="text-5xl font-mono font-bold tracking-wider">
+              <div className="text-5xl font-mono font-bold tracking-wider drop-shadow-lg">
                 {formatElapsedTime(elapsedTime)}
               </div>
-              <div className="text-sm opacity-90">경과 시간</div>
+              <div className="text-sm opacity-90 font-medium">경과 시간</div>
             </div>
           </div>
         )}
@@ -1017,11 +1021,13 @@ export default function WorkerMain() {
         {/* 배정 정보 (차량 + 현장) */}
         {(assignedEquipment || currentDeployment) && (
           <div className="px-4 mb-4">
-            <Card className="bg-blue-50 border-blue-200">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 shadow-md">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Truck className="h-5 w-5 text-blue-700" />
-                  <span className="font-bold text-blue-900">배정 정보</span>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-blue-600 shadow-md">
+                    <Truck className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="font-bold text-blue-900 text-lg">배정 정보</span>
                 </div>
                 <div className="space-y-3">
                   {/* 차량 정보 */}
@@ -1045,10 +1051,12 @@ export default function WorkerMain() {
                   )}
                   {/* 현장 정보 (BP사) */}
                   {currentDeployment?.bpCompany?.name && (
-                    <div className="flex items-center gap-2 pt-2 border-t border-blue-200">
-                      <Building2 className="h-4 w-4 text-blue-600" />
-                      <span className="text-gray-600 text-sm">현장:</span>
-                      <span className="font-medium text-gray-800">{currentDeployment.bpCompany.name}</span>
+                    <div className="flex items-center gap-2 pt-2 border-t border-blue-300">
+                      <div className="p-1.5 rounded-md bg-blue-200">
+                        <Building2 className="h-4 w-4 text-blue-700" />
+                      </div>
+                      <span className="text-gray-600 text-sm font-medium">현장:</span>
+                      <span className="font-semibold text-gray-800">{currentDeployment.bpCompany.name}</span>
                     </div>
                   )}
                 </div>
@@ -1104,22 +1112,26 @@ export default function WorkerMain() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="h-16 text-base border-2 border-yellow-400 hover:bg-yellow-50 active:scale-95 transition-transform"
+                    className="h-16 text-base border-2 border-yellow-400 hover:border-yellow-500 hover:bg-gradient-to-br hover:from-yellow-50 hover:to-yellow-100 active:scale-95 transition-all rounded-xl shadow-sm"
                     onClick={() => startBreakMutation.mutate()}
                     disabled={startBreakMutation.isPending}
                   >
-                    <Coffee className="mr-2 h-5 w-5" />
+                    <div className="mr-2 p-1 rounded-md bg-yellow-100">
+                      <Coffee className="h-5 w-5 text-yellow-700" />
+                    </div>
                     휴식 시작
                   </Button>
 
                   <Button
                     size="lg"
                     variant="outline"
-                    className="h-16 text-base border-2 border-orange-400 hover:bg-orange-50 active:scale-95 transition-transform"
+                    className="h-16 text-base border-2 border-orange-400 hover:border-orange-500 hover:bg-gradient-to-br hover:from-orange-50 hover:to-orange-100 active:scale-95 transition-all rounded-xl shadow-sm"
                     onClick={() => startOvertimeMutation.mutate()}
                     disabled={startOvertimeMutation.isPending}
                   >
-                    <Clock className="mr-2 h-5 w-5" />
+                    <div className="mr-2 p-1 rounded-md bg-orange-100">
+                      <Clock className="h-5 w-5 text-orange-700" />
+                    </div>
                     연장 시작
                   </Button>
                 </div>
@@ -1128,11 +1140,13 @@ export default function WorkerMain() {
               {currentSession.status === "break" && (
                 <Button
                   size="lg"
-                  className="w-full h-16 text-lg font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg active:scale-95 transition-transform"
+                  className="w-full h-16 text-lg font-bold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg shadow-green-500/30 active:scale-95 transition-all rounded-xl"
                   onClick={() => endBreakMutation.mutate()}
                   disabled={endBreakMutation.isPending}
                 >
-                  <Play className="mr-2 h-5 w-5" />
+                  <div className="mr-2 p-1 rounded-md bg-white/20">
+                    <Play className="h-5 w-5" />
+                  </div>
                   휴식 종료
                 </Button>
               )}
@@ -1140,11 +1154,13 @@ export default function WorkerMain() {
               {currentSession.status === "overtime" && (
                 <Button
                   size="lg"
-                  className="w-full h-16 text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg active:scale-95 transition-transform"
+                  className="w-full h-16 text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30 active:scale-95 transition-all rounded-xl"
                   onClick={() => endOvertimeMutation.mutate()}
                   disabled={endOvertimeMutation.isPending}
                 >
-                  <Square className="mr-2 h-5 w-5" />
+                  <div className="mr-2 p-1 rounded-md bg-white/20">
+                    <Square className="h-5 w-5" />
+                  </div>
                   연장 종료
                 </Button>
               )}
@@ -1154,8 +1170,10 @@ export default function WorkerMain() {
 
         {/* 빠른 메뉴 - Grid Layout */}
         <div className="px-4 mt-6 space-y-3">
-          <div className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <Settings className="h-4 w-4 text-gray-500" />
+          <div className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-gray-100">
+              <Settings className="h-4 w-4 text-gray-600" />
+            </div>
             빠른 메뉴
           </div>
 
@@ -1163,7 +1181,7 @@ export default function WorkerMain() {
             {/* 현위치 전송 */}
             <Button
               variant="outline"
-              className="h-24 flex flex-col items-center justify-center gap-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all rounded-xl shadow-sm"
+              className="h-24 flex flex-col items-center justify-center gap-2 border-2 border-gray-200 hover:border-green-400 hover:bg-gradient-to-br hover:from-green-50 hover:to-green-100 transition-all rounded-xl shadow-md hover:shadow-lg active:scale-95"
               onClick={() => {
                 if (!assignedEquipment) {
                   toast.error("배정된 장비가 없습니다.");
@@ -1201,28 +1219,26 @@ export default function WorkerMain() {
               }}
               disabled={!assignedEquipment || isSendingLocation}
             >
-              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-md">
                 {isSendingLocation ? (
-                  <Loader2 className="h-5 w-5 text-green-600 animate-spin" />
+                  <Loader2 className="h-6 w-6 text-white animate-spin" />
                 ) : (
-                  <MapPin className="h-5 w-5 text-green-600" />
+                  <MapPin className="h-6 w-6 text-white" />
                 )}
               </div>
-              <span className="text-sm font-medium text-gray-700">현위치 전송</span>
+              <span className="text-sm font-semibold text-gray-700">현위치 전송</span>
             </Button>
-
-
 
             {/* 생체 인증 설정 */}
             <Button
               variant="outline"
-              className="h-24 flex flex-col items-center justify-center gap-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all rounded-xl shadow-sm"
+              className="h-24 flex flex-col items-center justify-center gap-2 border-2 border-gray-200 hover:border-purple-400 hover:bg-gradient-to-br hover:from-purple-50 hover:to-purple-100 transition-all rounded-xl shadow-md hover:shadow-lg active:scale-95"
               onClick={() => setLocation("/mobile/biometric-setup")}
             >
-              <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                <Fingerprint className="h-5 w-5 text-purple-600" />
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                <Fingerprint className="h-6 w-6 text-white" />
               </div>
-              <span className="text-sm font-medium text-gray-700">생체 인증 설정</span>
+              <span className="text-sm font-semibold text-gray-700">생체 인증 설정</span>
             </Button>
           </div>
         </div>
@@ -1231,23 +1247,25 @@ export default function WorkerMain() {
         {/* 긴급 상황 버튼 - Grid Layout */}
         <div className="px-4 mt-8 mb-8">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-red-600 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
+            <div className="text-sm font-bold text-red-600 flex items-center gap-2">
+              <div className="p-1 rounded-md bg-red-100">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
               긴급 신고 센터
             </div>
-            <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1 rounded-full">즉시 전송됨</span>
+            <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-1 rounded-full font-medium">즉시 전송됨</span>
           </div>
 
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: "사고", icon: AlertTriangle, color: "red", type: "사고", desc: "사고 발생" },
-              { label: "고장", icon: Truck, color: "orange", type: "고장", desc: "장비 고장" },
-              { label: "위험", icon: AlertCircle, color: "yellow", type: "안전위험", desc: "안전 위험" },
-              { label: "기타", icon: Bell, color: "purple", type: "기타", desc: "기타 긴급" },
+              { label: "사고", icon: AlertTriangle, color: "red", bgColor: "bg-red-50", borderColor: "border-red-200", iconBg: "bg-red-500", textColor: "text-red-700", type: "사고", desc: "사고 발생" },
+              { label: "고장", icon: Truck, color: "orange", bgColor: "bg-orange-50", borderColor: "border-orange-200", iconBg: "bg-orange-500", textColor: "text-orange-700", type: "고장", desc: "장비 고장" },
+              { label: "위험", icon: AlertCircle, color: "yellow", bgColor: "bg-yellow-50", borderColor: "border-yellow-200", iconBg: "bg-yellow-500", textColor: "text-yellow-700", type: "안전위험", desc: "안전 위험" },
+              { label: "기타", icon: Bell, color: "purple", bgColor: "bg-purple-50", borderColor: "border-purple-200", iconBg: "bg-purple-500", textColor: "text-purple-700", type: "기타", desc: "기타 긴급" },
             ].map((item) => (
               <button
                 key={item.label}
-                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-${item.color}-100 bg-${item.color}-50 active:scale-95 transition-transform`}
+                className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 ${item.borderColor} ${item.bgColor} hover:shadow-lg active:scale-95 transition-all`}
                 onClick={() => {
                   if (!assignedEquipment) {
                     toast.error("배정된 장비가 없습니다.");
@@ -1260,10 +1278,10 @@ export default function WorkerMain() {
                 }}
                 disabled={!assignedEquipment || sendEmergencyMutation.isPending}
               >
-                <div className={`h-10 w-10 rounded-full bg-white flex items-center justify-center shadow-sm text-${item.color}-600`}>
-                  <item.icon className="h-5 w-5" />
+                <div className={`h-12 w-12 rounded-full ${item.iconBg} flex items-center justify-center shadow-md`}>
+                  <item.icon className="h-6 w-6 text-white" />
                 </div>
-                <span className={`text-xs font-medium text-${item.color}-700`}>{item.label}</span>
+                <span className={`text-xs font-bold ${item.textColor}`}>{item.label}</span>
               </button>
             ))}
           </div>

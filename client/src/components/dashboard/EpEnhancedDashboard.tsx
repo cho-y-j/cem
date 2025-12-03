@@ -111,15 +111,22 @@ function BigStatCard({
   color?: string;
 }) {
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className="hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-l-4" style={{ borderLeftColor: color }}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <Icon className="h-5 w-5" style={{ color }} />
+          <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}15` }}>
+            <Icon className="h-5 w-5" style={{ color }} />
+          </div>
           {label}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-5xl font-bold mb-4" style={{ color }}>
+        <div className="text-5xl font-bold mb-4 bg-gradient-to-br" style={{ 
+          background: `linear-gradient(135deg, ${color}, ${color}dd)`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text'
+        }}>
           {value}
         </div>
         {subItems && subItems.length > 0 && (
@@ -162,18 +169,26 @@ function MiniStatCard({
 
   return (
     <Card
-      className={`hover:shadow-md transition-all ${onClick ? 'cursor-pointer' : ''}`}
+      className={`hover:shadow-lg hover:scale-[1.02] transition-all duration-300 border-l-4 ${onClick ? 'cursor-pointer' : ''}`}
+      style={{ borderLeftColor: statusColors[status] }}
       onClick={onClick}
     >
       <CardContent className="pt-6">
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-muted-foreground mb-1">{label}</p>
-            <p className="text-3xl font-bold" style={{ color: statusColors[status] }}>
+            <p className="text-sm font-medium text-muted-foreground mb-2">{label}</p>
+            <p className="text-3xl font-bold bg-gradient-to-br" style={{ 
+              background: `linear-gradient(135deg, ${statusColors[status]}, ${statusColors[status]}dd)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
               {value}
             </p>
           </div>
-          <Icon className="h-10 w-10 opacity-20" style={{ color: statusColors[status] }} />
+          <div className="p-3 rounded-lg" style={{ backgroundColor: `${statusColors[status]}15` }}>
+            <Icon className="h-8 w-8" style={{ color: statusColors[status] }} />
+          </div>
         </div>
       </CardContent>
     </Card>

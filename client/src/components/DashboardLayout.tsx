@@ -265,7 +265,7 @@ function DashboardLayoutContent({
           </SidebarHeader>
 
           <SidebarContent className="gap-0">
-            <SidebarMenu className="px-2 py-1">
+            <SidebarMenu className="px-2 py-2 space-y-1">
               {menuItems
                 .filter(item => {
                   // roles가 undefined면 모든 사용자에게 표시
@@ -282,12 +282,16 @@ function DashboardLayoutContent({
                         isActive={isActive}
                         onClick={() => handleMenuClick(item.path)}
                         tooltip={item.label}
-                        className={`h-10 transition-all font-normal`}
+                        className={`h-11 transition-all duration-200 font-medium rounded-lg ${
+                          isActive 
+                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/30" 
+                            : "hover:bg-accent/80 hover:shadow-sm"
+                        }`}
                       >
                         <item.icon
-                          className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
+                          className={`h-5 w-5 transition-transform ${isActive ? "text-white scale-110" : "text-muted-foreground group-hover:text-foreground"}`}
                         />
-                        <span>{item.label}</span>
+                        <span className={isActive ? "text-white font-semibold" : ""}>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -299,8 +303,8 @@ function DashboardLayoutContent({
                 item.roles.includes(userRole)
               );
               return visibleAdminItems.length > 0 && (
-                <SidebarMenu className="px-2 py-1 mt-4">
-                  <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">관리자</div>
+                <SidebarMenu className="px-2 py-2 mt-6 space-y-1">
+                  <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">관리자</div>
                   {visibleAdminItems.map(item => {
                     const isActive = location === item.path;
                     return (
@@ -309,12 +313,16 @@ function DashboardLayoutContent({
                           isActive={isActive}
                           onClick={() => handleMenuClick(item.path)}
                           tooltip={item.label}
-                          className={`h-10 transition-all font-normal`}
+                          className={`h-11 transition-all duration-200 font-medium rounded-lg ${
+                            isActive 
+                              ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-md shadow-purple-500/30" 
+                              : "hover:bg-accent/80 hover:shadow-sm"
+                          }`}
                         >
                           <item.icon
-                            className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
+                            className={`h-5 w-5 transition-transform ${isActive ? "text-white scale-110" : "text-muted-foreground group-hover:text-foreground"}`}
                           />
-                          <span>{item.label}</span>
+                          <span className={isActive ? "text-white font-semibold" : ""}>{item.label}</span>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );

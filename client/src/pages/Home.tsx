@@ -31,47 +31,55 @@ function DefaultDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-l-4 border-l-blue-500 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">전체 장비</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 rounded-lg bg-blue-50">
+              <Truck className="h-5 w-5 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{equipmentList?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">등록된 장비 수</p>
+            <div className="text-3xl font-bold bg-gradient-to-br from-blue-600 to-blue-700 bg-clip-text text-transparent">{equipmentList?.length || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">등록된 장비 수</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-green-500 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">전체 인력</CardTitle>
-            <HardHat className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 rounded-lg bg-green-50">
+              <HardHat className="h-5 w-5 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{workersList?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">등록된 인력 수</p>
+            <div className="text-3xl font-bold bg-gradient-to-br from-green-600 to-green-700 bg-clip-text text-transparent">{workersList?.length || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">등록된 인력 수</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-orange-500 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">만료 예정 서류</CardTitle>
-            <AlertCircle className="h-4 w-4 text-orange-500" />
+            <div className="p-2 rounded-lg bg-orange-50">
+              <AlertCircle className="h-5 w-5 text-orange-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{expiringDocs?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">30일 이내 만료</p>
+            <div className="text-3xl font-bold bg-gradient-to-br from-orange-600 to-orange-700 bg-clip-text text-transparent">{expiringDocs?.length || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">30일 이내 만료</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-purple-500 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">대기 중 작업확인서</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 rounded-lg bg-purple-50">
+              <Clock className="h-5 w-5 text-purple-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pendingWorkJournals.length}</div>
-            <p className="text-xs text-muted-foreground">승인 대기 중</p>
+            <div className="text-3xl font-bold bg-gradient-to-br from-purple-600 to-purple-700 bg-clip-text text-transparent">{pendingWorkJournals.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">승인 대기 중</p>
           </CardContent>
         </Card>
       </div>

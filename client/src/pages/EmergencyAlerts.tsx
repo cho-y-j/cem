@@ -491,12 +491,13 @@ export default function EmergencyAlerts() {
                         <Button
                           variant="default"
                           size="sm"
+                          className="text-xs md:text-sm px-2 md:px-3 h-8 md:h-9 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedAlert(alert);
                           }}
                         >
-                          해결 처리
+                          처리
                         </Button>
                       )}
                     </div>
@@ -562,7 +563,7 @@ export default function EmergencyAlerts() {
                   처리 중...
                 </>
               ) : (
-                "해결 완료"
+                "처리 완료"
               )}
             </Button>
           </DialogFooter>

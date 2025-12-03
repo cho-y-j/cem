@@ -17,7 +17,7 @@ export default function MobileBottomNav({ items }: MobileBottomNavProps) {
   const [location, setLocation] = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg safe-area-inset-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg safe-area-nav-bottom">
       <div className="flex items-center justify-around px-2 py-2">
         {items.map((item) => {
           const Icon = item.icon;

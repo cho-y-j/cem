@@ -69,7 +69,8 @@
       "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
       "Bash(cmd //c \"gradlew.bat clean assembleDebug\")",
       "Bash(./gradlew assembleDebug:*)",
-      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" PATH=\"/c/Program Files/Android/Android Studio/jbr/bin:$PATH\" cd:*)"
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" PATH=\"/c/Program Files/Android/Android Studio/jbr/bin:$PATH\" cd:*)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []

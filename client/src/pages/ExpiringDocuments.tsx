@@ -208,8 +208,8 @@ export default function ExpiringDocuments() {
       {/* 필터 */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
+          <div className="flex flex-col md:flex-row md:flex-wrap gap-4">
+            <div className="w-full md:flex-1 md:min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input

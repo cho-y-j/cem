@@ -442,9 +442,9 @@ export default function Equipment() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* 필터 UI - 한 줄 통일 디자인 */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[200px]">
+          {/* 필터 UI - 모바일 최적화 */}
+          <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
+            <div className="w-full md:flex-1 md:min-w-[200px]">
               <Label className="text-sm font-medium mb-1.5 block">검색</Label>
               <Input
                 id="equipment-search"
@@ -456,7 +456,7 @@ export default function Equipment() {
             </div>
 
             {(role === "admin" || role === "bp" || role === "ep") && (
-              <div className="flex-1 min-w-[200px]">
+              <div className="w-full md:flex-1 md:min-w-[200px]">
                 <Label className="text-sm font-medium mb-1.5 block">Owner 회사</Label>
                 <Select
                   value={ownerCompanyFilter || "all"}
@@ -478,7 +478,7 @@ export default function Equipment() {
             )}
 
             {(role === "admin" || role === "ep" || role === "owner") && (
-              <div className="flex-1 min-w-[200px]">
+              <div className="w-full md:flex-1 md:min-w-[200px]">
                 <Label className="text-sm font-medium mb-1.5 block">BP 회사</Label>
                 <Select
                   value={bpCompanyFilter || "all"}
@@ -500,7 +500,7 @@ export default function Equipment() {
             )}
 
             {role === "admin" && (
-              <div className="flex-1 min-w-[200px]">
+              <div className="w-full md:flex-1 md:min-w-[200px]">
                 <Label className="text-sm font-medium mb-1.5 block">EP 회사</Label>
                 <Select
                   value={epCompanyFilter || "all"}

@@ -188,6 +188,16 @@
       padding-bottom: env(safe-area-inset-bottom);
     }
 
+    /* 하단 네비게이션용 강화된 safe area */
+    .safe-area-nav-bottom {
+      padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+    }
+
+    /* 메인 컨텐츠용 safe area - 하단 네비게이션 높이 + 시스템 UI 고려 */
+    .safe-area-content-bottom {
+      padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+    }
+
     /* 터치 최적화 */
     button, a, [role="button"] {
       touch-action: manipulation;

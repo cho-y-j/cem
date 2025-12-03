@@ -513,9 +513,9 @@ export default function EntryRequestsNew() {
           <CardDescription>등록된 반입,출입 요청을 확인하고 관리합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* 필터 UI - 한 줄 통일 디자인 */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[200px]">
+          {/* 필터 UI - 모바일 최적화 */}
+          <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
+            <div className="w-full md:flex-1 md:min-w-[200px]">
               <Label className="text-sm font-medium mb-1.5 block">상태</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-9">
@@ -532,7 +532,7 @@ export default function EntryRequestsNew() {
               </Select>
             </div>
 
-            <div className="flex-1 min-w-[200px]">
+            <div className="w-full md:flex-1 md:min-w-[200px]">
               <Label className="text-sm font-medium mb-1.5 block">협력업체</Label>
               <Select value={bpCompanyFilter} onValueChange={setBpCompanyFilter}>
                 <SelectTrigger className="h-9">
