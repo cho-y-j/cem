@@ -54,8 +54,6 @@ import WorkMonitoring from "./pages/WorkMonitoring";
 import Login from "./pages/Login";
 import MyProfile from "./pages/MyProfile";
 import MobileMyProfile from "./pages/mobile/MyProfile";
-import MobileLoginNew from "./pages/mobile/LoginNew";
-import MobileLoginCompare from "./pages/mobile/LoginCompare";
 import BiometricSetup from "./pages/mobile/BiometricSetup";
 import WorkZones from "./pages/WorkZones";
 import CheckInMonitoring from "./pages/CheckInMonitoring";
@@ -70,8 +68,6 @@ function Router() {
       {/* 로그인 페이지 (레이아웃 없음) */}
       <Route path="/login" component={Login} />
       <Route path="/mobile/login" component={PinLogin} />
-      <Route path="/mobile/login-new" component={MobileLoginNew} />
-      <Route path="/mobile/login-compare" component={MobileLoginCompare} />
       <Route path="/mobile/inspector/login" component={InspectorLogin} />
 
       {/* 모바일 전용 페이지 (레이아웃 없음 - MobileLayout 사용) */}

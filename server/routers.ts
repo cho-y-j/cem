@@ -10,7 +10,6 @@ import * as db from "./db";
 import { sendEntryRequestNotification, sendWorkJournalNotification } from "./_core/email";
 import { sendEmergencyNotification, saveLocationTracking, EmergencyReport, LocationTracking } from "./_core/emergency";
 import { storagePut } from "./storage";
-import { entryRequestsRouter } from "./entry-request-router-new";
 import { entryRequestsRouterV2 } from "./entry-request-router-v2";
 import { mobileRouter } from "./mobile-router";
 import { authPinRouter } from "./auth-pin-router";
@@ -1449,9 +1448,6 @@ export const appRouter = router({
 
   // 기존 entryRequests도 V2로 연결 (하위 호환성)
   entryRequests: entryRequestsRouterV2,
-
-  // 기존 버전 (백업)
-  entryRequestsOldV1: entryRequestsRouter,
 
   // 모바일 앱 API
   mobile: mobileRouter,

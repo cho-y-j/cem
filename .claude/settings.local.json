@@ -70,7 +70,13 @@
       "Bash(cmd //c \"gradlew.bat clean assembleDebug\")",
       "Bash(./gradlew assembleDebug:*)",
       "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" PATH=\"/c/Program Files/Android/Android Studio/jbr/bin:$PATH\" cd:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "WebFetch(domain:apis.data.go.kr)",
+      "WebFetch(domain:openapi.q-net.or.kr)",
+      "WebSearch",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []
