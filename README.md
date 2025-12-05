@@ -174,10 +174,87 @@ FIREBASE_CLIENT_EMAIL=xxx
 FIREBASE_PRIVATE_KEY=xxx
 ```
 
+## Android 앱 빌드
+
+### 사전 요구사항
+- Android Studio (Arctic Fox 이상)
+- Java JDK 17+
+- Android SDK 34+
+
+### 빌드 방법
+
+```bash
+# 1. 웹 빌드
+pnpm build
+
+# 2. Capacitor 동기화
+npx cap sync android
+
+# 3. Android Studio에서 열기
+npx cap open android
+```
+
+### Android Studio에서 빌드
+1. `android/` 폴더를 Android Studio에서 열기
+2. Gradle Sync 완료 대기
+3. Build > Build Bundle(s) / APK(s) > Build APK(s)
+4. APK 경로: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+### 주요 네이티브 기능
+
+| 기능 | 플러그인 | 설명 |
+|------|----------|------|
+| 푸시 알림 | @capacitor/push-notifications | Firebase FCM |
+| NFC | @capgo/capacitor-nfc | 장비 태그 스캔 |
+| 생체 인증 | capacitor-native-biometric | 지문/Face ID |
+| 위치 | Capacitor Geolocation | GPS 출퇴근 |
+
+### Firebase 설정
+1. Firebase Console에서 프로젝트 생성
+2. Android 앱 추가 (패키지명: `com.cem.app`)
+3. `google-services.json` 다운로드
+4. `android/app/` 폴더에 배치
+
+### 환경 설정 파일
+```
+android/
+├── app/
+│   ├── google-services.json    # Firebase 설정
+│   ├── build.gradle            # 앱 빌드 설정
+│   └── src/main/
+│       ├── AndroidManifest.xml # 권한 설정
+│       └── res/                # 리소스
+├── build.gradle                # 프로젝트 설정
+├── gradle.properties           # Gradle 속성
+└── variables.gradle            # SDK 버전 설정
+```
+
+### 권한 (AndroidManifest.xml)
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.NFC" />
+<uses-permission android:name="android.permission.USE_BIOMETRIC" />
+<uses-permission android:name="android.permission.CAMERA" />
+```
+
+## iOS 앱 빌드 (예정)
+
+```bash
+# Capacitor iOS 추가
+npx cap add ios
+
+# Xcode에서 열기
+npx cap open ios
+```
+
+> iOS 빌드는 macOS 환경에서만 가능합니다.
+
 ## 라이선스
 
 MIT License
 
 ---
 
-**Made with React + tRPC + Supabase**
+**Made with React + tRPC + Supabase + Capacitor**
