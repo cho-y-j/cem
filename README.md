@@ -1,6 +1,8 @@
-# 건설현장 장비·인력 통합관리 시스템
+# CEM - 건설현장 장비·인력 통합관리 시스템
 
 건설 현장에서 운영되는 다양한 임대 장비와 관련 인력을 효율적으로 관리하기 위한 통합 플랫폼입니다.
+
+> **최종 업데이트**: 2025-12-05
 
 ## 주요 기능
 
@@ -8,72 +10,81 @@
 
 시스템은 6가지 사용자 역할을 지원합니다:
 
-- **관리자 (admin)**: 시스템 전체 설정 및 마스터 데이터 관리
-- **장비 임대사업자 (owner)**: 장비/인력 등록 및 서류 관리
-- **협력사 (bp)**: 서류 승인 및 작업 확인서 검토
-- **운영사 (ep)**: 최종 반입 승인 및 전체 현황 모니터링
-- **운전자 (worker)**: 작업 확인서 제출 및 근태 관리
-- **안전점검원 (inspector)**: 안전점검 수행 및 결과 기록
+| 역할 | 설명 | 접근 방식 |
+|------|------|-----------|
+| **관리자 (admin)** | 시스템 전체 설정 및 마스터 데이터 관리 | 웹 (데스크톱) |
+| **장비 임대사업자 (owner)** | 장비/인력 등록 및 서류 관리 | 웹 (데스크톱) |
+| **협력사 (bp)** | 반입요청 승인 및 작업 확인서 검토 | 웹 (데스크톱) |
+| **운영사 (ep)** | 최종 반입 승인 및 전체 현황 모니터링 | 웹 (데스크톱) |
+| **운전자 (worker)** | 작업 확인서 제출 및 근태 관리 | 모바일 앱 (PIN 로그인) |
+| **안전점검원 (inspector)** | 안전점검 수행 및 결과 기록 | 모바일 앱 |
 
-### 2. 유연한 마스터 데이터 관리
+### 2. 반입요청 워크플로우
 
-- **장비 종류 관리**: 크레인, 펌프카, 굴삭기 등 다양한 장비 종류 정의
-- **인력 유형 관리**: 크레인 운전자, 용접공 등 인력 유형 정의
-- **필수 서류 정의**: 장비/인력 유형별 필수 서류 및 만료일 설정
-- **안전점검표 템플릿**: JSON 기반 동적 점검표 양식 생성
+3단계 승인 프로세스:
+```
+[Owner] 반입요청 생성 → [BP] 검토/승인 → [EP] 최종 승인 → 투입 관리
+```
 
-### 3. 서류 만료일 추적
+### 3. 서류 관리 및 인증
 
-- 서류별 만료일 자동 추적
-- 만료 예정 서류 대시보드 (30일, 7일, 당일 알림)
-- 만료 현황 실시간 모니터링
+- **운전면허 자동 검증**: RIMS API 연동 (한국도로교통공단)
+- **OCR 자동 추출**: Google Vision API 활용
+- **만료일 추적**: 30일, 7일, 당일 알림
+- **서류 유형별 관리**: 장비/인력 유형에 따른 필수 서류 정의
 
-### 4. 안전점검 관리
+### 4. 모바일 기능
 
-- 장비 종류별 맞춤형 안전점검표
+- **PIN 로그인**: 운전자용 4자리 PIN 인증
+- **생체 인증**: WebAuthn (지문/Face ID) 지원
+- **GPS 출퇴근**: 위치 기반 체크인/체크아웃
+- **NFC 태그**: 장비별 NFC 태그 스캔
+
+### 5. 안전점검 관리
+
+- 장비 종류별 맞춤형 안전점검표 (JSON 기반)
 - 모바일 친화적 점검 인터페이스
-- 점검 결과 JSON 저장 및 이력 관리
+- 운전자 일일 점검 시스템
+- 점검 이력 관리 및 통계
 
-### 5. 작업 확인서 관리
+### 6. 실시간 모니터링
 
-- 운전자 작업 확인서 제출
-- 협력사 승인/반려 워크플로우
-- 정산 연동 준비
+- 긴급 알림 시스템
+- 위치 추적 대시보드
+- 체크인 현황 모니터링
 
 ## 기술 스택
 
 ### 프론트엔드
-
-- **React 19**: 최신 React 기능 활용
-- **Vite**: 빠른 개발 서버 및 빌드
-- **Tailwind CSS 4**: 유틸리티 우선 CSS 프레임워크
-- **shadcn/ui**: 고품질 UI 컴포넌트
-- **Wouter**: 경량 라우팅 라이브러리
+- **React 19** + **Vite 7**
+- **Tailwind CSS 4** + **shadcn/ui**
+- **Wouter** (라우팅)
+- **TanStack Query** (서버 상태 관리)
 
 ### 백엔드
+- **Express 4** + **tRPC 11**
+- **Drizzle ORM** + **PostgreSQL** (Supabase)
 
-- **Express 4**: Node.js 웹 프레임워크
-- **tRPC 11**: 타입 안전 API
-- **Drizzle ORM**: TypeScript ORM
-- **MySQL/TiDB**: 관계형 데이터베이스 (또는 Supabase PostgreSQL)
+### 모바일
+- **Capacitor 7** (Android/iOS)
+- **Firebase Cloud Messaging** (푸시 알림)
 
-### 인증 및 스토리지
-
-- **Manus OAuth**: 통합 인증 시스템
-- **S3 호환 스토리지**: 파일 업로드 및 관리
+### 외부 API
+- **RIMS API**: 운전면허 진위 확인
+- **Google Vision API**: OCR
+- **Google Maps API**: 위치 서비스
 
 ### 배포
-
-- **Vercel**: 프론트엔드 및 백엔드 서버리스 배포
-- **Supabase**: PostgreSQL 데이터베이스 (선택사항)
+- **Vercel**: 프론트엔드 + 서버리스 백엔드
+- **Supabase**: PostgreSQL + Storage
 
 ## 시작하기
 
 ### 사전 요구사항
 
-- Node.js 18 이상
-- pnpm 8 이상
-- MySQL 8 이상 또는 Supabase 계정
+- Node.js 20+
+- pnpm 10+
+- Supabase 계정
 
 ### 설치
 
@@ -81,146 +92,92 @@
 # 의존성 설치
 pnpm install
 
-# 환경 변수 설정
-cp .env.example .env
-# .env 파일 편집하여 DATABASE_URL 등 설정
-
-# 데이터베이스 마이그레이션
-pnpm db:push
+# 환경 변수 설정 (.env 파일 생성)
+DATABASE_URL=postgresql://...
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=xxx
+JWT_SECRET=xxx
 
 # 개발 서버 실행
 pnpm dev
 ```
 
-개발 서버는 `http://localhost:3000`에서 실행됩니다.
+개발 서버: `http://localhost:3000`
+
+### 주요 명령어
+
+```bash
+pnpm dev          # 개발 서버 실행
+pnpm build        # 프로덕션 빌드
+pnpm check        # TypeScript 타입 체크
+pnpm db:push      # DB 마이그레이션
+```
 
 ## 프로젝트 구조
 
 ```
-construction-equipment-management/
-├── client/                 # 프론트엔드 소스
-│   ├── src/
-│   │   ├── pages/         # 페이지 컴포넌트
-│   │   ├── components/    # 재사용 가능한 UI 컴포넌트
-│   │   ├── lib/           # 유틸리티 및 tRPC 클라이언트
-│   │   └── App.tsx        # 라우팅 설정
-├── server/                # 백엔드 소스
-│   ├── routers.ts         # tRPC 라우터 정의
-│   ├── db.ts              # 데이터베이스 헬퍼 함수
-│   └── _core/             # 프레임워크 코어 (수정 금지)
-├── drizzle/               # 데이터베이스 스키마 및 마이그레이션
-│   └── schema.ts          # Drizzle ORM 스키마
-├── shared/                # 프론트엔드/백엔드 공유 코드
-└── storage/               # S3 스토리지 헬퍼
+cem/
+├── client/                    # React 프론트엔드
+│   └── src/
+│       ├── pages/            # 페이지 컴포넌트 (63개)
+│       │   ├── mobile/       # 모바일 전용 (31개)
+│       │   └── admin/        # 관리자 전용 (12개)
+│       ├── components/       # 재사용 컴포넌트 (83개)
+│       └── hooks/            # 커스텀 훅
+├── server/                    # Express + tRPC 백엔드
+│   ├── routers.ts            # 메인 라우터
+│   ├── *-router.ts           # 기능별 라우터 (18개)
+│   ├── db.ts                 # DB 헬퍼 함수
+│   └── _core/                # 프레임워크 코어
+├── drizzle/                   # Drizzle ORM
+│   ├── schema.ts             # DB 스키마
+│   └── migrations-pg/        # 마이그레이션 (22개)
+├── android/                   # Capacitor Android
+├── docs/                      # 문서
+│   └── archive/              # 아카이브 문서
+├── scripts/                   # 개발 스크립트
+│   ├── dev-utils/            # JS/MJS 유틸리티
+│   └── sql/                  # SQL 스크립트
+└── CLAUDE.md                  # AI 개발 가이드
 ```
 
-## 개발 워크플로우
+## 접속 정보
 
-### 1. 데이터베이스 스키마 변경
+### 데스크톱 (웹)
+- URL: `https://your-domain.vercel.app/login`
+- 역할: admin, owner, bp, ep
 
-```bash
-# drizzle/schema.ts 파일 수정
-# 마이그레이션 생성 및 적용
-pnpm db:push
-```
-
-### 2. API 추가
-
-1. `server/db.ts`에 데이터베이스 헬퍼 함수 추가
-2. `server/routers.ts`에 tRPC 프로시저 추가
-3. 프론트엔드에서 `trpc.*.useQuery/useMutation` 사용
-
-### 3. 페이지 추가
-
-1. `client/src/pages/` 디렉토리에 페이지 컴포넌트 생성
-2. `client/src/App.tsx`에 라우트 추가
-3. `client/src/components/DashboardLayout.tsx`에 메뉴 항목 추가 (선택사항)
-
-## 배포
-
-자세한 배포 가이드는 [DEPLOYMENT.md](./DEPLOYMENT.md)를 참조하세요.
-
-### 간단 배포 (Vercel)
-
-```bash
-# Vercel CLI 설치
-npm i -g vercel
-
-# 배포
-vercel
-
-# 프로덕션 배포
-vercel --prod
-```
+### 모바일
+- URL: `https://your-domain.vercel.app/mobile/login`
+- 역할: worker (PIN 로그인)
+- Inspector: `/mobile/inspector/login`
 
 ## 환경 변수
 
-필수 환경 변수:
-
 ```env
-DATABASE_URL=mysql://user:password@host:port/database
-JWT_SECRET=your_jwt_secret_key
-VITE_APP_ID=your_app_id
-OAUTH_SERVER_URL=https://api.manus.im
-VITE_OAUTH_PORTAL_URL=https://portal.manus.im
+# 필수
+DATABASE_URL=postgresql://...
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
+JWT_SECRET=xxx
+
+# 외부 API
+RIMS_AUTH_KEY=xxx              # 운전면허 검증
+RIMS_SECRET_KEY=xxx
+GOOGLE_CLOUD_VISION_KEY=xxx    # OCR
+VITE_GOOGLE_MAPS_API_KEY=xxx   # 지도
+
+# Firebase (모바일 푸시)
+FIREBASE_PROJECT_ID=xxx
+FIREBASE_CLIENT_EMAIL=xxx
+FIREBASE_PRIVATE_KEY=xxx
 ```
-
-선택적 환경 변수:
-
-```env
-VITE_APP_TITLE=건설현장 장비·인력 통합관리 시스템
-VITE_APP_LOGO=https://example.com/logo.png
-```
-
-## 데이터베이스 스키마
-
-주요 테이블:
-
-- `users`: 사용자 및 권한
-- `equip_types`: 장비 종류
-- `worker_types`: 인력 유형
-- `type_docs`: 장비별 필수 서류
-- `worker_docs`: 인력별 필수 서류
-- `checklist_forms`: 안전점검표 템플릿
-- `equipment`: 등록된 장비
-- `workers`: 등록된 인력
-- `docs_compliance`: 업로드된 서류
-- `check_records`: 안전점검 기록
-- `work_journal`: 작업 확인서
-
-## API 문서
-
-tRPC를 사용하여 타입 안전 API를 제공합니다. 주요 라우터:
-
-- `auth`: 인증 관련
-- `users`: 사용자 관리 (관리자 전용)
-- `equipTypes`: 장비 종류 관리
-- `workerTypes`: 인력 유형 관리
-- `equipment`: 장비 관리
-- `workers`: 인력 관리
-- `docsCompliance`: 서류 관리
-- `checkRecords`: 안전점검 기록
-- `workJournal`: 작업 확인서
-
-## 보안
-
-- 모든 API는 인증 필요 (`protectedProcedure`)
-- 역할 기반 접근 제어 (RBAC)
-- JWT 기반 세션 관리
-- HTTPS 사용 (Vercel 자동 제공)
-- 환경 변수로 비밀 정보 관리
 
 ## 라이선스
 
 MIT License
 
-## 지원
-
-문의사항이 있으시면 다음으로 연락주세요:
-- GitHub Issues
-- 이메일: support@example.com
-
 ---
 
-**Made with ❤️ for Construction Industry**
-
+**Made with React + tRPC + Supabase**
