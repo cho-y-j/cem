@@ -53,9 +53,12 @@ export default function AdminWorkerTypes() {
   });
 
   const deleteMutation = trpc.workerTypes.delete.useMutation({
-    onSuccess: () => { 
-      toast.success("인력 유형이 삭제되었습니다."); 
-      utils.workerTypes.list.invalidate(); 
+    onSuccess: () => {
+      toast.success("인력 유형이 삭제되었습니다.");
+      utils.workerTypes.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "인력 유형 삭제에 실패했습니다.");
     },
   });
 

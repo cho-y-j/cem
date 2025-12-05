@@ -431,8 +431,31 @@ export async function updateWorkerType(id: string, data: Partial<InsertWorkerTyp
 
 export async function deleteWorkerType(id: string) {
   const supabase = getSupabase();
-  if (!supabase) return;
+  if (!supabase) throw new Error("Supabase not available");
 
+  // 먼저 해당 worker_type을 사용하는 workers가 있는지 확인
+  const { data: workers } = await supabase
+    .from('workers')
+    .select('id')
+    .eq('worker_type_id', id)
+    .limit(1);
+
+  if (workers && workers.length > 0) {
+    throw new Error("해당 인력 유형을 사용 중인 인력이 있어 삭제할 수 없습니다.");
+  }
+
+  // 관련 worker_docs 먼저 삭제 (FK 제약조건)
+  const { error: docsError } = await supabase
+    .from('worker_docs')
+    .delete()
+    .eq('worker_type_id', id);
+
+  if (docsError) {
+    console.error("[Database] Error deleting worker docs:", docsError);
+    throw new Error("필수 서류 삭제 중 오류가 발생했습니다.");
+  }
+
+  // worker_type 삭제
   const { error } = await supabase
     .from('worker_types')
     .delete()
@@ -440,6 +463,7 @@ export async function deleteWorkerType(id: string) {
 
   if (error) {
     console.error("[Database] Error deleting worker type:", error);
+    throw new Error("인력 유형 삭제 중 오류가 발생했습니다: " + error.message);
   }
 }
 
